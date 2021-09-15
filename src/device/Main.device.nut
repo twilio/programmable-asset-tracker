@@ -23,3 +23,4 @@ Logger.setLogLevel(LGR_LOG_LEVEL.DEBUG);
 
 // Run the application
 app <- Application();
+
