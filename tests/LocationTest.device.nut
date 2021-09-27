@@ -4,6 +4,7 @@
 #require "ConnectionManager.lib.nut:3.1.1"
 #require "Messenger.lib.nut:0.2.0"
 #require "ReplayMessenger.device.lib.nut:0.2.0"
+#require "utilities.lib.nut:2.0.0"
 
 @include once "../src/shared/Constants.shared.nut"
 @include once "../src/shared/Logger.shared.nut"
@@ -21,6 +22,9 @@
 //   - tries to obtain location using BLE beacons
 //   - logs the obtained locations
 
+// Period to repeat location obtaining, in seconds
+const TEST_GET_LOCATION_PERIOD = 60;
+
 // Replay Messenger configuration constants:
 // Allocation for the used SPI Flash Logger
 const HW_RM_SFL_START_ADDR = 0x000000;
@@ -31,42 +35,54 @@ const APP_RM_MSG_SENDING_MAX_RATE = 5;
 // The maximum number of messages to queue at any given time when replaying
 const APP_RM_MSG_RESEND_LIMIT = 5;
 
-    /**
-     * Create and intialize Replay Messenger
-     *
-     * @return {Promise} that:
-     * - resolves if the operation succeeded
-     * - rejects with if the operation failed
-     */
-    function initReplayMessenger() {
-        // Configure and intialize SPI Flash Logger
-        local sfLogger = SPIFlashLogger(HW_RM_SFL_START_ADDR, HW_RM_SFL_END_ADDR);
+// Connection Manager connection timeout, in seconds
+const APP_CM_CONNECT_TIMEOUT = 300;
 
-        // Configure and create Replay Messenger.
-        // Customized Replay Messenger is used.
-        local rmConfig = {
-            "debug"      : false,
-            "maxRate"    : APP_RM_MSG_SENDING_MAX_RATE,
-            "resendLimit": APP_RM_MSG_RESEND_LIMIT
-        };
-        rm = CustomReplayMessenger(sfLogger, rmConfig);
+/**
+ * Create and intialize Replay Messenger
+ *
+ * @return {Promise} that:
+ * - resolves if the operation succeeded
+ * - rejects with if the operation failed
+ */
+function initReplayMessenger() {
+    // Configure and intialize SPI Flash Logger
+    local sfLogger = SPIFlashLogger(HW_RM_SFL_START_ADDR, HW_RM_SFL_END_ADDR);
 
-        // Initialize Replay Messenger
-        return Promise(function(resolve, reject) {
-            rm.init(resolve);
-        }.bindenv(this));
-    }
+    // Configure and create Replay Messenger.
+    // Customized Replay Messenger is used.
+    local rmConfig = {
+        "debug"      : false,
+        "maxRate"    : APP_RM_MSG_SENDING_MAX_RATE,
+        "resendLimit": APP_RM_MSG_RESEND_LIMIT
+    };
+    rm = CustomReplayMessenger(sfLogger, rmConfig);
 
-function getLocation() {
+    // Initialize Replay Messenger
+    return Promise(function(resolve, reject) {
+        rm.init(resolve);
+    }.bindenv(this));
+}
 
-  // Obtain and log GNSS location
-  // Use LocationMonitor private method _getLocationGNSS()
+/**
+ * Obtains location
+ */
+ function getLocation() {
 
-  // Obtain and log cellular location
-  // Use LocationMonitor private method _getLocationCellTowers()
+    // Obtain and log location by cell info
+    // Use LocationMonitor private method _getLocationCellTowers()
+    lm._getLocationCellTowers();
 
-  // Periodically repeat
+    // Obtain and log location by GNSS
+    // Use LocationMonitor private method _getLocationGNSS()
+    lm._getLocationGNSS();
 
+    // Obtain and log location by WiFi info - TBD
+
+    // Obtain and log location by BLE beacons - TBD
+
+    // Periodically repeat
+    imp.wakeup(TEST_GET_LOCATION_PERIOD, getLocation);
 }
 
 // ---------------------------- THE MAIN CODE ---------------------------- //
@@ -78,13 +94,13 @@ cm <- null;
 rm <- null;
 
 // Location Monitor, obtains the current location
-rm <- null;
+lm <- null;
 
 // Create and intialize Connection Manager
 // NOTE: This needs to be called as early in the code as possible
 // in order to run the application without a connection to the Internet
 // (it sets the appropriate send timeout policy)
-cmConfig = {
+cmConfig <- {
         "stayConnected"   : true,
         "errorPolicy"     : RETURN_ON_ERROR_NO_DISCONNECT,
         "connectTimeout"  : APP_CM_CONNECT_TIMEOUT
