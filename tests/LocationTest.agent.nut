@@ -48,7 +48,7 @@ Logger.setLogLevel(LGR_LOG_LEVEL.DEBUG);
 ::info("Location test started");
 
 // Initialize library for communication with Imp-Device
-_msngr = Messenger();
-_msngr.on(APP_RM_MSG_NAME.GNSS_ASSIST, _onGnssAssist.bindenv(this));
-_msngr.on(APP_RM_MSG_NAME.LOCATION_CELL, _onLocationCell.bindenv(this));
+msngr <- Messenger();
+msngr.on(APP_RM_MSG_NAME.GNSS_ASSIST, _onGnssAssist.bindenv(this));
+msngr.on(APP_RM_MSG_NAME.LOCATION_CELL, _onLocationCell.bindenv(this));
 
