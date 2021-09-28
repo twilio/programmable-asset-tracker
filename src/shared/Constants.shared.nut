@@ -2,6 +2,7 @@
 
 // ReplayMessenger message names
 enum APP_RM_MSG_NAME {
+    DATA = "data",
     GNSS_ASSIST = "gnssAssist",
     LOCATION_CELL = "locationCell"
 }
