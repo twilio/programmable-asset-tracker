@@ -70,12 +70,20 @@ function initReplayMessenger() {
  function getLocation() {
 
     // Obtain and log location by cell info
-    // Use LocationMonitor private method _getLocationCellTowers()
-    lm._getLocationCellTowers();
+    lm._getLocationCellTowers().then(function(loc){
+        ::info("Location cell tower:");
+        foreach (key, value in loc) {
+            ::info(key + ":" + value);
+        };
+    });
 
     // Obtain and log location by GNSS
-    // Use LocationMonitor private method _getLocationGNSS()
-    lm._getLocationGNSS();
+    lm._getLocationGNSS().then(function(loc){
+        ::info("Location GNSS:");
+        foreach (key, value in loc) {
+            ::info(key + ":" + value);
+        };
+    });
 
     // Obtain and log location by WiFi info - TBD
 
