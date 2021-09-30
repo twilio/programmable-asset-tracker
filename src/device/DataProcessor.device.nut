@@ -8,8 +8,9 @@ class DataProcessor {
      *  Constructor for Data Processor class.
      *  @param {object} motionMon - Motion monitor object.
      *  @param {object} accelDriver - Accelerometer driver object.
+     *  @param {object} batDriver - Battery driver object.
      */
-    constructor(motionMon, accelDriver) {
+    constructor(motionMon, accelDriver, batDriver) {
         
     }
 
