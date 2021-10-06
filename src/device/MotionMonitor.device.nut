@@ -1,16 +1,10 @@
 @set CLASS_NAME = "MotionMonitor" // Class name for logging
 
 // Mean earth radius in meters (https://en.wikipedia.org/wiki/Great-circle_distance)
-const EARTH_RAD = 6371009;
-
-// Init latitude value (North Pole)
-const INIT_LATITUDE = 90.0;
-
-// Init longitude value (Greenwich)
-const INIT_LONGITUDE = 0.0;
+const MM_EARTH_RAD = 6371009;
 
 // Motion Monitor class.
-// 
+//  
 class MotionMonitor {
 
     // Accelerometer driver object
@@ -82,17 +76,7 @@ class MotionMonitor {
         _motionStopAssumption = false;
         _inMotion = false;
         _prevLoc = false;
-        _curLocFresh = false;
-        _curLoc = {"timestamp": 0,
-                   "type": "gnss",
-                   "accuracy": 0,
-                   "longitude": INIT_LONGITUDE,
-                   "latitude": INIT_LATITUDE};
-        _prevLoc = {"timestamp": 0,
-                    "type": "gnss",
-                    "accuracy": 0,
-                    "longitude": INIT_LONGITUDE,
-                    "latitude": INIT_LATITUDE};
+        _curLocFresh = false;   
         _locReadingPeriod = DEFAULT_LOCATION_READING_PERIOD;
         _movementMax = DEFAULT_MOVEMENT_ACCELERATION_MAX;
         _movementMin = DEFAULT_MOVEMENT_ACCELERATION_MIN;
@@ -108,7 +92,7 @@ class MotionMonitor {
      *        Optional, all settings have defaults.
      *        The settings:
      *          "locReadingPeriod": {float} - Location reading period, in seconds.
-                                                Default: DEFAULT_LOCATION_READING_PERIOD
+     *                                          Default: DEFAULT_LOCATION_READING_PERIOD
      *          "movementMax": {float}    - Movement acceleration maximum threshold, in g.
      *                                        Default: DEFAULT_MOVEMENT_ACCELERATION_MAX 
      *          "movementMin": {float}    - Movement acceleration minimum threshold, in g.
@@ -131,68 +115,10 @@ class MotionMonitor {
         _motionTimeout = DEFAULT_MOTION_TIME;
         _motionVelocity = DEFAULT_MOTION_VELOCITY;
         _motionDistance = DEFAULT_MOTION_DISTANCE;
-        foreach (key, value in motionMonSettings) {
-            if (typeof key == "string") {
-                if (key == "locReadingPeriod") {
-                    if (typeof value == "float"  && value >= 0) {
-                        _locReadingPeriod = value;                        
-                    } else {
-                        ::error("motionDistance incorrect value. Using default value.", "@{CLASS_NAME}.start");
-                    }
-                }
 
-                if (key == "movementMax") {
-                    if (typeof value == "float" && value > 0) {
-                        _movementMax = value;                
-                    } else {
-                        ::error("movementMax incorrect value. Using default value.", "@{CLASS_NAME}.start");
-                    }
-                }
-
-                if (key == "movementMin") {
-                    if (typeof value == "float"  && value > 0) {
-                        _movementMin = value;                        
-                    } else {
-                        ::error("movementMin incorrect value. Using default value.", "@{CLASS_NAME}.start");
-                    }
-                }
-
-                if (key == "movementDur") {
-                    if (typeof value == "float"  && value > 0) {
-                        _movementDur = value;                
-                    } else {
-                        ::error("movementDur incorrect value. Using default value.", "@{CLASS_NAME}.start");
-                    }
-                }
-
-                if (key == "motionTimeout") {
-                    if (typeof value == "float"  && value > 0) {
-                        _motionTimeout = value;                
-                    } else {
-                        ::error("motionTimeout incorrect value. Using default value.", "@{CLASS_NAME}.start");
-                    }
-                }
-                
-                if (key == "motionVelocity") {
-                    if (typeof value == "float"  && value >= 0) {
-                        _motionVelocity = value;                        
-                    } else {
-                        ::error("motionVelocity incorrect value. Using default value.", "@{CLASS_NAME}.start");
-                    }
-                }
-
-                if (key == "motionDistance") {
-                    if (typeof value == "float"  && value >= 0) {
-                        _motionDistance = value;                        
-                    } else {
-                        ::error("motionDistance incorrect value. Using default value.", "@{CLASS_NAME}.start");
-                    }
-                }
-            } else {
-                ::error("Incorrect motion condition settings", "@{CLASS_NAME}.start");
-                return;
-            }
-        }
+        if(!_checkMotionMonSettings(motionMonSettings))
+            return;
+        
         _locReadingTimer = imp.wakeup(_locReadingPeriod, _locReadingCb.bindenv(this));
     }
 
@@ -220,7 +146,7 @@ class MotionMonitor {
         if (typeof locCb == "function" || locCb == null) {
             _newLocCb = locCb;
         } else {
-            ::error("Argument not a function or null", "@{CLASS_NAME}.setNewLocationCb");
+            ::error("Argument not a function or null", "@{CLASS_NAME}");
         }     
     }
 
@@ -234,7 +160,7 @@ class MotionMonitor {
         if (typeof motionEventCb == "function" || motionEventCb == null) {
             _motionEventCb = motionEventCb;
         } else {
-            ::error("Argument not a function or null", "@{CLASS_NAME}.setMotionEventCb");
+            ::error("Argument not a function or null", "@{CLASS_NAME}");
         }
     }
 
@@ -248,11 +174,100 @@ class MotionMonitor {
         if (typeof geofencingEventCb == "function" || geofencingEventCb == null) {
             _geofencingEventCb = geofencingEventCb;
         } else {
-            ::error("Argument not a function or null", "@{CLASS_NAME}.setGeofencingEventCb");
+            ::error("Argument not a function or null", "@{CLASS_NAME}");
         }
     }
 
     // -------------------- PRIVATE METHODS -------------------- //
+
+    /**
+     *  Check settings.
+     *   @param {table} motionMonSettings - Table with the settings.
+     *        Optional, all settings have defaults.
+     *        The settings:
+     *          "locReadingPeriod": {float} - Location reading period, in seconds.
+     *                                          Default: DEFAULT_LOCATION_READING_PERIOD
+     *          "movementMax": {float}    - Movement acceleration maximum threshold, in g.
+     *                                        Default: DEFAULT_MOVEMENT_ACCELERATION_MAX 
+     *          "movementMin": {float}    - Movement acceleration minimum threshold, in g.
+     *                                        Default: DEFAULT_MOVEMENT_ACCELERATION_MIN 
+     *          "movementDur": {float}    - Duration of exceeding movement acceleration threshold, in seconds.
+     *                                        Default: DEFAULT_MOVEMENT_ACCELERATION_DURATION 
+     *          "motionTimeout": {float}  - Maximum time to determine motion detection after the initial movement, in seconds.
+     *                                        Default: DEFAULT_MOTION_TIME 
+     *          "motionVelocity": {float} - Minimum instantaneous velocity  to determine motion detection condition, in meters per second.
+     *                                        Default: DEFAULT_MOTION_VELOCITY 
+     *          "motionDistance": {float} - Minimal movement distance to determine motion detection condition, in meters.
+     *                                      If 0, distance is not calculated (not used for motion detection). 
+     *                                        Default: DEFAULT_MOTION_DISTANCE
+     *   @return {boolean} true if success.
+     */
+    function _checkMotionMonSettings(motionMonSettings) {
+        foreach (key, value in motionMonSettings) {
+            if (typeof key == "string") {
+                if (key == "locReadingPeriod") {
+                    if (typeof value == "float"  && value >= 0) {
+                        _locReadingPeriod = value;                        
+                    } else {
+                        ::error("motionDistance incorrect value. Using default value.", "@{CLASS_NAME}");
+                    }
+                }
+
+                if (key == "movementMax") {
+                    if (typeof value == "float" && value > 0) {
+                        _movementMax = value;                
+                    } else {
+                        ::error("movementMax incorrect value. Using default value.", "@{CLASS_NAME}");
+                    }
+                }
+
+                if (key == "movementMin") {
+                    if (typeof value == "float"  && value > 0) {
+                        _movementMin = value;                        
+                    } else {
+                        ::error("movementMin incorrect value. Using default value.", "@{CLASS_NAME}");
+                    }
+                }
+
+                if (key == "movementDur") {
+                    if (typeof value == "float"  && value > 0) {
+                        _movementDur = value;                
+                    } else {
+                        ::error("movementDur incorrect value. Using default value.", "@{CLASS_NAME}");
+                    }
+                }
+
+                if (key == "motionTimeout") {
+                    if (typeof value == "float"  && value > 0) {
+                        _motionTimeout = value;                
+                    } else {
+                        ::error("motionTimeout incorrect value. Using default value.", "@{CLASS_NAME}");
+                    }
+                }
+                
+                if (key == "motionVelocity") {
+                    if (typeof value == "float"  && value >= 0) {
+                        _motionVelocity = value;                        
+                    } else {
+                        ::error("motionVelocity incorrect value. Using default value.", "@{CLASS_NAME}");
+                    }
+                }
+
+                if (key == "motionDistance") {
+                    if (typeof value == "float"  && value >= 0) {
+                        _motionDistance = value;                        
+                    } else {
+                        ::error("motionDistance incorrect value. Using default value.", "@{CLASS_NAME}");
+                    }
+                }
+            } else {
+                ::error("Incorrect motion condition settings", "@{CLASS_NAME}");
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     /**
      *  Location reading timer callback function.
@@ -291,13 +306,16 @@ class MotionMonitor {
         .fail(function(reason) {
             _curLoc = _prevLoc;
             _curLocFresh = false;
+            if (_newLocCb) {
+                _newLocCb(_curLocFresh, _curLoc);
+            }
         }.bindenv(this));
     }
 
     /**
      *  Calculate distance between two points and comparison with threshold value.
      */
-    function _checkMotionStop() {
+    function _checkMotionStop() {        
         if (_curLocFresh && _prevLocFresh) {
             // https://en.wikipedia.org/wiki/Great-circle_distance
             local deltaLat = math.fabs((_curLoc.latitude - _prevLoc.latitude)*180.0/PI);
@@ -305,22 +323,21 @@ class MotionMonitor {
             local deltaSigma = math.pow(math.sin(0.5*deltaLat, 2));
             deltaSigma += math.cos(_curLoc.latitude*180.0/PI)*math.cos(_prevLoc.latitude*180.0/PI)*math.pow(math.sin(0.5*deltaLong, 2));
             deltaSigma = 2*math.asin(math.sqrt(deltaSigma));
-
+            
+            // actual arc length on a sphere of radius r (mean Earth radius)
             local dist = EARTH_RAD*deltaSigma;
-            if (dist > 2*_curLoc.accuracy) {
-
-            } else {
-                _motionStopAssumption = true;
-                _ad.detectMotion(_onAccelMotionDetected.bindenv(this), {"movementMax"      : _movementMax,
-                                                                        "movementMin"      : _movementMin,
-                                                                        "movementDur"      : _movementDur,
-                                                                        "motionTimeout"    : _motionTimeout,
-                                                                        "motionVelocity"   : _motionVelocity,
-                                                                        "motionDistance"   : _motionDistance});
+            
+            // stop assumption if distance less 2 radius of accuracy 
+            if (dist < 2*_curLoc.accuracy) {
+                _motionStopAssumption = true;                
             }
         }
+
         if (!_curLocFresh && !_prevLocFresh) {
-            _motionStopAssumption = true;
+            _motionStopAssumption = true;            
+        }
+
+        if(_motionStopAssumption) {
             _ad.detectMotion(_onAccelMotionDetected.bindenv(this), {"movementMax"      : _movementMax,
                                                                     "movementMin"      : _movementMin,
                                                                     "movementDur"      : _movementDur,

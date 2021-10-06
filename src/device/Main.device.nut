@@ -6,6 +6,7 @@
 #require "ReplayMessenger.device.lib.nut:0.2.0"
 #require "utilities.lib.nut:2.0.0"
 #require "LIS3DH.device.lib.nut:3.0.0"
+#require "HTS221.device.lib.nut:2.0.2"
 
 @include once "../shared/Version.shared.nut"
 @include once "../shared/Constants.shared.nut"
@@ -40,6 +41,7 @@ class Application {
     _accelDriver = null;
     _motionMon = null;
     _dataProc = null;
+    _thermoSensDriver = null;
     
     /**
      * Application Constructor
@@ -67,11 +69,15 @@ class Application {
             // Create and initialize Accelerometer Driver
             _accelDriver = AccelerometerDriver(hardware.i2cLM, hardware.pinW);
 
+            // Create and initialize Thermosensor Driver
+            _thermoSensDriver = HTS221(hardware.i2cLM);
+            _thermoSensDriver.setMode(HTS221_MODE.ONE_SHOT);
+
             // Create and initialize Motion Monitor
             _motionMon = MotionMonitor(_accelDriver, _locationDriver);
 
             // Create and initialize Data Processor
-            _dataProc = DataProcessor(_motionMon, _accelDriver, null, null);
+            _dataProc = DataProcessor(_motionMon, _accelDriver, _thermoSensDriver, null);
 
             // Start other activities - TODO
 
