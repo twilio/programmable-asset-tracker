@@ -142,6 +142,7 @@ class Application {
     function _onDisconnect(expected) {
         ::debug("Disconnected");
     }
+}
 
 // ---------------------------- THE MAIN CODE ---------------------------- //
 

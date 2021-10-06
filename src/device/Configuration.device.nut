@@ -20,7 +20,7 @@ const DEFAULT_SHOCK_THRESHOLD = 2.0;
 // Tracking settings:
 
 // Tracking is enabled (true) or disabled (false)
-const DEFAULT_TRACKING_ENABLED = true;
+const DEFAULT_TRACKING_ENABLED = 1;
 // Location reading period, in seconds
 const DEFAULT_LOCATION_READING_PERIOD = 60.0;
 
@@ -43,7 +43,7 @@ const DEFAULT_MOTION_DISTANCE = 0.0;
 
 // Geofence settings:
 // Geofencing is enabled (true) or disabled (false)
-const DEFAULT_GEOFENCE_ENABLED = false;
+const DEFAULT_GEOFENCE_ENABLED = 0;
 // TBD
 
 // BLE Beacons settings: TBD

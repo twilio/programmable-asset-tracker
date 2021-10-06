@@ -300,8 +300,12 @@ class MotionMonitor {
     function _checkMotionStop() {
         if (_curLocFresh && _prevLocFresh) {
             // https://en.wikipedia.org/wiki/Great-circle_distance
-            local deltaSigma = 2*math.asin(math.sqrt(math.pow(math.sin(0.5*math.fabs((_curLoc.latitude - _prevLoc.latitude)*180.0/PI)), 2) + 
-                                                     math.cos(_curLoc.latitude*180.0/PI)*math.cos(_prevLoc.latitude*180.0/PI)*math.pow(math.sin(0.5*math.fabs((_curLoc.longitude - _prevLoc.longitude)*180.0/PI), 2)));
+            local deltaLat = math.fabs((_curLoc.latitude - _prevLoc.latitude)*180.0/PI);
+            local deltaLong = math.fabs((_curLoc.longitude - _prevLoc.longitude)*180.0/PI);
+            local deltaSigma = math.pow(math.sin(0.5*deltaLat, 2));
+            deltaSigma += math.cos(_curLoc.latitude*180.0/PI)*math.cos(_prevLoc.latitude*180.0/PI)*math.pow(math.sin(0.5*deltaLong, 2));
+            deltaSigma = 2*math.asin(math.sqrt(deltaSigma));
+
             local dist = EARTH_RAD*deltaSigma;
             if (dist > 2*_curLoc.accuracy) {
 
