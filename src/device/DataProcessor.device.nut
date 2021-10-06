@@ -144,6 +144,8 @@ class DataProcessor {
      *                                          Default: DEFAULT_DATA_SENDING_PERIOD
      *                    "batteryLowThr": {integer} - Battery low alert threshold
      *                                          Default: DEFAULT_BATTERY_LOW
+     *                   "shockThreshold": {float} - Shock acceleration threshold, in g.
+     *                                      Default: DEFAULT_SHOCK_THRESHOLD 
      */
     function start(dataProcSettings = {}) {
         _temperatureHighAlertThr = DEFAULT_TEMPERATURE_HIGH;
