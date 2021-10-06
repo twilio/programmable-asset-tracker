@@ -5,6 +5,7 @@
 #require "Messenger.lib.nut:0.2.0"
 #require "ReplayMessenger.device.lib.nut:0.2.0"
 #require "utilities.lib.nut:2.0.0"
+#require "LIS3DH.device.lib.nut:3.0.0"
 
 @include once "../shared/Version.shared.nut"
 @include once "../shared/Constants.shared.nut"
