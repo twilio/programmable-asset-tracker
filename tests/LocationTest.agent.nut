@@ -41,7 +41,6 @@
         }.bindenv(this));
     }
 
-
 // ---------------------------- THE MAIN CODE ---------------------------- //
 
 Logger.setLogLevel(LGR_LOG_LEVEL.DEBUG);
@@ -51,4 +50,3 @@ Logger.setLogLevel(LGR_LOG_LEVEL.DEBUG);
 msngr <- Messenger();
 msngr.on(APP_RM_MSG_NAME.GNSS_ASSIST, _onGnssAssist.bindenv(this));
 msngr.on(APP_RM_MSG_NAME.LOCATION_CELL, _onLocationCell.bindenv(this));
-

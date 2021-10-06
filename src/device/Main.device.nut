@@ -13,7 +13,10 @@
 @include once "CustomReplayMessenger.device.nut"
 @include once "bg96_gps.device.lib.nut"
 @include once "BG96CellInfo.device.nut"
-@include once "LocationMonitor.device.nut"
+@include once "LocationDriver.device.nut"
+@include once "AccelerometerDriver.device.nut"
+@include once "MotionMonitor.device.nut"
+@include once "DataProcessor.device.nut"
 
 // Main application on Imp-Device: does the main logic of the application
 
@@ -32,8 +35,11 @@ const APP_RM_MSG_SENDING_MAX_RATE = 5;
 const APP_RM_MSG_RESEND_LIMIT = 5;
 
 class Application {
-    _locationMonitor = null;
-
+    _locationDriver = null;
+    _accelDriver = null;
+    _motionMon = null;
+    _dataProc = null;
+    
     /**
      * Application Constructor
      */
@@ -54,8 +60,17 @@ class Application {
         // Create and intialize Replay Messenger
         _initReplayMessenger()
         .then(function(_) {
-            // Create and initialize Location Monitor
-            _locationMonitor = LocationMonitor();
+            // Create and initialize Location Driver
+            _locationDriver = LocationDriver();
+
+            // Create and initialize Accelerometer Driver
+            _accelDriver = AccelerometerDriver(hardware.i2cLM, hardware.pinW);
+
+            // Create and initialize Motion Monitor
+            _motionMon = MotionMonitor(_accelDriver, _locationDriver);
+
+            // Create and initialize Data Processor
+            _dataProc = DataProcessor(_motionMon, _accelDriver, null, null);
 
             // Start other activities - TODO
 

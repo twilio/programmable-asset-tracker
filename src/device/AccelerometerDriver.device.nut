@@ -522,7 +522,6 @@ class AccelerometerDriver {
         _accel.configureFifo(true, LIS3DH_FIFO_BYPASS_MODE);
         _accel.configureFifo(true, LIS3DH_FIFO_STREAM_TO_FIFO_MODE);
     }
-}
 
     /**
      * Check FIFO watermark.
@@ -745,5 +744,6 @@ class AccelerometerDriver {
             }
         }
     }
+}
 
 @set CLASS_NAME = null // Reset the variable
