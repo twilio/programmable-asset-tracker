@@ -79,7 +79,9 @@ class Application {
             // Create and initialize Data Processor
             _dataProc = DataProcessor(_motionMon, _accelDriver, _thermoSensDriver, null);
 
-            // Start other activities - TODO
+            // Start other activities
+            _motionMon.start();
+            _dataProc.start();
 
         }.bindenv(this), function(err) {
             ::error("Replay Messenger initialization error: " + err);
