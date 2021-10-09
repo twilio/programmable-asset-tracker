@@ -4,7 +4,7 @@
 @include once "../shared/Version.shared.nut"
 @include once "../shared/Constants.shared.nut"
 @include once "../shared/Logger.shared.nut"
-//@include once "CloudClient.agent.nut"
+@include once "CloudClient.agent.nut"
 @include once "LocationAssistant.agent.nut"
 
 // Main application on Imp-Agent:
@@ -43,12 +43,15 @@ class Application {
      * Handler for Data received from Imp-Device
      */
     function _onData(msg, customAck) {
-        ::debug("Data received");
+        ::debug("Data received from imp-device");
 
-        local ack = customAck();
-
-        // Send data to Cloud REST API - TODO
-
+        CloudClient.send(msg.data)
+        .then(function() {
+            ::info("Data has been successfully sent to the cloud");
+        }.bindenv(this), function(err) {
+            ::error("Cloud reported an error while receiving data: " + err);
+            // TODO - decide if we need RM noack here
+        }.bindenv(this));
     }
 
     /**
