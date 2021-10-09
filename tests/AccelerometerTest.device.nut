@@ -62,7 +62,7 @@ Logger.setLogLevel(LGR_LOG_LEVEL.DEBUG);
 ::info("Accelerometer test started");
 
 try {
-    ad <- AccelerometerDriver(hardware.i2c89, hardware.pin1);
+    ad <- AccelerometerDriver(hardware.i2cLM, hardware.pinW);
     ad.enableShockDetection(shockTestCb.bindenv(this), {"shockThreshold" : TEST_SHOCK_THR});
     ad.detectMotion(motionTestCb.bindenv(this), {"movementMax"      : TEST_MOV_MAX,
                                                  "movementMin"      : TEST_MOV_MIN,

@@ -11,11 +11,11 @@
 @include once "../src/device/CustomReplayMessenger.device.nut"
 @include once "../src/device/bg96_gps.device.lib.nut"
 @include once "../src/device/BG96CellInfo.device.nut"
-@include once "../src/device/LocationMonitor.device.nut"
+@include once "../src/device/LocationDriver.device.nut"
 
 // Test for Location determination.
 // Periodically tries to obtain the current location by different ways.
-// Imp-Device part - tests/uses LocationMonitor:
+// Imp-Device part - tests/uses LocationDriver:
 //   - tries to obtain location using GNSS
 //   - tries to obtain location using cellular info
 //   - tries to obtain location using WiFi info
@@ -23,7 +23,7 @@
 //   - logs the obtained locations
 
 // Period to repeat location obtaining, in seconds
-const TEST_GET_LOCATION_PERIOD = 60;
+const TEST_GET_LOCATION_PERIOD = 600;
 
 // Replay Messenger configuration constants:
 // Allocation for the used SPI Flash Logger
@@ -70,7 +70,7 @@ function initReplayMessenger() {
  function getLocation() {
 
     // Obtain and log location by cell info
-    lm._getLocationCellTowers().then(function(loc){
+    ld._getLocationCellTowers().then(function(loc){
         ::info("Location cell tower:");
         foreach (key, value in loc) {
             ::info(key + ":" + value);
@@ -78,7 +78,7 @@ function initReplayMessenger() {
     });
 
     // Obtain and log location by GNSS
-    lm._getLocationGNSS().then(function(loc){
+    ld._getLocationGNSS().then(function(loc){
         ::info("Location GNSS:");
         foreach (key, value in loc) {
             ::info(key + ":" + value);
@@ -101,8 +101,8 @@ cm <- null;
 // Replay Messenger, communicates with Imp-Agent
 rm <- null;
 
-// Location Monitor, obtains the current location
-lm <- null;
+// Location Driver, obtains the current location
+ld <- null;
 
 // Create and intialize Connection Manager
 // NOTE: This needs to be called as early in the code as possible
@@ -122,8 +122,8 @@ Logger.setLogLevel(LGR_LOG_LEVEL.DEBUG);
 // Create and intialize Replay Messenger
 initReplayMessenger()
 .then(function(_) {
-    // Create and initialize Location Monitor
-    lm = LocationMonitor();
+    // Create and initialize Location Driver
+    ld = LocationDriver();
 
     // Start periodic obtaining of the current location
     getLocation();
