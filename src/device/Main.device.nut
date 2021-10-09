@@ -5,6 +5,8 @@
 #require "Messenger.lib.nut:0.2.0"
 #require "ReplayMessenger.device.lib.nut:0.2.0"
 #require "utilities.lib.nut:2.0.0"
+#require "LIS3DH.device.lib.nut:3.0.0"
+#require "HTS221.device.lib.nut:2.0.2"
 
 @include once "../shared/Version.shared.nut"
 @include once "../shared/Constants.shared.nut"
@@ -13,7 +15,10 @@
 @include once "CustomReplayMessenger.device.nut"
 @include once "bg96_gps.device.lib.nut"
 @include once "BG96CellInfo.device.nut"
-@include once "LocationMonitor.device.nut"
+@include once "LocationDriver.device.nut"
+@include once "AccelerometerDriver.device.nut"
+@include once "MotionMonitor.device.nut"
+@include once "DataProcessor.device.nut"
 
 // Main application on Imp-Device: does the main logic of the application
 
@@ -32,8 +37,12 @@ const APP_RM_MSG_SENDING_MAX_RATE = 5;
 const APP_RM_MSG_RESEND_LIMIT = 5;
 
 class Application {
-    _locationMonitor = null;
-
+    _locationDriver = null;
+    _accelDriver = null;
+    _motionMon = null;
+    _dataProc = null;
+    _thermoSensDriver = null;
+    
     /**
      * Application Constructor
      */
@@ -54,10 +63,25 @@ class Application {
         // Create and intialize Replay Messenger
         _initReplayMessenger()
         .then(function(_) {
-            // Create and initialize Location Monitor
-            _locationMonitor = LocationMonitor();
+            // Create and initialize Location Driver
+            _locationDriver = LocationDriver();
 
-            // Start other activities - TODO
+            // Create and initialize Accelerometer Driver
+            _accelDriver = AccelerometerDriver(hardware.i2cLM, hardware.pinW);
+
+            // Create and initialize Thermosensor Driver
+            _thermoSensDriver = HTS221(hardware.i2cLM);
+            _thermoSensDriver.setMode(HTS221_MODE.ONE_SHOT);
+
+            // Create and initialize Motion Monitor
+            _motionMon = MotionMonitor(_accelDriver, _locationDriver);
+
+            // Create and initialize Data Processor
+            _dataProc = DataProcessor(_motionMon, _accelDriver, _thermoSensDriver, null);
+
+            // Start other activities
+            _motionMon.start();
+            _dataProc.start();
 
         }.bindenv(this), function(err) {
             ::error("Replay Messenger initialization error: " + err);
@@ -127,6 +151,7 @@ class Application {
     function _onDisconnect(expected) {
         ::debug("Disconnected");
     }
+}
 
 // ---------------------------- THE MAIN CODE ---------------------------- //
 

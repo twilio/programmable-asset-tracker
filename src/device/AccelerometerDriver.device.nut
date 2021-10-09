@@ -271,7 +271,7 @@ class AccelerometerDriver {
             _accel = LIS3DH(_i2c, _addr);
             _accel.reset();
             local rate = _accel.setDataRate(ACCEL_DEFAULT_DATA_RATE);
-            ::debug(format("Accelerometer rate %d", rate), "@{CLASS_NAME}");
+            ::debug(format("Accelerometer rate %d Hz", rate), "@{CLASS_NAME}");
             _accel.setMode(LIS3DH_MODE_LOW_POWER);
             _accel.enable(true);
             _accel.configureFifo(true, LIS3DH_FIFO_BYPASS_MODE);
@@ -522,7 +522,6 @@ class AccelerometerDriver {
         _accel.configureFifo(true, LIS3DH_FIFO_BYPASS_MODE);
         _accel.configureFifo(true, LIS3DH_FIFO_STREAM_TO_FIFO_MODE);
     }
-}
 
     /**
      * Check FIFO watermark.
@@ -745,5 +744,6 @@ class AccelerometerDriver {
             }
         }
     }
+}
 
 @set CLASS_NAME = null // Reset the variable

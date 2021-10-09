@@ -1,17 +1,17 @@
-@set CLASS_NAME = "LocationMonitor" // Class name for logging
+@set CLASS_NAME = "LocationDriver" // Class name for logging
 
 // GNSS options:
 // Accuracy threshold of positioning, in meters. Range: 1-1000.
-const LM_GNSS_ACCURACY = 10;
+const LD_GNSS_ACCURACY = 10;
 // The maximum positioning time, in seconds. Range: 1-255
-const LM_LOC_TIMEOUT = 55;
+const LD_LOC_TIMEOUT = 55;
 
 // Minimum time of BG96 assist data validity to skip updating of the assist data, in minutes
-const LM_ASSIST_DATA_MIN_VALID_TIME = 1440;
+const LD_ASSIST_DATA_MIN_VALID_TIME = 1440;
 
-// Location Monitor class.
+// Location Driver class.
 // Determines the current position.
-class LocationMonitor {
+class LocationDriver {
     // Assist data validity time, in minutes
     _assistDataValidityTime = 0;
     // Promise that resolves or rejects when the assist data has been obtained.
@@ -21,7 +21,7 @@ class LocationMonitor {
     _assistData = null;
 
     /**
-     * Constructor for Location Monitor
+     * Constructor for Location Driver
      */
     constructor() {
         cm.onConnect(_onConnected.bindenv(this), "@{CLASS_NAME}");
@@ -68,8 +68,8 @@ class LocationMonitor {
                 BG96_GPS.enableGNSS({
                     "onLocation": _onGnssLocationFunc(resolve, reject),
                     "onEnabled": _onGnssEnabledFunc(reject),
-                    "maxPosTime": LM_LOC_TIMEOUT,
-                    "accuracy": LM_GNSS_ACCURACY,
+                    "maxPosTime": LD_LOC_TIMEOUT,
+                    "accuracy": LD_GNSS_ACCURACY,
                     "useAssist": true,
                     "assistData": _assistData
                 });
@@ -167,7 +167,7 @@ class LocationMonitor {
      */
     function _onGnssLocationFunc(onFix, onError) {
         // A valid timestamp will surely be greater than this value (01.01.2021)
-        const LM_VALID_TS = 1609459200;
+        const LD_VALID_TS = 1609459200;
 
         return function(result) {
             BG96_GPS.disableGNSS();
@@ -189,7 +189,7 @@ class LocationMonitor {
 
             onFix({
                 // If we don't have the valid time, we take it from the location data
-                "timestamp": time() > LM_VALID_TS ? time() : result.fix.time,
+                "timestamp": time() > LD_VALID_TS ? time() : result.fix.time,
                 "type": "gnss",
                 "accuracy": accuracy,
                 "longitude": result.fix.lon.tofloat(),
@@ -220,7 +220,7 @@ class LocationMonitor {
             return _gettingAssistData;
         }
 
-        if (_assistData || _assistDataValidityTime >= LM_ASSIST_DATA_MIN_VALID_TIME || !cm.isConnected()) {
+        if (_assistData || _assistDataValidityTime >= LD_ASSIST_DATA_MIN_VALID_TIME || !cm.isConnected()) {
             // If we already have ready-to-use assist data or assist data validity time is big enough,
             // it doesn't matter if we resolve or reject the promise.
             // Since the update was actually not done, let's just reject it
