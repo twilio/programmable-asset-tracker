@@ -1,32 +1,58 @@
-ver 2021-09-27
+ver 2021-11-28
 
-Prog-X demo: scope
+Prog-X: scope
 ------------------
 
-- imp006 breakout board
+Releases:
+- POC - subset of functionality on imp006 breakout board
+- FT1 (Field Trial 1) - maximum possible functionality on imp006 breakout board
+- FT2 (Field Trial 2) - full functionality on target board
+- OS (Open Source) - open source version of FT2
 
-- Configuration is hardcoded
+Hardware:
+- POC: standard imp006 breakout board
+- FT1: imp006 breakout board + WiFi/BLE MIKROE-3542 ESP32-WROOM-32 + Ublox M8N GNSS
+- FT2: a target board (imp006, BG95-M3 modem, MIKROE-3542, Ublox M8N, LIS2DH12, light sensor, user button)
+
+- Subset of Configuration is hardcoded (POC only)
+- Full runtime configuration - imp-Agent REST API (not in POC)
+- Safeguards for non-effective cfg (not in POC)
+- Recovery mode - "empty" cfg in case of non-recoverable "errors" (not in POC)
 
 - Data from sensors:
   - Temperature
+  - Battery level (by voltage) (not in POC)
 
 - Alerts:
   - Temperature High
   - Temperature Low
+  - Battery Low (not in POC)
   - Shock Detected
   - Motion Started
   - Motion Stopped
+  - Geofence Entered (not in POC)
+  - Geofence Exited (not in POC)
+  - Theft Mode Activated (not in POC)
+  - Tampering (not in POC, FT1)
 
-- Location determination by:
-  - first - GNSS,
-  - then - cell info
+- Location determination in the following order:
+  - BLE beacons (not in POC),
+  - GNSS,
+  - WiFi networks (not in POC),
+  - cell info
+
+- Geofencing (one configurable zone) (not in POC)
 
 - Motion start detection using Accelerometer
 
 - Motion stop detection using Location (+ Accelerometer for confirmation)
 
+- Repo/theft mode - activate tracking after some date (not in POC)
+
 - Device is disconnected most of time
 - Connected only when data sending to imp-agent is needed
+
+- Back-off for GNSS fix (not in POC)
 
 - No bufferization on imp-agent side
 - Messages are forwarded to the cloud's REST API
@@ -36,19 +62,11 @@ Prog-X demo: scope
   -- Response code 200 from the cloud if the request/data is accepted
 - The cloud's REST API is emulated on another imp
 
-Out of scope in the demo:
--------------------------
-- Runtime configuration (Southbound API)
-- Location determination using BLE beacons
-- Location determination using WiFi
-- Geofencing
-- Battery level
-- Tamper detection
-- Shipping mode
-- Back-off for GNSS fix
-- Recovery mode
-- Safeguards for non-effective cfg
-- Super SIM OTA update
+- Shipping mode - first wakeup by a user button (not in POC, FT1)
+
+- Tampering detection by light sensor (not in POC, FT1)
+
+- Super SIM OTA update (not in POC, FT1)
 
 ----------------------------------------
 DETAILS
@@ -56,7 +74,8 @@ DETAILS
 Data polling:
 -------------
 - Temperature
-- Battery Level (not in demo)
+- Battery Level by voltage (not in POC)
+- Light sensor (TBD) (not in POC, FT1)
 
 Alerts
 ------
@@ -64,31 +83,34 @@ By event:
 - Shock Detected
 - Motion Started
 - Motion Stopped
-- Geofence Entered (not in demo)
-- Geofence Exited (not in demo)
+- Geofence Entered (not in POC)
+- Geofence Exited (not in POC)
 By polling:
 - Temperature High
 - Temperature Low
-- Battery Low (not in demo)
+- Battery Low (not in POC)
+- Tampering (TBD) (not in POC, FT1)
+
+Activation after Shipping (not in POC, FT1)
+-------------------------
+TBD. Initial thoughts:
+- After the first start (at factory ?) the app should go into deep sleep (?) - so called "shipping mode".
+- There is a "button". It is "pressed" by a "user" when the device should start functioning (goes out from "shipping" mode).
+- After that the app wakes up, sends the first report and starts normal working.
+- The app should never go into deep sleep again.
+- No more reactions to the "button".
 
 Initialization Function (called after Imp restart)
 -----------------------
-- (not in demo) Read from a permanent memory and apply:
-  -- Configuration
-  -- Latest location
-  -- Geofence inside/outside
-  -- Latest status (TBD)
-- If some data is not read, hardcoded defaults are used:
-  -- Default configuration
-  -- "Zero"/invalid/default non-fresh latest location (TBD)
-  -- inMotion = false
-  -- motionStopAssumption = false, etc.
-(Exact order of the following calls - TBD)
-- If Shock detection is configured, enable Shock Detection
-- If Tracking is configured, enable Motion Detection
-- Call Location Reading Function
-- Call Check Geofencing Function (not in demo)
-- Call Data Reading Function
+- (not in POC, FT1) TBD - Recognize is it the first start, the wakeup from "shipping" mode or just a restart in a normal work.
+- (not in POC) TBD - Recognize if there is a need to go to "recovery mode" - empty the configuration.
+- (not in POC) Read from a permanent memory: configuration, latest location, latest status (TBD).
+- (not in POC) There can be special situations:
+  - "Empty" cfg - the app does nothing but waits for a new app version and/or new configuration
+  - "Initial" cfg/status - default cfg and status (TBD) after first start (or after shipping mode) - TBD (is it the same as empty?)
+  - "Defaults" - default settings if not explicitly specified in cfg - TBD
+- (not in POC) Check if there is a new cfg from imp-Agent - TBD
+- Initialize and start modules according to the current configuration and status - TBD.
 - Disconnect imp-device
 - Set Data Sending Timer
 
@@ -106,7 +128,7 @@ Data Reading Function
 - Cancel Data Reading Timer (if any)
 - Read current data
   -- Temperature
-  -- Battery Level (not in demo)
+  -- Battery Level (not in POC)
 - Check alert events
   -- Alert event happens in case of a transition: non-alert condition (at the previous reading) -> alert condition (at the current reading)
 - Create and save message:
@@ -159,16 +181,16 @@ Location Reading Timer Callback
 - Otherwise:
   -- Call Location Reading Function
   -- Call Check Motion Stop Function
-  -- If Geofencing is configured, call Check Geofencing Function (not in demo)
+  -- If Geofencing is configured, call Check Geofencing Function (not in POC)
   -- Set Location Reading Timer
 
 Location Reading Function
 -------------------------
 - Save the latest location as the previous location
 - Try to determine the current location in the following order (till successfully determined):
-  -- By BLE beacons (not in demo)
+  -- By BLE beacons (not in POC)
   -- By GNSS fix
-  -- By WiFi hotspots (not in demo)
+  -- By WiFi hotspots (not in POC)
   -- By Cellular info
 - If the current location is determined, save it as the latest location and mark it as fresh
 - Otherwise, save the previous location as the latest location and mark it as non-fresh
@@ -182,7 +204,7 @@ Check Motion Stop Function
   -- Set motionStopAssumption = true
   -- Enable Motion Detection
 
-Check Geofencing Function (not in demo)
+Check Geofencing Function (not in POC)
 -------------------------
 - If the latest location is fresh:
   -- Calculate/check if the location is inside or outside the geofencing zone, set the current flag (inside/outside).
@@ -192,10 +214,14 @@ Check Geofencing Function (not in demo)
      - Call Data Reading Function
   -- Save the current flag as the previous one
 
+Repo/theft mode - activate tracking after some date (not in POC)
+---------------------------------------------------
+TBD
+
 Northbound API (Data sending to the cloud)
 ------------------------------------------
 - POST https://<cloud_api_url>/data
-- Basic authentication - username/password are hardcoded (in demo) or configured (not in demo)
+- Basic authentication - username/password are hardcoded (in POC) or configured (TBD, not in POC)
 - Body with data in text (JSON) format
 - Response code 200 from the cloud if the request/data is accepted
 - No bufferization on imp-agent side
@@ -229,3 +255,13 @@ Data Message JSON
    ]
 }
 
+Southbound API (Configuration sending from the cloud) (not in POC)
+-----------------------------------------------------
+REST API in imp-Agent.
+Algorithm for cfg processing.
+Safeguards for non-effective cfg.
+TBD
+
+Recovery Mode (not in POC)
+-------------
+TBD
