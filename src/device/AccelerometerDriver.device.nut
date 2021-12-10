@@ -68,9 +68,9 @@ const ACCEL_DEFAULT_WTM = 15;
 // Velocity zeroing counter (for stop motion)
 const ACCEL_VELOCITY_RESET_CNTR = 2;
 // Discrimination window applied low threshold
-const ACCEL_DISCR_WNDW_LOW_THR = -0.05;
+const ACCEL_DISCR_WNDW_LOW_THR = -0.1;
 // Discrimination window applied high threshold
-const ACCEL_DISCR_WNDW_HIGH_THR = 0.05;
+const ACCEL_DISCR_WNDW_HIGH_THR = 0.1;
 
 // States of the motion detection - FSM (finite state machine):
 // Motion detection is disabled (initial state; motion detection is disabled automatically after motion is detected)
@@ -87,6 +87,131 @@ const LIS2DH12_FDS = 0x08; // Filtered data selection. Data from internal filter
 const LIS2DH12_FIFO_SRC_REG  = 0x2F; // FIFO state register.
 const LIS2DH12_FIFO_WTM = 0x80; // Set high when FIFO content exceeds watermark level.
 
+// Vector of velocity and movement class.
+// Vectors operation in 3D.
+class FloatVector {
+
+    // x coordinat
+    _x = null;
+
+    // y coordinat
+    _y = null;
+
+    // z coordinat
+    _z = null;
+
+    /**
+     * Constructor for FloatVector Class
+     *
+     * @param {float} x - Start x coordinat of vector.
+     *                       Default: 0.0
+     * @param {float} y - Start y coordinat of vector.
+     *                       Default: 0.0
+     * @param {float} z - Start z coordinat of vector.
+     *                       Default: 0.0
+     */
+    constructor(x = 0.0, y = 0.0, z = 0.0) {
+        _x = x;
+        _y = y;
+        _z = z;
+    }
+
+    /**
+     * Calculate vector length.
+     * 
+     * @return {float} Current vector length.
+     */
+    function length() {
+        return math.sqrt(_x*_x + _y*_y + _z*_z);
+    }
+
+    /**
+     * Clear vector (set 0.0 to all coordinates).
+     */
+    function clear() {
+        _x = 0.0;
+        _y = 0.0;
+        _z = 0.0;
+    }
+
+    /**
+     * Overload of operation additions for vectors.
+     *                                     _ _
+     * @return {FloatVector} Result vector X+Y.
+     * An exception will be thrown in case of argument is not a FloatVector.
+     */
+    function _add(val) {
+        if (typeof val != "FloatVector") throw "Operand is not a Vector object";
+        return Vector(_x + val._x, _y + val._y, _z + val._z);
+    }
+
+    /**
+     * Overload of operation subtractions for vectors.
+     *                                     _ _
+     * @return {FloatVector} Result vector X-Y.
+     * An exception will be thrown in case of argument is not a FloatVector.
+     */
+    function _sub(val) {
+        if (typeof val != "FloatVector") throw "Operand is not a Vector object";
+        return Vector(_x - val._x, _y - val._y, _z - val._z);
+    }
+
+    /**
+     * Overload of operation assignment for vectors.
+     * 
+     * @return {FloatVector} Result vector.
+     * An exception will be thrown in case of argument is not a FloatVector.
+     */
+    function _set(val) {
+        if (typeof val != "FloatVector") throw "Operand is not a Vector object";
+        return Vector(val._x, val._y, val._z);
+    }
+
+    /**
+     * Overload of operation division for vectors.
+     *                                             _
+     * @return {FloatVector} Result vector (1/alf)*V.
+     * An exception will be thrown in case of argument is not a float value.
+     */
+    function _div(val) {
+        if (typeof val != "float") throw "Operand is not a float number";
+        return Vector(val > 0.0 || val < 0.0 ? _x/val : 0.0, 
+                      val > 0.0 || val < 0.0 ? _y/val : 0.0, 
+                      val > 0.0 || val < 0.0 ? _z/val : 0.0);
+    }
+
+    /**
+     * Overload of operation multiplication for vectors and scalar.
+     *                                         _
+     * @return {FloatVector} Result vector alf*V.
+     * An exception will be thrown in case of argument is not a float value.
+     */
+    function _mul(val) {
+        if (typeof val != "float") throw "Operand is not a float number";
+        return Vector(_x*val, _y*val, _z*val);
+    }
+
+    /**
+     * Return type.
+     * 
+     * @return {string} Type name.
+     */
+    function _typeof() {
+        return "FloatVector";
+    }
+
+    /**
+     * Convert class data to string.
+     * 
+     * @return {string} Class data.
+     */
+    function _tostring() {
+        return (_x + "," + _y + "," + _z);
+    }
+}
+
+// Accelerometer Driver class.
+// Determines the motion and shock detection.
 class AccelerometerDriver {
     // enable / disable motion detection
     _enMtnDetect = null;
@@ -139,59 +264,23 @@ class AccelerometerDriver {
     // minimal movement distance to determine motion detection condition
     _motionDistance = null;
 
-    // current value of acceleration x axis
-    _accXCur = null;
+    // current value of acceleration vector
+    _accCur = null;
 
-    // current value of acceleration y axis
-    _accYCur = null;
+    // previous value of acceleration vector
+    _accPrev = null;
 
-    // current value of acceleration z axis
-    _accZCur = null;
+    // current value of velocity vector
+    _velCur = null;
 
-    // previous value of acceleration x axis
-    _accXPrev = null;
+    // previous value of velocity vector
+    _velPrev = null;
 
-    // previous value of acceleration y axis
-    _accYPrev = null;
+    // current value of position vector
+    _positionCur = null;
 
-    // previous value of acceleration z axis
-    _accZPrev = null;
-
-    // current value of velocity x axis
-    _velXCur = null;
-
-    // current value of velocity y axis
-    _velYCur = null;
-
-    // current value of velocity z axis
-    _velZCur = null;
-
-    // previous value of velocity x axis
-    _velXPrev = null;
-
-    // previous value of velocity y axis
-    _velYPrev = null;
-
-    // previous value of velocity y axis
-    _velZPrev = null;
-
-    // current value of position x axis
-    _positionXCur = null;
-
-    // current value of position y axis
-    _positionYCur = null;
-
-    // current value of position z axis
-    _positionZCur = null;
-
-    // previous value of position x axis
-    _positionXPrev = null;
-
-    // previous value of position y axis
-    _positionYPrev = null;
-
-    // previous value of position z axis
-    _positionZPrev = null;
+    // previous value of position vector
+    _positionPrev = null;
 
     // counter for stop motion detection x axis
     _cntrAccLowX = null;
@@ -232,29 +321,13 @@ class AccelerometerDriver {
         _motionTimeout = ACCEL_DEFAULT_MOTION_TIME;
         _motionDistance = ACCEL_DEFAULT_MOTION_DIST;
         _motionDistance /= ACCEL_G;
-        _velXCur = 0.0;
-        _velYCur = 0.0;
-        _velZCur = 0.0;
 
-        _velXPrev = 0.0;
-        _velYPrev = 0.0;
-        _velZPrev = 0.0;
-
-        _accXCur = 0.0;
-        _accYCur = 0.0;
-        _accZCur = 0.0;
-
-        _accXPrev = 0.0;
-        _accYPrev = 0.0;
-        _accZPrev = 0.0;
-
-        _positionXCur = 0.0;
-        _positionYCur = 0.0;
-        _positionZCur = 0.0;
-
-        _positionXPrev = 0.0;
-        _positionYPrev = 0.0;
-        _positionZPrev = 0.0;
+        _velCur = FloatVector();
+        _velPrev = FloatVector();
+        _accCur = FloatVector();
+        _accPrev = FloatVector();
+        _positionCur = FloatVector();
+        _positionPrev = FloatVector();
 
         _cntrAccLowX = ACCEL_VELOCITY_RESET_CNTR;
         _cntrAccLowY = ACCEL_VELOCITY_RESET_CNTR;
@@ -281,7 +354,7 @@ class AccelerometerDriver {
             _accel.getInterruptTable();
             _accel.configureInterruptLatching(false);
             _intPin.configure(DIGITAL_IN_WAKEUP, _checkInt.bindenv(this));
-            ::debug("Accelerometer configured", "@{CLASS_NAME}");            
+            ::debug("Accelerometer configured", "@{CLASS_NAME}");
         } catch (e) {
             throw "Accelerometer configuration error: " + e;
         }
@@ -363,7 +436,7 @@ class AccelerometerDriver {
         _movementCurThr = ACCEL_DEFAULT_MOV_MIN;
         _movementMin = ACCEL_DEFAULT_MOV_MIN;
         _movementMax = ACCEL_DEFAULT_MOV_MAX;
-        _movementDur = ACCEL_DEFAULT_MOV_DUR;        
+        _movementDur = ACCEL_DEFAULT_MOV_DUR;
         _motionVelocity = ACCEL_DEFAULT_MOTION_VEL;
         _motionVelocity /= ACCEL_G;
         _motionTimeout = ACCEL_DEFAULT_MOTION_TIME;
@@ -373,7 +446,7 @@ class AccelerometerDriver {
             if (typeof key == "string") {
                 if (key == "movementMax") {
                     if (typeof value == "float" && value > 0) {
-                        _movementMax = value;                
+                        _movementMax = value;
                     } else {
                         ::error("movementMax incorrect value", "@{CLASS_NAME}");
                         motionSettIsCorr = false;
@@ -384,7 +457,7 @@ class AccelerometerDriver {
                 if (key == "movementMin") {
                     if (typeof value == "float"  && value > 0) {
                         _movementMin = value;
-                        _movementCurThr = value;            
+                        _movementCurThr = value;
                     } else {
                         ::error("movementMin incorrect value", "@{CLASS_NAME}");
                         motionSettIsCorr = false;
@@ -394,7 +467,7 @@ class AccelerometerDriver {
 
                 if (key == "movementDur") {
                     if (typeof value == "float"  && value > 0) {
-                        _movementDur = value;                
+                        _movementDur = value;
                     } else {
                         ::error("movementDur incorrect value", "@{CLASS_NAME}");
                         motionSettIsCorr = false;
@@ -404,7 +477,7 @@ class AccelerometerDriver {
 
                 if (key == "motionTimeout") {
                     if (typeof value == "float"  && value > 0) {
-                        _motionTimeout = value;                
+                        _motionTimeout = value;
                     } else {
                         ::error("motionTimeout incorrect value", "@{CLASS_NAME}");
                         motionSettIsCorr = false;
@@ -451,12 +524,8 @@ class AccelerometerDriver {
             _mtnCb = null;
             _enMtnDetect = false;
             _motionState = ACCEL_MOTION_STATE_DISABLED;
-            _positionXCur = 0;
-            _positionYCur = 0;
-            _positionZCur = 0;
-            _positionXPrev = 0;
-            _positionYPrev = 0;
-            _positionZPrev = 0;
+            _positionCur.clear();
+            _positionPrev.clear();
             _movementCurThr = _movementMin;
             _enMtnDetect = false;
             _accel.configureFifoInterrupts(false);
@@ -503,10 +572,10 @@ class AccelerometerDriver {
             _accAverage();
             _removeOffset();
             _calcVelosityAndPosition();
-            if (_motionState == ACCEL_MOTION_STATE_CONFIRMING) {            
-                _confirmMotion();            
+            if (_motionState == ACCEL_MOTION_STATE_CONFIRMING) {
+                _confirmMotion();
             }
-            _checkZeroValueAcc();                        
+            _checkZeroValueAcc();
         }
 
         if (_checkFIFOWtrm()) { 
@@ -514,8 +583,8 @@ class AccelerometerDriver {
             _accAverage();   
             _removeOffset();
             _calcVelosityAndPosition();
-            if (_motionState == ACCEL_MOTION_STATE_CONFIRMING) {            
-                _confirmMotion();            
+            if (_motionState == ACCEL_MOTION_STATE_CONFIRMING) {
+                _confirmMotion();
             }
             _checkZeroValueAcc();
         }
@@ -550,9 +619,7 @@ class AccelerometerDriver {
     function _accAverage() {
         local stats = _accel.getFifoStats();
 
-        _accXCur = 0;
-        _accYCur = 0;
-        _accZCur = 0;
+        _accCur.clear();
 
         for (local i = 0; i < stats.unread; i++) {
             local data = _accel.getAccel();
@@ -564,15 +631,12 @@ class AccelerometerDriver {
                 }
             }
 
-            _accXCur += data.x;
-            _accYCur += data.y;
-            _accZCur += data.z;
+            local acc = FloatVector(data.x, data.y, data.z);
+            _accCur = _accCur + acc;
         }
 
         if (stats.unread > 0) {
-            _accXCur /= stats.unread;
-            _accYCur /= stats.unread;
-            _accZCur /= stats.unread;
+            _accCur = _accCur / stats.unread.tofloat();
         }
     }
 
@@ -586,16 +650,16 @@ class AccelerometerDriver {
         //              |--/----\/\----/--\--/--\------------------------- time
         //              |__________\__/____\/_____________________________
         //              |           \/ <- real acceleration               ACCEL_DISCR_WNDW_LOW_THR
-        if (_accXCur < ACCEL_DISCR_WNDW_HIGH_THR && _accXCur > ACCEL_DISCR_WNDW_LOW_THR) {
-            _accXCur = 0;
+        if (_accCur._x < ACCEL_DISCR_WNDW_HIGH_THR && _accXCur._x > ACCEL_DISCR_WNDW_LOW_THR) {
+            _accCur._x = 0.0;
         }
 
-        if (_accYCur < ACCEL_DISCR_WNDW_HIGH_THR && _accYCur > ACCEL_DISCR_WNDW_LOW_THR) {
-            _accYCur = 0;
+        if (_accCur._y < ACCEL_DISCR_WNDW_HIGH_THR && _accCur._y > ACCEL_DISCR_WNDW_LOW_THR) {
+            _accCur._y = 0.0;
         }
 
-        if (_accZCur < ACCEL_DISCR_WNDW_HIGH_THR && _accZCur > ACCEL_DISCR_WNDW_LOW_THR) {
-            _accZCur = 0;
+        if (_accCur._z < ACCEL_DISCR_WNDW_HIGH_THR && _accCur._z > ACCEL_DISCR_WNDW_LOW_THR) {
+            _accCur._z = 0.0;
         }
     }
 
@@ -603,30 +667,14 @@ class AccelerometerDriver {
      * Calculate velocity and position.     
      */
     function _calcVelosityAndPosition() {
-        //  errors of integration are reduced with a first order approximation (Trapezoidal method)
-        _velXCur = _velXPrev + _accXPrev + (_accXCur - _accXPrev) / 2.0;
+        //  errors of integration are reduced with a first order approximation (Trapezoidal method)        
+        _velCur = _velPrev + _accPrev + (_accCur - _accPrev) / 2.0;
         if (_motionDistance > 0) {
-            _positionXCur = _positionXPrev + _velXPrev + (_velXCur - _velXPrev) / 2.0;
+            _positionCur = _positionPrev + _velPrev + (_velCur - _velPrev) / 2.0;
         }
-        _accXPrev = _accXCur;
-        _velXPrev = _velXCur;
-        _positionXPrev = _positionXCur;
-
-        _velYCur = _velYPrev + _accYPrev + (_accYCur - _accYPrev) / 2.0;
-        if (_motionDistance > 0) {
-            _positionYCur = _positionYPrev + _velYPrev + (_velYCur - _velYPrev) / 2.0;
-        }
-        _accYPrev = _accYCur;
-        _velYPrev = _velYCur;
-        _positionYPrev = _positionYCur;
-
-        _velZCur = _velZPrev + _accZPrev + (_accZCur - _accZPrev) / 2.0;
-        if (_motionDistance > 0) {
-            _positionZCur = _positionZPrev + _velZPrev + (_velZCur - _velZPrev) / 2.0;
-        }
-        _accZPrev = _accZCur;
-        _velZPrev = _velZCur;
-        _positionZPrev = _positionZCur;
+        _accPrev = _accCur;
+        _velPrev = _velCur;
+        _positionPrev = _positionCur;
     }
 
     /**
@@ -634,8 +682,8 @@ class AccelerometerDriver {
      * 
      */
     function _confirmMotion() {        
-        local vel = _getVectorLength(_velXCur, _velYCur, _velZCur);
-        local moving = _getVectorLength(_positionXCur, _positionYCur, _positionZCur);
+        local vel = _velCur.length();
+        local moving = _positionCur.length();
 
         ::debug(format("V %f m/s, S %f m", vel*ACCEL_G, moving*ACCEL_G), "@{CLASS_NAME}");
         local diffTm = time() - _motionCurTime;
@@ -662,27 +710,11 @@ class AccelerometerDriver {
                     _movementCurThr = _movementMax;
             } 
             ::debug(format("Motion is NOT confirmed. New movementCurThr %f g", _movementCurThr), "@{CLASS_NAME}")
-            _positionXCur = 0;
-            _positionYCur = 0;
-            _positionZCur = 0;
-            _positionXPrev = 0;
-            _positionYPrev = 0;
-            _positionZPrev = 0;
-            _accel.configureFifoInterrupts(false);            
+            _positionCur.clear();
+            _positionPrev.clear();
+            _accel.configureFifoInterrupts(false);
             _accel.configureInertialInterrupt(true, _movementCurThr, (_movementDur*ACCEL_DEFAULT_DATA_RATE).tointeger());            
         }
-    }
-
-    /**
-     * Calculate vector length.
-     * @param {float} x - current x coordinate.
-     * @param {float} y - current y coordinate.
-     * @param {float} z - current z coordinate.
-     * 
-     * @return {float} Current vector length.
-     */
-    function _getVectorLength(x, y, z) {
-        return math.sqrt(x*x + y*y + z*z);
     }
 
     /**
@@ -693,12 +725,8 @@ class AccelerometerDriver {
         _motionState = ACCEL_MOTION_STATE_DISABLED;
         if (_mtnCb && _enMtnDetect) {
             // clear current and previous position for new motion detection
-            _positionXCur = 0;
-            _positionYCur = 0;
-            _positionZCur = 0;
-            _positionXPrev = 0;
-            _positionYPrev = 0;
-            _positionZPrev = 0;
+            _positionCur.clear();
+            _positionPrev.clear();
             // reset movement threshold to minimum value
             _movementCurThr = _movementMin;
             _enMtnDetect = false;
@@ -713,34 +741,34 @@ class AccelerometerDriver {
     /**
      * Сheck for zero acceleration.
      */
-    function _checkZeroValueAcc() {                
-        if (_accXCur == 0) {
+    function _checkZeroValueAcc() {
+        if (_accCur._x == 0.0) {
             if (_cntrAccLowX > 0)
                 _cntrAccLowX--;
             else if (_cntrAccLowX == 0) {
                 _cntrAccLowX = ACCEL_VELOCITY_RESET_CNTR;
-                _velXCur = 0;
-                _velXPrev = 0;
+                _velCur._x = 0.0;
+                _velPrev._x = 0.0;
             }
         }
 
-        if (_accYCur == 0) {
+        if (_accCur._y == 0.0) {
             if (_cntrAccLowY > 0)
                 _cntrAccLowY--;
             else if (_cntrAccLowY == 0) {
                 _cntrAccLowY = ACCEL_VELOCITY_RESET_CNTR;
-                _velYCur = 0;
-                _velYPrev = 0;
+                _velCur._y = 0.0;
+                _velPrev._y = 0.0;
             }
         }
 
-        if (_accZCur == 0) {
+        if (_accCur._z == 0.0) {
             if (_cntrAccLowZ > 0)
                 _cntrAccLowZ--;
             else if (_cntrAccLowZ == 0) {
                 _cntrAccLowZ = ACCEL_VELOCITY_RESET_CNTR;
-                _velZCur = 0;
-                _velZPrev = 0;                                
+                _velCur._z = 0.0;
+                _velPrev._z = 0.0;
             }
         }
     }
