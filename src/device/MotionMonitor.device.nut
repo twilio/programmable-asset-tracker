@@ -4,7 +4,7 @@
 const MM_EARTH_RAD = 6371009;
 
 // Motion Monitor class.
-//  Start and stop motion checking.
+// Starts and stops motion monitoring.
 class MotionMonitor {
 
     // Accelerometer driver object
@@ -37,31 +37,31 @@ class MotionMonitor {
     // Current location
     _curLoc = null;
 
-    // Sign of relevance
+    // Sign of the current location relevance
     _curLocFresh = null;
 
     // Previous location
     _prevLoc = null;
 
-    // Sign of relevance
+    // Sign of the previous location relevance
     _prevLocFresh = null;
 
-    // maximum value of acceleration threshold for bounce filtering
+    // Movement acceleration threshold range: maximum level
     _movementMax = null;
 
-    // minimum value of acceleration threshold for bounce filtering
+    // Movement acceleration threshold range: minimum (starting) level
     _movementMin = null;
 
-    // minimum value of acceleration threshold for bounce filtering
+    // Duration of exceeding movement acceleration threshold
     _movementDur = null;
 
-    // maximum time to determine motion detection after the initial movement
+    // Maximum time to determine motion detection after the initial movement
     _motionTimeout = null;
 
-    // minimum instantaneous velocity to determine motion detection condition
+    // Minimal instantaneous velocity to determine motion detection condition
     _motionVelocity = null;
 
-    // minimal movement distance to determine motion detection condition
+    // Minimal movement distance to determine motion detection condition
     _motionDistance = null;
 
     /**
@@ -91,6 +91,7 @@ class MotionMonitor {
      *   Start motion monitoring.
      *   @param {table} motionMonSettings - Table with the settings.
      *        Optional, all settings have defaults.
+     *        If a setting is missed, it is reset to default.
      *        The settings:
      *          "locReadingPeriod": {float} - Location reading period, in seconds.
      *                                          Default: DEFAULT_LOCATION_READING_PERIOD
@@ -117,9 +118,10 @@ class MotionMonitor {
         _motionVelocity = DEFAULT_MOTION_VELOCITY;
         _motionDistance = DEFAULT_MOTION_DISTANCE;
 
+        // Check and set the settings
         _checkMotionMonSettings(motionMonSettings);
 
-        _locReadingTimer = imp.wakeup(_locReadingPeriod, _locReadingCb.bindenv(this));
+        _locReadingTimer = imp.wakeup(_locReadingPeriod, _locReadingTimerCb.bindenv(this));
     }
 
     /**
@@ -131,13 +133,13 @@ class MotionMonitor {
 
     /**
      *  Set new location callback function.
-     *  @param {function | null} locCb - The callback will be called every time the new location is received.
-     *                 locCb(loc), where
+     *  @param {function | null} locCb - The callback will be called every time the new location is received (null - disables the callback)
+     *                 locCb(isFresh, loc), where
      *                 @param {bool} isFresh - false if the latest location has not beed determined, the provided data is the previous location
-     *                 @param {table} loc - New location table.
+     *                 @param {table} loc - Location information
      *                      The fields:
      *                          "timestamp": {integer}  - The number of seconds that have elapsed since midnight on 1 January 1970.
-     *                               "type": {string}   - gnss or cell e.g.
+     *                               "type": {string}   - "gnss", "cell", "wifi", "ble"
      *                           "accuracy": {integer}  - Accuracy in meters
      *                          "longitude": {float}    - Longitude in degrees
      *                           "latitude": {float}    - Latitude in degrees
@@ -152,9 +154,9 @@ class MotionMonitor {
 
     /**
      *  Set motion event callback function.
-     *  @param {function | null} motionEventCb - The callback will be called every time the new motion event is detected.
+     *  @param {function | null} motionEventCb - The callback will be called every time the new motion event is detected (null - disables the callback)
      *                 motionEventCb(ev), where
-     *                 @param {bool} ev - If true - in motion.
+     *                 @param {bool} ev - true: motion started, false: motion stopped
      */
     function setMotionEventCb(motionEventCb) {
         if (typeof motionEventCb == "function" || motionEventCb == null) {
@@ -166,9 +168,9 @@ class MotionMonitor {
 
     /**
      *  Set geofencing event callback function.
-     *  @param {function | null} geofencingEventCb - The callback will be called every time the new geofencing event is detected.
+     *  @param {function | null} geofencingEventCb - The callback will be called every time the new geofencing event is detected (null - disables the callback)
      *                 geofencingEventCb(ev), where
-     *                 @param {bool} ev - If true - geofence entered.
+     *                 @param {bool} ev - true: geofence entered, false: geofence exited
      */
     function setGeofencingEventCb(geofencingEventCb) {
         if (typeof geofencingEventCb == "function" || geofencingEventCb == null) {
@@ -182,6 +184,7 @@ class MotionMonitor {
 
     /**
      * Check settings element.
+     * Returns the specified value if the check fails.
      *
      * @param {float} val - Value of settings element.
      * @param {float} defVal - Default value of settings element.
@@ -201,14 +204,16 @@ class MotionMonitor {
                 }
             }
         } else {
-            ::error("incorrect type of settings parameter", "@{CLASS_NAME}");
+            ::error("Incorrect type of settings parameter", "@{CLASS_NAME}");
         }
 
         return defVal;
     }
 
     /**
-     *  Check settings.
+     *  Check and set settings.
+     *  Sets default values for incorrect settings.
+     *
      *   @param {table} motionMonSettings - Table with the settings.
      *        Optional, all settings have defaults.
      *        The settings:
@@ -266,8 +271,10 @@ class MotionMonitor {
     /**
      *  Location reading timer callback function.
      */
-    function _locReadingCb() {
+    function _locReadingTimerCb() {
         if (_motionStopAssumption) {
+            // no movement during location reading period =>
+            // motion stop is confirmed
             _inMotion = false;
             _motionStopAssumption = false;
             if (_motionEventCb) {
@@ -278,14 +285,12 @@ class MotionMonitor {
             _checkMotionStop();
 
             _locReadingTimer && imp.cancelwakeup(_locReadingTimer);
-            _locReadingTimer = imp.wakeup(_locReadingPeriod, _locReadingCb.bindenv(this));
+            _locReadingTimer = imp.wakeup(_locReadingPeriod, _locReadingTimerCb.bindenv(this));
         }
     }
 
     /**
-     *  Try to determine the current location in the following order (till successfully determined):
-     *     1)  By GNSS fix
-     *     2)  By Cellular info
+     *  Try to determine the current location
      */
     function _locReading() {
         _prevLoc = _curLoc;
@@ -300,6 +305,7 @@ class MotionMonitor {
             }
         }.bindenv(this))
         .fail(function(reason) {
+            // the current location becomes non-fresh
             _curLoc = _prevLoc;
             _curLocFresh = false;
             if (_newLocCb) {
@@ -309,10 +315,12 @@ class MotionMonitor {
     }
 
     /**
-     *  Calculate distance between two points and comparison with threshold value.
+     *  Check if the motion is stopped
      */
     function _checkMotionStop() {
         if (_curLocFresh && _prevLocFresh) {
+
+            // calculate distance between two locations
             // https://en.wikipedia.org/wiki/Great-circle_distance
             local deltaLat = math.fabs(_curLoc.latitude - _prevLoc.latitude)*PI/180.0;
             local deltaLong = math.fabs(_curLoc.longitude - _prevLoc.longitude)*PI/180.0;
@@ -323,10 +331,13 @@ class MotionMonitor {
             // actual arc length on a sphere of radius r (mean Earth radius)
             local dist = MM_EARTH_RAD*deltaSigma;
             ::debug("Distance: " + dist, "@{CLASS_NAME}");
-            // stop assumption if distance less 2 radius of accuracy
+
+            // check if the distance is less than 2 radius of accuracy
             if (dist < 2*_curLoc.accuracy) {
+                // maybe motion is stopped, need to double check
                 _motionStopAssumption = true;
             } else {
+                // still in motion
                 if (!inMotion) {
                     inMotion = true;
                     if (_motionEventCb) {
@@ -337,10 +348,13 @@ class MotionMonitor {
         }
 
         if (!_curLocFresh && !_prevLocFresh) {
+            // the location has not been determined two times in a raw,
+            // need to double check the motion
             _motionStopAssumption = true;
         }
 
         if(_motionStopAssumption) {
+            // enable motion detection by accelerometer to double check the motion
             _ad.detectMotion(_onAccelMotionDetected.bindenv(this), {"movementMax"      : _movementMax,
                                                                     "movementMin"      : _movementMin,
                                                                     "movementDur"      : _movementDur,
@@ -351,18 +365,19 @@ class MotionMonitor {
     }
 
     /**
-     *  The handler is called when a accelerometer motion detected.
+     *  The handler is called when the motion is detected by accelerometer
      */
     function _onAccelMotionDetected() {
         _motionStopAssumption = false;
         if (!_inMotion) {
             _inMotion = true;
             _locReadingTimer && imp.cancelwakeup(_locReadingTimer);
+            // start reading location
             _locReading();
             if (_motionEventCb) {
                 _motionEventCb(_inMotion);
             }
-            _locReadingTimer = imp.wakeup(_locReadingPeriod, _locReadingCb.bindenv(this));
+            _locReadingTimer = imp.wakeup(_locReadingPeriod, _locReadingTimerCb.bindenv(this));
         }
     }
 }
