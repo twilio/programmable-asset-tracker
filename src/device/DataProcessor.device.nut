@@ -16,7 +16,7 @@ enum DP_ALERTS_SHIFTS {
 // Temperature hysteresis
 const DP_TEMPER_HYST = 1.0;
 
-// Init Impossible temperature value 
+// Init Impossible temperature value
 const DP_INIT_TEMPER_VALUE = -300.0;
 
 // Battery level hysteresis
@@ -32,13 +32,13 @@ class DataProcessor {
     // Data reading timer period
     _dataReadingPeriod = null;
 
-    // Data reading timer handler 
+    // Data reading timer handler
     _dataReadingTimer = null;
 
     // Data sending timer period
     _dataSendingPeriod = null;
 
-    // Data sending timer handler 
+    // Data sending timer handler
     _dataSendingTimer = null;
 
     // Result message
@@ -141,7 +141,7 @@ class DataProcessor {
      *                    "batteryLowThr": {float} - Battery low alert threshold
      *                                          Default: DEFAULT_BATTERY_LOW
      *                   "shockThreshold": {float} - Shock acceleration threshold, in g.
-     *                                      Default: DEFAULT_SHOCK_THRESHOLD 
+     *                                      Default: DEFAULT_SHOCK_THRESHOLD
      */
     function start(dataProcSettings = {}) {
         _temperatureHighAlertThr = DEFAULT_TEMPERATURE_HIGH;
@@ -150,7 +150,7 @@ class DataProcessor {
         _dataSendingPeriod = DEFAULT_DATA_SENDING_PERIOD;
         _batteryLowThr = DEFAULT_BATTERY_LOW;
         _shockThreshold = DEFAULT_SHOCK_THRESHOLD;
-        
+
         _checkDataProcSettings(dataProcSettings);
 
         if (_ad) {
@@ -185,7 +185,7 @@ class DataProcessor {
 
     /**
      *  Set data sending callback function.
-     *  @param {function} sendCb - The callback will be called every time there is a time to send data.     
+     *  @param {function} sendCb - The callback will be called every time there is a time to send data.
      */
     function setDataSendingCb(sendCb) {
         if (typeof sendCb == "function" || sendCb == null) {
@@ -206,7 +206,7 @@ class DataProcessor {
      *
      * @return {float} If success - value, else - default value.
      */
-    function _checkVal(val, defVal, flCheckSign = false) {        
+    function _checkVal(val, defVal, flCheckSign = false) {
         if (typeof val == "float") {
             if (flCheckSign) {
                 if (val > 0.0) {
@@ -217,7 +217,7 @@ class DataProcessor {
             }
         } else {
             ::error("incorrect type of settings parameter", "@{CLASS_NAME}");
-        }        
+        }
 
         return defVal;
     }
@@ -329,7 +329,7 @@ class DataProcessor {
         if (_curBatteryLev < _batteryLowThr) {
             _curAlertState = _curAlertState | (1 << DP_ALERTS_SHIFTS.DP_BATTERY_LOW);
         }
-        
+
         if (_curBatteryLev > _batteryLowThr + DP_BATTERY_LEV_HYST) {
             _curAlertState = _curAlertState & ~(1 << DP_ALERTS_SHIFTS.DP_BATTERY_LOW);
         }
@@ -339,7 +339,7 @@ class DataProcessor {
             for (local bitCntr = DP_ALERTS_SHIFTS.DP_SHOCK_DETECTED; bitCntr < DP_ALERTS_SHIFTS.DP_ALERTS_MAX; bitCntr++) {
                 // Alert event happens in case of a transition: non-alert condition (at the previous reading) -> alert condition (at the current reading)
                 if (!(_prevAlertState & (1 << bitCntr)) && (_curAlertState & (1 << bitCntr))) {
-                    alerts.append(_alertNames[bitCntr]);                                            
+                    alerts.append(_alertNames[bitCntr]);
                 }
             }
             _curAlertState = _curAlertState & ~(1 << DP_ALERTS_SHIFTS.DP_SHOCK_DETECTED);
@@ -362,14 +362,14 @@ class DataProcessor {
                           "sensors":{"batteryLevel": _curBatteryLev,
                                      "temperature": _curTemper},
                           "alerts":alerts};
-        
+
             ::info("Message:", "@{CLASS_NAME}");
             ::info("trackerId: " + _dataMessg.trackerId + ", timestamp: " + _dataMessg.timestamp +
-                   ", inMotion: " + _inMotion + ", fresh: " + _isFreshCurLoc + 
-                   ", location timestamp: " + _curLoc.timestamp + ", type: " + 
-                   _curLoc.type + ", accuracy: " + _curLoc.accuracy + 
-                   ", lng: " + _curLoc.longitude + ", lat: " + _curLoc.latitude + 
-                   ", batteryLevel: " + _curBatteryLev + ", temperature: " + 
+                   ", inMotion: " + _inMotion + ", fresh: " + _isFreshCurLoc +
+                   ", location timestamp: " + _curLoc.timestamp + ", type: " +
+                   _curLoc.type + ", accuracy: " + _curLoc.accuracy +
+                   ", lng: " + _curLoc.longitude + ", lat: " + _curLoc.latitude +
+                   ", batteryLevel: " + _curBatteryLev + ", temperature: " +
                    _curTemper, "@{CLASS_NAME}");
             ::info("Alerts:", "@{CLASS_NAME}");
             foreach (item in alerts) {
@@ -387,7 +387,7 @@ class DataProcessor {
         }
 
         _prevAlertState = _curAlertState;
-        
+
         _dataReadingTimer = imp.wakeup(_dataReadingPeriod, _dataProcCb.bindenv(this));
     }
 
@@ -437,9 +437,9 @@ class DataProcessor {
      */
     function _onMotionEvent(eventType) {
         if (eventType) {
-            _curAlertState = _curAlertState | (1 << DP_ALERTS_SHIFTS.DP_MOTION_STARTED);            
+            _curAlertState = _curAlertState | (1 << DP_ALERTS_SHIFTS.DP_MOTION_STARTED);
             _inMotion = true;
-        } else {            
+        } else {
             _curAlertState = _curAlertState | (1 << DP_ALERTS_SHIFTS.DP_MOTION_STOPPED);
             _inMotion = false;
         }
@@ -452,8 +452,8 @@ class DataProcessor {
      */
     function _onGeofencingEvent(eventType) {
         if (eventType) {
-            _curAlertState = _curAlertState | (1 << DP_ALERTS_SHIFTS.DP_GEOFENCE_ENTERED);            
-        } else {            
+            _curAlertState = _curAlertState | (1 << DP_ALERTS_SHIFTS.DP_GEOFENCE_ENTERED);
+        } else {
             _curAlertState = _curAlertState | (1 << DP_ALERTS_SHIFTS.DP_GEOFENCE_EXITED);
         }
         _dataProc();

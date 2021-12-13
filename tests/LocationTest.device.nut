@@ -112,7 +112,7 @@ cmConfig <- {
         "stayConnected"   : true,
         "errorPolicy"     : RETURN_ON_ERROR_NO_DISCONNECT,
         "connectTimeout"  : APP_CM_CONNECT_TIMEOUT
-};        
+};
 cm = ConnectionManager(cmConfig);
 cm.connect();
 

@@ -35,7 +35,7 @@ class MotionMonitor {
     _inMotion = null;
 
     // Current location
-    _curLoc = null;    
+    _curLoc = null;
 
     // Sign of relevance
     _curLocFresh = null;
@@ -95,17 +95,17 @@ class MotionMonitor {
      *          "locReadingPeriod": {float} - Location reading period, in seconds.
      *                                          Default: DEFAULT_LOCATION_READING_PERIOD
      *          "movementMax": {float}    - Movement acceleration maximum threshold, in g.
-     *                                        Default: DEFAULT_MOVEMENT_ACCELERATION_MAX 
+     *                                        Default: DEFAULT_MOVEMENT_ACCELERATION_MAX
      *          "movementMin": {float}    - Movement acceleration minimum threshold, in g.
-     *                                        Default: DEFAULT_MOVEMENT_ACCELERATION_MIN 
+     *                                        Default: DEFAULT_MOVEMENT_ACCELERATION_MIN
      *          "movementDur": {float}    - Duration of exceeding movement acceleration threshold, in seconds.
-     *                                        Default: DEFAULT_MOVEMENT_ACCELERATION_DURATION 
+     *                                        Default: DEFAULT_MOVEMENT_ACCELERATION_DURATION
      *          "motionTimeout": {float}  - Maximum time to determine motion detection after the initial movement, in seconds.
-     *                                        Default: DEFAULT_MOTION_TIME 
+     *                                        Default: DEFAULT_MOTION_TIME
      *          "motionVelocity": {float} - Minimum instantaneous velocity  to determine motion detection condition, in meters per second.
-     *                                        Default: DEFAULT_MOTION_VELOCITY 
+     *                                        Default: DEFAULT_MOTION_VELOCITY
      *          "motionDistance": {float} - Minimal movement distance to determine motion detection condition, in meters.
-     *                                      If 0, distance is not calculated (not used for motion detection). 
+     *                                      If 0, distance is not calculated (not used for motion detection).
      *                                        Default: DEFAULT_MOTION_DISTANCE
      */
     function start(motionMonSettings = {}) {
@@ -114,16 +114,16 @@ class MotionMonitor {
         _movementMin = DEFAULT_MOVEMENT_ACCELERATION_MIN;
         _movementDur = DEFAULT_MOVEMENT_ACCELERATION_DURATION;
         _motionTimeout = DEFAULT_MOTION_TIME;
-        _motionVelocity = DEFAULT_MOTION_VELOCITY;     
+        _motionVelocity = DEFAULT_MOTION_VELOCITY;
         _motionDistance = DEFAULT_MOTION_DISTANCE;
 
         _checkMotionMonSettings(motionMonSettings);
-        
+
         _locReadingTimer = imp.wakeup(_locReadingPeriod, _locReadingCb.bindenv(this));
     }
 
     /**
-     *   Stop motion monitoring.     
+     *   Stop motion monitoring.
      */
     function stop() {
         _locReadingTimer && imp.cancelwakeup(_locReadingTimer);
@@ -147,14 +147,14 @@ class MotionMonitor {
             _newLocCb = locCb;
         } else {
             ::error("Argument not a function or null", "@{CLASS_NAME}");
-        }     
+        }
     }
 
     /**
      *  Set motion event callback function.
      *  @param {function | null} motionEventCb - The callback will be called every time the new motion event is detected.
      *                 motionEventCb(ev), where
-     *                 @param {bool} ev - If true - in motion.     
+     *                 @param {bool} ev - If true - in motion.
      */
     function setMotionEventCb(motionEventCb) {
         if (typeof motionEventCb == "function" || motionEventCb == null) {
@@ -202,7 +202,7 @@ class MotionMonitor {
             }
         } else {
             ::error("incorrect type of settings parameter", "@{CLASS_NAME}");
-        }        
+        }
 
         return defVal;
     }
@@ -215,17 +215,17 @@ class MotionMonitor {
      *          "locReadingPeriod": {float} - Location reading period, in seconds.
      *                                          Default: DEFAULT_LOCATION_READING_PERIOD
      *          "movementMax": {float}    - Movement acceleration maximum threshold, in g.
-     *                                        Default: DEFAULT_MOVEMENT_ACCELERATION_MAX 
+     *                                        Default: DEFAULT_MOVEMENT_ACCELERATION_MAX
      *          "movementMin": {float}    - Movement acceleration minimum threshold, in g.
-     *                                        Default: DEFAULT_MOVEMENT_ACCELERATION_MIN 
+     *                                        Default: DEFAULT_MOVEMENT_ACCELERATION_MIN
      *          "movementDur": {float}    - Duration of exceeding movement acceleration threshold, in seconds.
      *                                        Default: DEFAULT_MOVEMENT_ACCELERATION_DURATION
      *          "motionTimeout": {float}  - Maximum time to determine motion detection after the initial movement, in seconds.
      *                                        Default: DEFAULT_MOTION_TIME
      *          "motionVelocity": {float} - Minimum instantaneous velocity  to determine motion detection condition, in meters per second.
-     *                                        Default: DEFAULT_MOTION_VELOCITY 
+     *                                        Default: DEFAULT_MOTION_VELOCITY
      *          "motionDistance": {float} - Minimal movement distance to determine motion detection condition, in meters.
-     *                                      If 0, distance is not calculated (not used for motion detection). 
+     *                                      If 0, distance is not calculated (not used for motion detection).
      *                                        Default: DEFAULT_MOTION_DISTANCE
      */
     function _checkMotionMonSettings(motionMonSettings) {
@@ -256,9 +256,9 @@ class MotionMonitor {
                     default:
                         ::error("Incorrect key name", "@{CLASS_NAME}");
                         break;
-                }                
+                }
             } else {
-                ::error("Incorrect motion condition settings", "@{CLASS_NAME}");                
+                ::error("Incorrect motion condition settings", "@{CLASS_NAME}");
             }
         }
     }
@@ -276,7 +276,7 @@ class MotionMonitor {
         } else {
             _locReading();
             _checkMotionStop();
-            
+
             _locReadingTimer && imp.cancelwakeup(_locReadingTimer);
             _locReadingTimer = imp.wakeup(_locReadingPeriod, _locReadingCb.bindenv(this));
         }
@@ -284,7 +284,7 @@ class MotionMonitor {
 
     /**
      *  Try to determine the current location in the following order (till successfully determined):
-     *     1)  By GNSS fix  
+     *     1)  By GNSS fix
      *     2)  By Cellular info
      */
     function _locReading() {
@@ -319,11 +319,11 @@ class MotionMonitor {
             local deltaSigma = math.pow(math.sin(0.5*deltaLat), 2);
             deltaSigma += math.cos(_curLoc.latitude*PI/180.0)*math.cos(_prevLoc.latitude*PI/180.0)*math.pow(math.sin(0.5*deltaLong), 2);
             deltaSigma = 2*math.asin(math.sqrt(deltaSigma));
-            
+
             // actual arc length on a sphere of radius r (mean Earth radius)
             local dist = MM_EARTH_RAD*deltaSigma;
             ::debug("Distance: " + dist, "@{CLASS_NAME}");
-            // stop assumption if distance less 2 radius of accuracy 
+            // stop assumption if distance less 2 radius of accuracy
             if (dist < 2*_curLoc.accuracy) {
                 _motionStopAssumption = true;
             } else {
@@ -349,7 +349,7 @@ class MotionMonitor {
                                                                     "motionDistance"   : _motionDistance});
         }
     }
-    
+
     /**
      *  The handler is called when a accelerometer motion detected.
      */
@@ -357,7 +357,7 @@ class MotionMonitor {
         _motionStopAssumption = false;
         if (!_inMotion) {
             _inMotion = true;
-            _locReadingTimer && imp.cancelwakeup(_locReadingTimer);            
+            _locReadingTimer && imp.cancelwakeup(_locReadingTimer);
             _locReading();
             if (_motionEventCb) {
                 _motionEventCb(_inMotion);

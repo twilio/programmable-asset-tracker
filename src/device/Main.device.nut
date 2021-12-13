@@ -42,7 +42,7 @@ class Application {
     _motionMon = null;
     _dataProc = null;
     _thermoSensDriver = null;
-    
+
     /**
      * Application Constructor
      */

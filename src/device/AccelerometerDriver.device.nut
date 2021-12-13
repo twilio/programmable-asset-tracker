@@ -36,7 +36,7 @@ const ACCEL_DEFAULT_DATA_RATE = 10;
 // Defaults for shock detection:
 // -----------------------------
 
-// Acceleration threshold, in g 
+// Acceleration threshold, in g
 const ACCEL_DEFAULT_SHOCK_THR = 2;    // (for LIS2DH12 register 0x3A)
 
 // Defaults for motion detection:
@@ -118,7 +118,7 @@ class FloatVector {
 
     /**
      * Calculate vector length.
-     * 
+     *
      * @return {float} Current vector length.
      */
     function length() {
@@ -158,7 +158,7 @@ class FloatVector {
 
     /**
      * Overload of operation assignment for vectors.
-     * 
+     *
      * @return {FloatVector} Result vector.
      * An exception will be thrown in case of argument is not a FloatVector.
      */
@@ -175,8 +175,8 @@ class FloatVector {
      */
     function _div(val) {
         if (typeof val != "float") throw "Operand is not a float number";
-        return Vector(val > 0.0 || val < 0.0 ? _x/val : 0.0, 
-                      val > 0.0 || val < 0.0 ? _y/val : 0.0, 
+        return Vector(val > 0.0 || val < 0.0 ? _x/val : 0.0,
+                      val > 0.0 || val < 0.0 ? _y/val : 0.0,
                       val > 0.0 || val < 0.0 ? _z/val : 0.0);
     }
 
@@ -193,7 +193,7 @@ class FloatVector {
 
     /**
      * Return type.
-     * 
+     *
      * @return {string} Type name.
      */
     function _typeof() {
@@ -202,7 +202,7 @@ class FloatVector {
 
     /**
      * Convert class data to string.
-     * 
+     *
      * @return {string} Class data.
      */
     function _tostring() {
@@ -246,10 +246,10 @@ class AccelerometerDriver {
     // current movement acceleration threshold
     _movementCurThr = null;
 
-    // maximum value of acceleration threshold for bounce filtering 
+    // maximum value of acceleration threshold for bounce filtering
     _movementMax = null;
 
-    // minimum value of acceleration threshold for bounce filtering 
+    // minimum value of acceleration threshold for bounce filtering
     _movementMin = null;
 
     // maximum time to determine motion detection after the initial movement
@@ -370,7 +370,7 @@ class AccelerometerDriver {
      *        Optional, all settings have defaults.
      *        The settings:
      *          "shockThreshold": {float} - Shock acceleration threshold, in g.
-     *                                      Default: ACCEL_DEFAULT_SHOCK_THR 
+     *                                      Default: ACCEL_DEFAULT_SHOCK_THR
      */
     function enableShockDetection(shockCb, shockCnd = {}) {
         local shockSettIsCorr = true;
@@ -413,22 +413,22 @@ class AccelerometerDriver {
      * (if needed) should be explicitly re-enabled again.
      * @param {function} motionCb - Callback to be called once when the motion condition is detected.
      *        The callback has no parameters. If null or not a function, the motion detection is disabled.
-     *        Otherwise, the motion detection is (re-)enabled for the provided motion condition. 
+     *        Otherwise, the motion detection is (re-)enabled for the provided motion condition.
      * @param {table} motionCnd - Table with the motion condition settings.
      *        Optional, all settings have defaults.
      *        The settings:
      *          "movementMax": {float}    - Movement acceleration maximum threshold, in g.
-     *                                        Default: ACCEL_DEFAULT_MOV_MAX 
+     *                                        Default: ACCEL_DEFAULT_MOV_MAX
      *          "movementMin": {float}    - Movement acceleration minimum threshold, in g.
-     *                                        Default: ACCEL_DEFAULT_MOV_MIN 
+     *                                        Default: ACCEL_DEFAULT_MOV_MIN
      *          "movementDur": {float}    - Duration of exceeding movement acceleration threshold, in seconds.
-     *                                        Default: ACCEL_DEFAULT_MOV_DUR 
+     *                                        Default: ACCEL_DEFAULT_MOV_DUR
      *          "motionTimeout": {float}  - Maximum time to determine motion detection after the initial movement, in seconds.
-     *                                        Default: ACCEL_DEFAULT_MOTION_TIME 
+     *                                        Default: ACCEL_DEFAULT_MOTION_TIME
      *          "motionVelocity": {float} - Minimum instantaneous velocity  to determine motion detection condition, in meters per second.
-     *                                        Default: ACCEL_DEFAULT_MOTION_VEL 
+     *                                        Default: ACCEL_DEFAULT_MOTION_VEL
      *          "motionDistance": {float} - Minimal movement distance to determine motion detection condition, in meters.
-     *                                      If 0, distance is not calculated (not used for motion detection). 
+     *                                      If 0, distance is not calculated (not used for motion detection).
      *                                        Default: ACCEL_DEFAULT_MOTION_DIST
      */
     function detectMotion(motionCb, motionCnd = {}) {
@@ -484,7 +484,7 @@ class AccelerometerDriver {
                         break;
                     }
                 }
-                
+
                 if (key == "motionVelocity") {
                     if (typeof value == "float"  && value >= 0) {
                         _motionVelocity = value;
@@ -554,7 +554,7 @@ class AccelerometerDriver {
 
         local intTable = _accel.getInterruptTable();
 
-        if (intTable.singleClick) { 
+        if (intTable.singleClick) {
             ::debug("Shock interrupt", "@{CLASS_NAME}");
             if (_shockCb && _enShockDetect) {
                 _shockCb();
@@ -578,9 +578,9 @@ class AccelerometerDriver {
             _checkZeroValueAcc();
         }
 
-        if (_checkFIFOWtrm()) { 
+        if (_checkFIFOWtrm()) {
             ::debug("FIFO watermark", "@{CLASS_NAME}");
-            _accAverage();   
+            _accAverage();
             _removeOffset();
             _calcVelosityAndPosition();
             if (_motionState == ACCEL_MOTION_STATE_CONFIRMING) {
@@ -605,7 +605,7 @@ class AccelerometerDriver {
             ::error("Error get FIFO state register", "@{CLASS_NAME}");
             fifoSt = 0;
         }
-        
+
         if (fifoSt & LIS2DH12_FIFO_WTM) {
             res = true;
         }
@@ -623,7 +623,7 @@ class AccelerometerDriver {
 
         for (local i = 0; i < stats.unread; i++) {
             local data = _accel.getAccel();
-            
+
             foreach (key, val in data) {
                 if (key == "error") {
                     ::error("Error get acceleration values", "@{CLASS_NAME}");
@@ -664,10 +664,10 @@ class AccelerometerDriver {
     }
 
     /**
-     * Calculate velocity and position.     
+     * Calculate velocity and position.
      */
     function _calcVelosityAndPosition() {
-        //  errors of integration are reduced with a first order approximation (Trapezoidal method)        
+        //  errors of integration are reduced with a first order approximation (Trapezoidal method)
         _velCur = _velPrev + _accPrev + (_accCur - _accPrev) / 2.0;
         if (_motionDistance > 0) {
             _positionCur = _positionPrev + _velPrev + (_velCur - _velPrev) / 2.0;
@@ -679,16 +679,16 @@ class AccelerometerDriver {
 
     /**
      * Check if motion condition(s) occured
-     * 
+     *
      */
-    function _confirmMotion() {        
+    function _confirmMotion() {
         local vel = _velCur.length();
         local moving = _positionCur.length();
 
         ::debug(format("V %f m/s, S %f m", vel*ACCEL_G, moving*ACCEL_G), "@{CLASS_NAME}");
         local diffTm = time() - _motionCurTime;
         if (diffTm < _motionTimeout) {
-            if (vel > _motionVelocity) {                
+            if (vel > _motionVelocity) {
                 _thrVelExceeded = true;
             }
             if (_motionDistance > 0 && moving > _motionDistance) {
@@ -708,12 +708,12 @@ class AccelerometerDriver {
                 _movementCurThr += ACCEL_DEFAULT_MOV_STEP;
                 if (_movementCurThr > _movementMax)
                     _movementCurThr = _movementMax;
-            } 
+            }
             ::debug(format("Motion is NOT confirmed. New movementCurThr %f g", _movementCurThr), "@{CLASS_NAME}")
             _positionCur.clear();
             _positionPrev.clear();
             _accel.configureFifoInterrupts(false);
-            _accel.configureInertialInterrupt(true, _movementCurThr, (_movementDur*ACCEL_DEFAULT_DATA_RATE).tointeger());            
+            _accel.configureInertialInterrupt(true, _movementCurThr, (_movementDur*ACCEL_DEFAULT_DATA_RATE).tointeger());
         }
     }
 

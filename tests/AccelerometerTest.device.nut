@@ -31,7 +31,7 @@ const TEST_MOTION_VEL = 0.6;
 // Minimal movement distance to determine motion detection condition, in meters
 const TEST_MOTION_DIST = 10.0;
 
-// Delay between motion event and enabling the next motion detection, in seconds 
+// Delay between motion event and enabling the next motion detection, in seconds
 const TEST_MOTION_CHECK_DELAY = 15;
 
 /**
@@ -71,7 +71,7 @@ try {
                                                  "motionVelocity"   : TEST_MOTION_VEL,
                                                  "motionDistance"   : TEST_MOTION_DIST});
     ::info("Motion and shock detection enabled");
-} catch (e) {    
+} catch (e) {
     ::error(e);
 }
 
