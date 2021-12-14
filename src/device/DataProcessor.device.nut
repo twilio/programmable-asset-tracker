@@ -16,14 +16,14 @@ enum DP_ALERTS_SHIFTS {
 // Temperature hysteresis
 const DP_TEMPER_HYST = 1.0;
 
-// Init Impossible temperature value
+// Init impossible temperature value
 const DP_INIT_TEMPER_VALUE = -300.0;
 
 // Battery level hysteresis
 const DP_BATTERY_LEV_HYST = 2.0;
 
 // Data Processor class.
-// Process data, save and send messages
+// Processes data, saves and sends messages
 class DataProcessor {
 
     // Array of alert names
@@ -65,7 +65,7 @@ class DataProcessor {
     // Last location
     _curLoc = null;
 
-    // Sign of relevance
+    // Sign of the location relevance
     _isFreshCurLoc = null;
 
     // Moton state
@@ -129,6 +129,7 @@ class DataProcessor {
      *  Start data processing.
      *   @param {table} dataProcSettings - Table with the settings.
      *        Optional, all settings have defaults.
+     *        If a setting is missed, it is reset to default.
      *        The settings:
      *          "temperatureHighAlertThr": {float} - Temperature high alert threshold, in Celsius.
      *                                          Default: DEFAULT_TEMPERATURE_HIGH
@@ -167,8 +168,9 @@ class DataProcessor {
             ::info("Motion monitor object is null", "@{CLASS_NAME}");
         }
 
-        _dataReadingTimer = imp.wakeup(_dataReadingPeriod, _dataProcCb.bindenv(this));
-        _dataSendingTimer = imp.wakeup(_dataSendingPeriod, _dataSendCb.bindenv(this));
+        // starts periodic data reading and sending
+        _dataReadingTimer = imp.wakeup(_dataReadingPeriod, _dataProcTimerCb.bindenv(this));
+        _dataSendingTimer = imp.wakeup(_dataSendingPeriod, _dataSendTimerCb.bindenv(this));
     }
 
     /**
@@ -199,6 +201,7 @@ class DataProcessor {
 
     /**
      * Check settings element.
+     * Returns the specified value if the check fails.
      *
      * @param {float} val - Value of settings element.
      * @param {float} defVal - Default value of settings element.
@@ -216,14 +219,16 @@ class DataProcessor {
                 return val;
             }
         } else {
-            ::error("incorrect type of settings parameter", "@{CLASS_NAME}");
+            ::error("Incorrect type of settings parameter", "@{CLASS_NAME}");
         }
 
         return defVal;
     }
 
     /**
-     *  Check settings.
+     *  Check and set settings.
+     *  Sets default values for incorrect settings.
+     *
      *   @param {table} dataProcSettings - Table with the settings.
      *        Optional, all settings have defaults.
      *        The settings:
@@ -267,7 +272,7 @@ class DataProcessor {
                         break;
                 }
             } else {
-                ::error("incorrect key type", "@{CLASS_NAME}");
+                ::error("Incorrect key type", "@{CLASS_NAME}");
             }
         }
     }
@@ -275,7 +280,7 @@ class DataProcessor {
     /**
      *  Data sending timer callback function.
      */
-    function _dataSendCb() {
+    function _dataSendTimerCb() {
         _dataSend();
     }
 
@@ -290,23 +295,24 @@ class DataProcessor {
             _sendCb();
         }
 
-        _dataSendingTimer = imp.wakeup(_dataSendingPeriod, _dataSendCb.bindenv(this));
+        _dataSendingTimer = imp.wakeup(_dataSendingPeriod, _dataSendTimerCb.bindenv(this));
     }
 
     /**
-     *  Data reading timer callback function.
+     *  Data reading and processing timer callback function.
      */
-    function _dataProcCb() {
+    function _dataProcTimerCb() {
         _dataProc();
     }
 
     /**
-     *  Data reading and alert polling.
+     *  Data and alerts reading and processing.
      */
     function _dataProc() {
 
         _dataReadingTimer && imp.cancelwakeup(_dataReadingTimer);
 
+        // get the current temperature, check alert conditions
         local res = _ts.read();
         _curTemper = res.temperature;
         ::debug("Temperature: " + _curTemper);
@@ -326,6 +332,7 @@ class DataProcessor {
             _curAlertState = _curAlertState & ~(1 << DP_ALERTS_SHIFTS.DP_TEMPER_LOW);
         }
 
+        // get the current battery level, check alert conditions - TODO
         if (_curBatteryLev < _batteryLowThr) {
             _curAlertState = _curAlertState | (1 << DP_ALERTS_SHIFTS.DP_BATTERY_LOW);
         }
@@ -388,13 +395,13 @@ class DataProcessor {
 
         _prevAlertState = _curAlertState;
 
-        _dataReadingTimer = imp.wakeup(_dataReadingPeriod, _dataProcCb.bindenv(this));
+        _dataReadingTimer = imp.wakeup(_dataReadingPeriod, _dataProcTimerCb.bindenv(this));
     }
 
     /**
      *  The handler is called when a new location is received.
-     *  @param {bool} isFresh - false if the latest location has not beed determined, the provided data is the previous location
-     *  @param {table} loc - New location table.
+     *  @param {bool} isFresh - false if the latest location has not been determined, the provided data is the previous location
+     *  @param {table} loc - Location information.
      *      The fields:
      *          "timestamp": {integer}  - Time value
      *               "type": {string}   - gnss or cell e.g.
@@ -424,7 +431,7 @@ class DataProcessor {
     }
 
     /**
-     * The handler is called when a new shock event is detected.
+     * The handler is called when a shock event is detected.
      */
     function _onShockDetectedEvent() {
         _curAlertState = _curAlertState | (1 << DP_ALERTS_SHIFTS.DP_SHOCK_DETECTED);
@@ -432,8 +439,8 @@ class DataProcessor {
     }
 
     /**
-     *  The handler is called when a new motion event is detected.
-     *  @param {bool} eventType - If true - in motion.
+     *  The handler is called when a motion event is detected.
+     *  @param {bool} eventType - true: motion started, false: motion stopped
      */
     function _onMotionEvent(eventType) {
         if (eventType) {
@@ -447,8 +454,8 @@ class DataProcessor {
     }
 
     /**
-     *  The handler is called when a new geofencing event is detected.
-     *  @param {bool} eventType - If true - geofence entered.
+     *  The handler is called when a geofencing event is detected.
+     *  @param {bool} eventType - true: geofence is entered, false: geofence is exited
      */
     function _onGeofencingEvent(eventType) {
         if (eventType) {
