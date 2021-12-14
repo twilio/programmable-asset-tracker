@@ -69,17 +69,17 @@ Variables:
 - `CLOUD_REST_API_PASSWORD` - Password to access the cloud REST API. Mandatory. Has no default.
 - TBD
 
-JSON with environment variables example:
+Example of JSON with environment variables:
 ```
 {
-  "CLOUD_REST_API_USERNAME": " "test",
-  "CLOUD_REST_API_PASSWORD": " "test"
+  "CLOUD_REST_API_USERNAME": "test",
+  "CLOUD_REST_API_PASSWORD": "test"
 }
 ```
 
 ## Build And Run ##
 
-- Change [Configuration Constants](#configuration-constants), if needed.
+- Change [Configuration Constants](#hardcoded-configuration), if needed.
 - Specify mandatory (and optional, if needed) [Builder Variables](#builder-variables).
 - Run [Builder](https://github.com/electricimp/Builder/) for [./src/agent/Main.agent.nut](./src/agent/Main.agent.nut) file to get Imp-Agent preprocessed file.
 - Run [Builder](https://github.com/electricimp/Builder/) for [./src/device/Main.device.nut](./src/device/Main.device.nut) file to get Imp-Device preprocessed file.
