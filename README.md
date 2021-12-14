@@ -1,89 +1,160 @@
-# prog-x
+# Prog-X Asset Tracker #
 
-Prog-X Asset Tracker
+**Version of the Application: 1.0.0 (POC)**
 
-## Getting started
+An application in Squirrel language for [Electric Imp platform](https://www.electricimp.com/platform) that implements asset tracking functionality.
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+The requirements: [./docs/Requirements - Prog-X Asset Tracker - external-GPx.pdf](./docs/Requirements%20-%20Prog-X%20Asset%20Tracker%20-%20external-GPx.pdf)
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+This version (Proof-Of-Concept) supports:
+- Target board: [imp006 Breakout Board](https://developer.electricimp.com/hardware/resources/reference-designs/imp006breakout)
+- Communication with the Internet (between Imp-Device and Imp-Agent) via cellular network.
+- Application configuration is hardcoded in the source file.
+- Motion start detection using Accelerometer.
+- Periodic Location tracking when the asset is in motion.
+- Motion stop detection using Location tracking (+ Accelerometer for confirmation).
+- Default configuration settings intended for manual testing of motion ("walking pattern").
+- Location tracking by:
+  - GNSS fix (BG96 GNSS) (+ BG96 Assist data)
+  - Cellular towers information (+ Google Maps Geolocation API)
+- Periodic reading and reporting of:
+  - Temperature
+- Alerts determination and immediate reporting for:
+  - Temperature High
+  - Temperature Low
+  - Shock Detected
+  - Motion Started
+  - Motion Stopped
+- Staying offline most of time. Connection to the Internet (from Imp-device to Imp-Agent) only for:
+  - Data/alerts sending
+  - GNSS Assist data obtaining
+  - Location obtaining by cellular towers information
+- If no/bad cellular network, saving messages in the flash and re-sending them later.
+- Sending data/alerts from Imp-Agent to a cloud with the predefined REST API.
+- The cloud REST API simple emulation on another Imp.
 
-## Add your files
+## Source Code ##
 
-- [ ] [Create](https://gitlab.com/-/experiment/new_project_readme_content:e0603bf782b5042835efd61d76ece19a?https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://gitlab.com/-/experiment/new_project_readme_content:e0603bf782b5042835efd61d76ece19a?https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://gitlab.com/-/experiment/new_project_readme_content:e0603bf782b5042835efd61d76ece19a?https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
+Shared sources: [./src/shared](./src/shared)
+
+Imp-Agent sources: [./src/agent](./src/agent)
+
+Imp-Device sources: [./src/device](./src/device)
+
+## Setup ##
+
+### Hardcoded Configuration ###
+
+Configuration constants: [./src/device/Configuration.device.nut](./src/device/Configuration.device.nut)
+
+### Builder Variables ###
+
+Should be passed to [Builder](https://github.com/electricimp/Builder/):
+- either using `-D<variable name> <variable value>` option,
+- or using `--use-directives <path_to_json_file>` option, where the json file contains the variables with the values.
+
+Variables:
+- `CLOUD_REST_API_URL` - Cloud REST API URL. Mandatory. Has no default.
+- `DEFAULT_LOG_LEVEL` - Logging level ("ERROR", "INFO", "DEBUG") on Imp-Agent/Device after the Imp firmware is deployed. Optional. Default: "INFO".
+- TBD
+
+### User-Defined Environment Variables ###
+
+Are used for sensitive settings, eg. credentials.
+
+Should be passed to [impcentral Device Group Environment Variables](https://developer.electricimp.com/tools/impcentral/environmentvariables#user-defined-environment-variables) in JSON format
+
+Variables:
+- `CLOUD_REST_API_USERNAME` - Username to access the cloud REST API. Mandatory. Has no default.
+- `CLOUD_REST_API_PASSWORD` - Password to access the cloud REST API. Mandatory. Has no default.
+- TBD
+
+JSON with environment variables example:
+```
+{
+  "CLOUD_REST_API_USERNAME": " "test",
+  "CLOUD_REST_API_PASSWORD": " "test"
+}
+```
+
+## Build And Run ##
+
+- Change [Configuration Constants](#configuration-constants), if needed.
+- Specify mandatory (and optional, if needed) [Builder Variables](#builder-variables).
+- Run [Builder](https://github.com/electricimp/Builder/) for [./src/agent/Main.agent.nut](./src/agent/Main.agent.nut) file to get Imp-Agent preprocessed file.
+- Run [Builder](https://github.com/electricimp/Builder/) for [./src/device/Main.device.nut](./src/device/Main.device.nut) file to get Imp-Device preprocessed file.
+- Specify mandatory [Environment Variables](#user-defined-environment-variables) in the impcentral Device Group where you plan to run the application.
+- Create and build a new deployment in the Device Group and restart Imp.
+- Check logs.
+
+## Simple Cloud Integration ##
+
+The cloud should implement the following REST API:
+- Accept `POST https://<cloud_api_url>/data` requests. Where <cloud_api_url> should be set as `CLOUD_REST_API_URL` [Builder Variable](#builder-variables) in the Imp application. `/data` - is an endpoint.
+- Support the basic authentication - `<username>/<password>`. Where `<username>/<password>` should be set as `CLOUD_REST_API_USERNAME`/`CLOUD_REST_API_PASSWORD` [Environment Variables](#user-defined-environment-variables) in the Imp application.
+- Accept message body in [JSON format](#data-message-json).
+- Return HTTP response code `200` when a message is accepted/received. The Imp application interpreters any other codes as error.
+
+### Data Message JSON ###
+
+All fields are mandatory, if not specified otherwise.
 
 ```
-cd existing_repo
-git remote add origin https://gitlab.com/iot-tracking-platform/prog-x.git
-git branch -M main
-git push -uf origin main
+{
+   "trackerId": <string>,    // Unique Id of the tracker (Imp deviceId)
+   "timestamp": <number>,    // Timestamp when the data was read (Unix time - secs since the Epoch)
+   "status": {
+     "inMotion": <boolean>   // true - the asset is in motion now; false - the asset is not in motion
+   },
+   "location": {             // Last known location
+     "timestamp": <number>,  // Timestamp when this location was determined (Unix time - secs since the Epoch)
+     "type": <string>,       // Type of location determination: "gnss", "cell", "wifi", "ble"
+     "accuracy": 3,          // Location accuracy, in meters
+     "lng": <number>,        // Longitude
+     "lat": <number>         // Latitude
+   },
+   "sensors": {
+     "temperature": <number> // Current temperature, in Celsius
+   },
+   "alerts": [ <array_of_strings> ]    // Alerts. Optional. Can be missed or empty if no alerts.
+   // Possible values: "temperatureHigh", "temperatureLow", "shockDetected", "motionStarted", "motionStopped"
+}
 ```
 
-## Integrate with your tools
+Example:
+```
+{
+   "trackerId": "c0010c2a69f088a4",
+   "timestamp": 1617900077,
+   "status": {
+     "inMotion": true
+   },
+   "location": {
+     "timestamp": 1617900070,
+     "type": "gnss",
+     "accuracy": 3,
+     "lng": 30.571465,
+     "lat": 59.749069
+   },
+   "sensors": {
+     "temperature": 42.191177
+   },
+   "alerts": [
+     "temperatureHigh",
+     "shockDetected"
+   ]
+}
+```
 
-- [ ] [Set up project integrations](https://gitlab.com/-/experiment/new_project_readme_content:e0603bf782b5042835efd61d76ece19a?https://docs.gitlab.com/ee/user/project/integrations/)
+### Simple Cloud Emulation ###
 
-## Collaborate with your team
+Cloud REST API is emulated by an application in Squirrel language which can be run on another Imp device.
 
-- [ ] [Invite team members and collaborators](https://gitlab.com/-/experiment/new_project_readme_content:e0603bf782b5042835efd61d76ece19a?https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://gitlab.com/-/experiment/new_project_readme_content:e0603bf782b5042835efd61d76ece19a?https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://gitlab.com/-/experiment/new_project_readme_content:e0603bf782b5042835efd61d76ece19a?https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Automatically merge when pipeline succeeds](https://gitlab.com/-/experiment/new_project_readme_content:e0603bf782b5042835efd61d76ece19a?https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
-
-## Test and Deploy
-
-Use the built-in continuous integration in GitLab.
-
-- [ ] [Get started with GitLab CI/CD](https://gitlab.com/-/experiment/new_project_readme_content:e0603bf782b5042835efd61d76ece19a?https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing(SAST)](https://gitlab.com/-/experiment/new_project_readme_content:e0603bf782b5042835efd61d76ece19a?https://docs.gitlab.com/ee/user/application_security/sast/)
-
-***
-
-# Editing this README
-
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!).  Thank you to [makeareadme.com](https://gitlab.com/-/experiment/new_project_readme_content:e0603bf782b5042835efd61d76ece19a?https://www.makeareadme.com/) for this template.
-
-## Suggestions for a good README
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
-
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
-
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
-
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
-
+How to run the emulator:
+- Use any Imp model. Only Imp-Agent is utilized.
+- Determine its URL. It comprises the base URL `agent.electricimp.com` plus the [agent’s ID](https://developer.electricimp.com/faqs/terminology#agent). Example: `https://agent.electricimp.com/7jiDVu1t_w--`
+- Take the emulator file: [./tests/CloudRestApiEmulator.agent.nut](./tests/CloudRestApiEmulator.agent.nut)
+- Set `CLOUD_REST_API_USERNAME` and `CLOUD_REST_API_PASSWORD` constants inside this file. For example to "test"/"test".
+- Upload, build and run this file on the Imp which is used for emulation. No [Builder](https://github.com/electricimp/Builder/) is required. Imp-Device code can be empty.
+- [Setup](#setup) the asset tracker application according to the emulator REST API URL/username/password and [run](#build-and-run) the application.
+- Check the emulator and the application logs.
