@@ -53,12 +53,6 @@ class DataProcessor {
     // Motion Monitor driver object
     _mm = null;
 
-    // Save message callback
-    _saveCb = null;
-
-    // Send message callback
-    _sendCb = null;
-
     // Last temperature value
     _curTemper = null;
 
@@ -173,30 +167,6 @@ class DataProcessor {
         _dataSendingTimer = imp.wakeup(_dataSendingPeriod, _dataSendTimerCb.bindenv(this));
     }
 
-    /**
-     *  Set data saving callback function.
-     *  @param {function} saveCb - The callback will be called every time the data is ready to be saved.
-     */
-    function setDataSavingCb(saveCb) {
-        if (typeof saveCb == "function" || saveCb == null) {
-            _saveCb = saveCb;
-        } else {
-            ::error("Argument not a function or null", "@{CLASS_NAME}");
-        }
-    }
-
-    /**
-     *  Set data sending callback function.
-     *  @param {function} sendCb - The callback will be called every time there is a time to send data.
-     */
-    function setDataSendingCb(sendCb) {
-        if (typeof sendCb == "function" || sendCb == null) {
-            _sendCb = sendCb;
-        } else {
-            ::error("Argument not a function or null", "@{CLASS_NAME}");
-        }
-    }
-
     // -------------------- PRIVATE METHODS -------------------- //
 
     /**
@@ -288,13 +258,8 @@ class DataProcessor {
      *  Data sending function.
      */
     function _dataSend() {
-
+        cm.connect();
         _dataSendingTimer && imp.cancelwakeup(_dataSendingTimer);
-
-        if (_sendCb) {
-            _sendCb();
-        }
-
         _dataSendingTimer = imp.wakeup(_dataSendingPeriod, _dataSendTimerCb.bindenv(this));
     }
 
@@ -384,9 +349,7 @@ class DataProcessor {
             }
         }
 
-        if (_saveCb) {
-            _saveCb();
-        }
+        rm.send(APP_RM_MSG_NAME.DATA, _dataMessg, RM_IMPORTANCE_HIGH);
 
         // If there is at least one alert event call data sending function
         if (alerts.len() > 0) {
