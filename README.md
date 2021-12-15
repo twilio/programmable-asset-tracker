@@ -54,9 +54,7 @@ Should be passed to [Builder](https://github.com/electricimp/Builder/):
 - or using `--use-directives <path_to_json_file>` option, where the json file contains the variables with the values.
 
 Variables:
-- `CLOUD_REST_API_URL` - Cloud REST API URL. Mandatory. Has no default.
-- `DEFAULT_LOG_LEVEL` - Logging level ("ERROR", "INFO", "DEBUG") on Imp-Agent/Device after the Imp firmware is deployed. Optional. Default: "INFO".
-- TBD
+- `LOGGER_LEVEL` - Logging level ("ERROR", "INFO", "DEBUG") on Imp-Agent/Device after the Imp firmware is deployed. Optional. Default: "INFO".
 
 ### User-Defined Environment Variables ###
 
@@ -65,13 +63,14 @@ Are used for sensitive settings, eg. credentials.
 Should be passed to [impcentral Device Group Environment Variables](https://developer.electricimp.com/tools/impcentral/environmentvariables#user-defined-environment-variables) in JSON format
 
 Variables:
+- `CLOUD_REST_API_URL` - Cloud REST API URL. Mandatory. Has no default.
 - `CLOUD_REST_API_USERNAME` - Username to access the cloud REST API. Mandatory. Has no default.
 - `CLOUD_REST_API_PASSWORD` - Password to access the cloud REST API. Mandatory. Has no default.
-- TBD
 
-Example of JSON with environment variables:
+Example of JSON with environment variables (when Cloud REST API is [emulated on another Imp](#simple-cloud-emulation)):
 ```
 {
+  "CLOUD_REST_API_URL": "https://agent.electricimp.com/7jiDVu1t_w--",
   "CLOUD_REST_API_USERNAME": "test",
   "CLOUD_REST_API_PASSWORD": "test"
 }
@@ -80,7 +79,7 @@ Example of JSON with environment variables:
 ## Build And Run ##
 
 - Change [Configuration Constants](#hardcoded-configuration), if needed.
-- Specify mandatory (and optional, if needed) [Builder Variables](#builder-variables).
+- Specify [Builder Variables](#builder-variables), if needed.
 - Run [Builder](https://github.com/electricimp/Builder/) for [./src/agent/Main.agent.nut](./src/agent/Main.agent.nut) file to get Imp-Agent preprocessed file.
 - Run [Builder](https://github.com/electricimp/Builder/) for [./src/device/Main.device.nut](./src/device/Main.device.nut) file to get Imp-Device preprocessed file.
 - Specify mandatory [Environment Variables](#user-defined-environment-variables) in the impcentral Device Group where you plan to run the application.
@@ -89,9 +88,12 @@ Example of JSON with environment variables:
 
 ## Simple Cloud Integration ##
 
-The cloud should implement the following REST API:
-- Accept `POST https://<cloud_api_url>/data` requests. Where <cloud_api_url> should be set as `CLOUD_REST_API_URL` [Builder Variable](#builder-variables) in the Imp application. `/data` - is an endpoint.
-- Support the basic authentication - `<username>/<password>`. Where `<username>/<password>` should be set as `CLOUD_REST_API_USERNAME`/`CLOUD_REST_API_PASSWORD` [Environment Variables](#user-defined-environment-variables) in the Imp application.
+To get data messages from the Asset Tracker application running on Imp, a cloud should implement the following REST API:
+- Accept `POST https://<cloud_api_url>/data` requests. Where:
+  - `<cloud_api_url>` will be set as `CLOUD_REST_API_URL` [Environment Variable](#user-defined-environment-variables) in the Imp application,
+  - `/data` - is an endpoint.
+- Support the basic authentication - `<username>/<password>`. Where:
+  - `<username>/<password>` will be set as `CLOUD_REST_API_USERNAME`/`CLOUD_REST_API_PASSWORD` [Environment Variables](#user-defined-environment-variables) in the Imp application.
 - Accept message body in [JSON format](#data-message-json).
 - Return HTTP response code `200` when a message is accepted/received. The Imp application interpreters any other codes as error.
 
