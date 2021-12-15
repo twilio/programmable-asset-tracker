@@ -5,15 +5,6 @@
 //   - Basic HTTP authentication is used
 //   - No buffering, data is sent immediately
 
-// Cloud REST API URL
-const CLOUD_REST_API_URL = "@{CLOUD_REST_API_URL}";
-
-// Username to access the cloud REST API
-const CLOUD_REST_API_USERNAME = "@{CLOUD_REST_API_USERNAME}";
-
-// Password to access the cloud REST API
-const CLOUD_REST_API_PASSWORD = "@{CLOUD_REST_API_PASSWORD}";
-
 // Timeout for waiting for a response from the cloud, in seconds
 // TODO - decide do we need it, how it correlates with RM ack timeout
 const CLOUD_REST_API_TIMEOUT = 60;
@@ -38,9 +29,9 @@ class CloudClient {
         local hdr = {
             "Content-Type" : "Application/JSON",
             "Content-Length" : json.len(),
-            "Authorization" : "Basic " + http.base64encode(CLOUD_REST_API_USERNAME + ":" + CLOUD_REST_API_PASSWORD)
+            "Authorization" : "Basic " + http.base64encode(__VARS.CLOUD_REST_API_USERNAME + ":" + __VARS.CLOUD_REST_API_PASSWORD)
         }
-        local req = http.post(CLOUD_REST_API_URL, hdr, json);
+        local req = http.post(__VARS.CLOUD_REST_API_URL, hdr, json);
 
         return Promise(function(resolve, reject) {
             req.sendasync(function(resp) {

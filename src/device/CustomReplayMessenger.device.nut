@@ -226,8 +226,12 @@ class CustomReplayMessenger extends ReplayMessenger {
         // Restart the timer if there is something pending
         if (!_isAllProcessed()) {
             _setTimer();
+            // If Replay Messenger has unsent or unacknowledged messages, keep the connection for it
+            cm.keepConnection("@{CLASS_NAME}", true);
         } else {
             _onIdleCb && _onIdleCb();
+            // If Replay Messenger is idle (has no unsent or unacknowledged messages), it doesn't need the connection anymore
+            cm.keepConnection("@{CLASS_NAME}", false);
         }
     }
 

@@ -48,7 +48,7 @@ class LocationDriver {
         .fail(function(err) {
             ::info("Couldn't get location using cell towers: " + err, "@{CLASS_NAME}");
             return Promise.reject(null);
-        });
+        }.bindenv(this));
     }
 
     // -------------------- PRIVATE METHODS -------------------- //
@@ -90,22 +90,31 @@ class LocationDriver {
     function _getLocationCellTowers() {
         ::debug("Getting location using cell towers..", "@{CLASS_NAME}");
 
-        if (!cm.isConnected()) {
-            return Promise.reject("imp-device is not connected");
-        }
+        cm.keepConnection("@{CLASS_NAME}", true);
 
-        local scannedTowers = BG96CellInfo.scanCellTowers();
+        return cm.connect()
+        .fail(function(_) {
+            throw "Couldn't connect to the server";
+        }.bindenv(this))
+        .then(function(_) {
+            local scannedTowers = BG96CellInfo.scanCellTowers();
 
-        if (scannedTowers == null) {
-            return Promise.reject("No towers scanned");
-        }
+            if (scannedTowers == null) {
+                throw "No towers scanned";
+            }
 
-        ::debug("Cell towers scanned. Sending results to the agent..", "@{CLASS_NAME}");
+            ::debug("Cell towers scanned. Sending results to the agent..", "@{CLASS_NAME}");
 
-        return _requestToAgent(APP_RM_MSG_NAME.LOCATION_CELL, scannedTowers)
+            return _requestToAgent(APP_RM_MSG_NAME.LOCATION_CELL, scannedTowers)
+            .fail(function(err) {
+                throw "Error sending a request to the agent: " + err;
+            }.bindenv(this));
+        }.bindenv(this))
         .then(function(location) {
+            cm.keepConnection("@{CLASS_NAME}", false);
+
             if (location == null) {
-                return Promise.reject("No location received from the agent");
+                throw "No location received from the agent";
             }
 
             ::info("Got location using cell towers", "@{CLASS_NAME}");
@@ -120,7 +129,8 @@ class LocationDriver {
                 "latitude": location.lat
             };
         }.bindenv(this), function(err) {
-            return Promise.reject("Error sending a request to the agent: " + err);
+            cm.keepConnection("@{CLASS_NAME}", false);
+            throw err;
         }.bindenv(this));
     }
 
@@ -208,7 +218,7 @@ class LocationDriver {
     }
 
     /**
-     * Update GNSS Assist data, if needed
+     * Update GNSS Assist data if needed
      *
      * @return {Promise} that:
      * - resolves if assist data was obtained

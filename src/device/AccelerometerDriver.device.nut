@@ -142,7 +142,7 @@ class FloatVector {
      */
     function _add(val) {
         if (typeof val != "FloatVector") throw "Operand is not a Vector object";
-        return Vector(_x + val._x, _y + val._y, _z + val._z);
+        return FloatVector(_x + val._x, _y + val._y, _z + val._z);
     }
 
     /**
@@ -153,7 +153,7 @@ class FloatVector {
      */
     function _sub(val) {
         if (typeof val != "FloatVector") throw "Operand is not a Vector object";
-        return Vector(_x - val._x, _y - val._y, _z - val._z);
+        return FloatVector(_x - val._x, _y - val._y, _z - val._z);
     }
 
     /**
@@ -164,7 +164,7 @@ class FloatVector {
      */
     function _set(val) {
         if (typeof val != "FloatVector") throw "Operand is not a Vector object";
-        return Vector(val._x, val._y, val._z);
+        return FloatVector(val._x, val._y, val._z);
     }
 
     /**
@@ -175,7 +175,7 @@ class FloatVector {
      */
     function _div(val) {
         if (typeof val != "float") throw "Operand is not a float number";
-        return Vector(val > 0.0 || val < 0.0 ? _x/val : 0.0,
+        return FloatVector(val > 0.0 || val < 0.0 ? _x/val : 0.0,
                       val > 0.0 || val < 0.0 ? _y/val : 0.0,
                       val > 0.0 || val < 0.0 ? _z/val : 0.0);
     }
@@ -188,7 +188,7 @@ class FloatVector {
      */
     function _mul(val) {
         if (typeof val != "float") throw "Operand is not a float number";
-        return Vector(_x*val, _y*val, _z*val);
+        return FloatVector(_x*val, _y*val, _z*val);
     }
 
     /**
@@ -650,7 +650,7 @@ class AccelerometerDriver {
         //              |--/----\/\----/--\--/--\------------------------- time
         //              |__________\__/____\/_____________________________
         //              |           \/ <- real acceleration               ACCEL_DISCR_WNDW_LOW_THR
-        if (_accCur._x < ACCEL_DISCR_WNDW_HIGH_THR && _accXCur._x > ACCEL_DISCR_WNDW_LOW_THR) {
+        if (_accCur._x < ACCEL_DISCR_WNDW_HIGH_THR && _accCur._x > ACCEL_DISCR_WNDW_LOW_THR) {
             _accCur._x = 0.0;
         }
 

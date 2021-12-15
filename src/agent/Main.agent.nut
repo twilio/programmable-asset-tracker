@@ -3,7 +3,7 @@
 
 @include once "../shared/Version.shared.nut"
 @include once "../shared/Constants.shared.nut"
-@include once "../shared/Logger.shared.nut"
+@include once "../shared/Logger/Logger.shared.nut"
 @include once "CloudClient.agent.nut"
 @include once "LocationAssistant.agent.nut"
 
