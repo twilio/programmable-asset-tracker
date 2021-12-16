@@ -325,7 +325,9 @@ class MotionMonitor {
             local deltaLat = math.fabs(_curLoc.latitude - _prevLoc.latitude)*PI/180.0;
             local deltaLong = math.fabs(_curLoc.longitude - _prevLoc.longitude)*PI/180.0;
             local deltaSigma = math.pow(math.sin(0.5*deltaLat), 2);
-            deltaSigma += math.cos(_curLoc.latitude*PI/180.0)*math.cos(_prevLoc.latitude*PI/180.0)*math.pow(math.sin(0.5*deltaLong), 2);
+            deltaSigma += math.cos(_curLoc.latitude*PI/180.0)*
+                          math.cos(_prevLoc.latitude*PI/180.0)*
+                          math.pow(math.sin(0.5*deltaLong), 2);
             deltaSigma = 2*math.asin(math.sqrt(deltaSigma));
 
             // actual arc length on a sphere of radius r (mean Earth radius)

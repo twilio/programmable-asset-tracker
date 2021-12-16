@@ -176,8 +176,8 @@ class FloatVector {
     function _div(val) {
         if (typeof val != "float") throw "Operand is not a float number";
         return FloatVector(val > 0.0 || val < 0.0 ? _x/val : 0.0,
-                      val > 0.0 || val < 0.0 ? _y/val : 0.0,
-                      val > 0.0 || val < 0.0 ? _z/val : 0.0);
+                           val > 0.0 || val < 0.0 ? _y/val : 0.0,
+                           val > 0.0 || val < 0.0 ? _z/val : 0.0);
     }
 
     /**

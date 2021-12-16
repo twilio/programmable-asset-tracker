@@ -19,6 +19,9 @@ const DP_TEMPER_HYST = 1.0;
 // Init impossible temperature value
 const DP_INIT_TEMPER_VALUE = -300.0;
 
+// Init battery level
+const DP_INIT_BAT_LEVEL = 0;
+
 // Battery level hysteresis
 const DP_BATTERY_LEV_HYST = 2.0;
 
@@ -77,11 +80,14 @@ class DataProcessor {
     // Temperature low alert threshold variable
     _temperatureLowAlertThr = null;
 
-    // Current alert state
-    _curAlertState = null;
+    // Array of alerts
+    _allAlerts = null;
 
-    // Previous alert state
-    _prevAlertState = null;
+    // Last alerts count
+    _lastAlertsCount = null;
+
+    // Last alerts hash
+    _lastAlertHash = null;
 
     // Shock threshold value
     _shockThreshold = null;
@@ -99,18 +105,20 @@ class DataProcessor {
         _ts = temperDriver;
         _curAlertState = 0;
         _prevAlertState = 0;
-        _curBatteryLev = 0;
+        _curBatteryLev = DP_INIT_BAT_LEVEL;
         _curTemper = DP_INIT_TEMPER_VALUE;
         _inMotion = false;
         _isFreshCurLoc = false;
-        _alertNames = ["shockDetected",
-                       "motionStarted",
-                       "motionStopped",
-                       "geofenceEntered",
-                       "geofenceExited",
-                       "temperatureHigh",
-                       "temperatureLow",
-                       "batteryLow"];
+        _allAlerts = {"shockDetected"       : false,
+                       "motionStarted"      : false,
+                       "motionStopped"      : false,
+                       "geofenceEntered"    : false,
+                       "geofenceExited"     : false,
+                       "temperatureHigh"    : false,
+                       "temperatureLow"     : false,
+                       "batteryLow"         : false};
+        _lastAlertsCount = 0;
+        _lastAlertHash = 0;
         _temperatureHighAlertThr = DEFAULT_TEMPERATURE_HIGH;
         _temperatureLowAlertThr = DEFAULT_TEMPERATURE_LOW;
         _dataReadingPeriod = DEFAULT_DATA_READING_PERIOD;
@@ -149,7 +157,8 @@ class DataProcessor {
         _checkDataProcSettings(dataProcSettings);
 
         if (_ad) {
-            _ad.enableShockDetection(_onShockDetectedEvent.bindenv(this), {"shockThreshold" : _shockThreshold});
+            _ad.enableShockDetection(_onShockDetectedEvent.bindenv(this), 
+                                     {"shockThreshold" : _shockThreshold});
         } else {
             ::info("Accelerometer driver object is null", "@{CLASS_NAME}");
         }
@@ -163,8 +172,10 @@ class DataProcessor {
         }
 
         // starts periodic data reading and sending
-        _dataReadingTimer = imp.wakeup(_dataReadingPeriod, _dataProcTimerCb.bindenv(this));
-        _dataSendingTimer = imp.wakeup(_dataSendingPeriod, _dataSendTimerCb.bindenv(this));
+        _dataReadingTimer = imp.wakeup(_dataReadingPeriod,
+                                       _dataProcTimerCb.bindenv(this));
+        _dataSendingTimer = imp.wakeup(_dataSendingPeriod,
+                                       _dataSendTimerCb.bindenv(this));
     }
 
     // -------------------- PRIVATE METHODS -------------------- //
@@ -260,7 +271,8 @@ class DataProcessor {
     function _dataSend() {
         cm.connect();
         _dataSendingTimer && imp.cancelwakeup(_dataSendingTimer);
-        _dataSendingTimer = imp.wakeup(_dataSendingPeriod, _dataSendTimerCb.bindenv(this));
+        _dataSendingTimer = imp.wakeup(_dataSendingPeriod,
+                                       _dataSendTimerCb.bindenv(this));
     }
 
     /**
@@ -268,6 +280,19 @@ class DataProcessor {
      */
     function _dataProcTimerCb() {
         _dataProc();
+    }
+
+    /**
+     *  Calculate hash of alerts.
+     */
+    function _getAlertHash() {
+        local hash = 0;
+        local cntr = 0;
+        foreach (key, val in _allAlerts) {
+            hash += (val.tointeger() << cntr);
+            cntr++;
+        }
+        return hash;
     }
 
     /**
@@ -279,60 +304,61 @@ class DataProcessor {
 
         // get the current temperature, check alert conditions
         local res = _ts.read();
-        _curTemper = res.temperature;
-        ::debug("Temperature: " + _curTemper);
+        if ("error" in res) {
+            ::error("Failed to read temperature: " + res.error, "@{CLASS_NAME}");
+            _curTemper = DP_INIT_TEMPER_VALUE;
+        } else {
+            _curTemper = res.temperature;
+            ::debug("Temperature: " + _curTemper);
+        }
         if (_curTemper > _temperatureHighAlertThr) {
-            _curAlertState = _curAlertState | (1 << DP_ALERTS_SHIFTS.DP_TEMPER_HIGH);
+            _allAlerts.temperatureHigh = true;
         }
 
-        if (_curTemper < _temperatureHighAlertThr - DP_TEMPER_HYST) {
-            _curAlertState = _curAlertState & ~(1 << DP_ALERTS_SHIFTS.DP_TEMPER_HIGH);
+        if (_curTemper < (_temperatureHighAlertThr - DP_TEMPER_HYST)) {
+            _allAlerts.temperatureHigh = false;
         }
 
-        if (_curTemper < _temperatureLowAlertThr) {
-            _curAlertState = _curAlertState | (1 << DP_ALERTS_SHIFTS.DP_TEMPER_LOW);
+        if (_curTemper < _temperatureLowAlertThr && 
+            _curTemper != DP_INIT_TEMPER_VALUE) {
+            _allAlerts.temperatureLow = true;
         }
 
-        if (_curTemper > _temperatureLowAlertThr + DP_TEMPER_HYST) {
-            _curAlertState = _curAlertState & ~(1 << DP_ALERTS_SHIFTS.DP_TEMPER_LOW);
+        if (_curTemper > (_temperatureLowAlertThr + DP_TEMPER_HYST)) {
+            _allAlerts.temperatureLow = false;
         }
 
         // get the current battery level, check alert conditions - TODO
-        if (_curBatteryLev < _batteryLowThr) {
-            _curAlertState = _curAlertState | (1 << DP_ALERTS_SHIFTS.DP_BATTERY_LOW);
+        if (_curBatteryLev < _batteryLowThr &&
+            _curBatteryLev != DP_INIT_BAT_LEVEL) {
+            _allAlerts.batteryLow = true;
         }
 
-        if (_curBatteryLev > _batteryLowThr + DP_BATTERY_LEV_HYST) {
-            _curAlertState = _curAlertState & ~(1 << DP_ALERTS_SHIFTS.DP_BATTERY_LOW);
+        if (_curBatteryLev > (_batteryLowThr + DP_BATTERY_LEV_HYST)) {
+            _allAlerts.batteryLow = false;
         }
 
         local alerts = [];
-        if (_prevAlertState != _curAlertState) {
-            for (local bitCntr = DP_ALERTS_SHIFTS.DP_SHOCK_DETECTED; bitCntr < DP_ALERTS_SHIFTS.DP_ALERTS_MAX; bitCntr++) {
-                // Alert event happens in case of a transition: non-alert condition (at the previous reading) -> alert condition (at the current reading)
-                if (!(_prevAlertState & (1 << bitCntr)) && (_curAlertState & (1 << bitCntr))) {
-                    alerts.append(_alertNames[bitCntr]);
-                }
+        local alertHash = _getAlertHash();
+        foreach (key, val in _allAlerts) {
+            if (val) {
+                alerts.append(key.tostring());
             }
-            _curAlertState = _curAlertState & ~(1 << DP_ALERTS_SHIFTS.DP_SHOCK_DETECTED);
-            _curAlertState = _curAlertState & ~(1 << DP_ALERTS_SHIFTS.DP_MOTION_STARTED);
-            _curAlertState = _curAlertState & ~(1 << DP_ALERTS_SHIFTS.DP_MOTION_STOPPED);
-            _curAlertState = _curAlertState & ~(1 << DP_ALERTS_SHIFTS.DP_GEOFENCE_ENTERED);
-            _curAlertState = _curAlertState & ~(1 << DP_ALERTS_SHIFTS.DP_GEOFENCE_EXITED);
+            _allAlerts[key] = false;
         }
+        local alertsCount = alerts.len();
 
         if (_curLoc) {
             _dataMessg = {"trackerId":hardware.getdeviceid(),
                           "timestamp": time(),
                           "status":{"inMotion":_inMotion},
-                                    "location":{"fresh":_isFreshCurLoc,
-                                    "timestamp": _curLoc.timestamp,
-                                    "type": _curLoc.type,
-                                    "accuracy": _curLoc.accuracy,
-                                    "lng": _curLoc.longitude,
-                                    "lat": _curLoc.latitude},
+                                    "location":{"timestamp": _curLoc.timestamp,
+                                        "type": _curLoc.type,
+                                        "accuracy": _curLoc.accuracy,
+                                        "lng": _curLoc.longitude,
+                                        "lat": _curLoc.latitude},
                           "sensors":{"batteryLevel": _curBatteryLev,
-                                     "temperature": _curTemper},
+                                     "temperature": _curTemper == DP_INIT_TEMPER_VALUE ? 0 : _curTemper}, // send 0 degrees of Celsius if termosensor error
                           "alerts":alerts};
 
             ::info("Message:", "@{CLASS_NAME}");
@@ -344,21 +370,25 @@ class DataProcessor {
                    ", batteryLevel: " + _curBatteryLev + ", temperature: " +
                    _curTemper, "@{CLASS_NAME}");
             ::info("Alerts:", "@{CLASS_NAME}");
-            foreach (item in alerts) {
-                ::info(item, "@{CLASS_NAME}");
+            if (alertsCount) {
+                foreach (item in alerts) {
+                    ::info(item, "@{CLASS_NAME}");
+                }
             }
         }
 
         rm.send(APP_RM_MSG_NAME.DATA, _dataMessg, RM_IMPORTANCE_HIGH);
 
-        // If there is at least one alert event call data sending function
-        if (alerts.len() > 0) {
+        // If current alerts count more then previous, or alert are different
+        if ((alertsCount > _lastAlertsCount) ||
+            ((alertsCount == _lastAlertsCount) && (alertHash != _lastAlertHash))) {
             _dataSend();
         }
+        _lastAlertsCount = alertsCount;
+        _lastAlertHash = alertHash;
 
-        _prevAlertState = _curAlertState;
-
-        _dataReadingTimer = imp.wakeup(_dataReadingPeriod, _dataProcTimerCb.bindenv(this));
+        _dataReadingTimer = imp.wakeup(_dataReadingPeriod,
+                                       _dataProcTimerCb.bindenv(this));
     }
 
     /**
@@ -377,7 +407,7 @@ class DataProcessor {
             _isFreshCurLoc = isFresh;
             _curLoc = loc;
         } else {
-            ::debug("Error type of location value", "@{CLASS_NAME}");
+            ::error("Error type of location value", "@{CLASS_NAME}");
         }
     }
 
@@ -397,7 +427,7 @@ class DataProcessor {
      * The handler is called when a shock event is detected.
      */
     function _onShockDetectedEvent() {
-        _curAlertState = _curAlertState | (1 << DP_ALERTS_SHIFTS.DP_SHOCK_DETECTED);
+        _allAlerts.shockDetected = true;
         _dataProc();
     }
 
@@ -407,10 +437,10 @@ class DataProcessor {
      */
     function _onMotionEvent(eventType) {
         if (eventType) {
-            _curAlertState = _curAlertState | (1 << DP_ALERTS_SHIFTS.DP_MOTION_STARTED);
+            _allAlerts.motionStarted = true;
             _inMotion = true;
         } else {
-            _curAlertState = _curAlertState | (1 << DP_ALERTS_SHIFTS.DP_MOTION_STOPPED);
+            _allAlerts.motionStopped = true;
             _inMotion = false;
         }
         _dataProc();
@@ -422,9 +452,9 @@ class DataProcessor {
      */
     function _onGeofencingEvent(eventType) {
         if (eventType) {
-            _curAlertState = _curAlertState | (1 << DP_ALERTS_SHIFTS.DP_GEOFENCE_ENTERED);
+            _allAlerts.geofenceEntered = true;
         } else {
-            _curAlertState = _curAlertState | (1 << DP_ALERTS_SHIFTS.DP_GEOFENCE_EXITED);
+            _allAlerts.geofenceExited = true;
         }
         _dataProc();
     }
