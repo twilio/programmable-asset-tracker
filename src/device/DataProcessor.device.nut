@@ -339,6 +339,7 @@ class DataProcessor {
         }
 
         local alerts = [];
+        local alertHash = _getAlertHash();
         foreach (key, val in _allAlerts) {
             if (val) {
                 alerts.append(key.tostring());
@@ -378,7 +379,6 @@ class DataProcessor {
 
         rm.send(APP_RM_MSG_NAME.DATA, _dataMessg, RM_IMPORTANCE_HIGH);
 
-        local alertHash = _getAlertHash();
         // If current alerts count more then previous, or alert are different
         if ((alertsCount > _lastAlertsCount) ||
             ((alertsCount == _lastAlertsCount) && (alertHash != _lastAlertHash))) {
