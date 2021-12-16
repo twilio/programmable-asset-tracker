@@ -287,7 +287,7 @@ class DataProcessor {
      */
     function _getAlertHash() {
         local hash = 0;
-        local cntr = ;
+        local cntr = 0;
         foreach (key, val in _allAlerts) {
             hash += (val.tointeger() << cntr);
             cntr++;
