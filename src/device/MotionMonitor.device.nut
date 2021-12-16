@@ -75,6 +75,7 @@ class MotionMonitor {
 
         _motionStopAssumption = false;
         _inMotion = false;
+        // TODO: Why false? Is null not ok?
         _prevLoc = false;
         _curLocFresh = false;
         _prevLocFresh = false;
@@ -309,6 +310,7 @@ class MotionMonitor {
             _curLoc = _prevLoc;
             _curLocFresh = false;
             if (_newLocCb) {
+                // TODO: What if _curLoc is null/false? Because _curLoc = _prevLoc and _prevLoc can be null/false
                 _newLocCb(_curLocFresh, _curLoc);
             }
         }.bindenv(this));

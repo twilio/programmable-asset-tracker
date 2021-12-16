@@ -66,6 +66,7 @@ Variables:
 - `CLOUD_REST_API_URL` - Cloud REST API URL. Mandatory. Has no default.
 - `CLOUD_REST_API_USERNAME` - Username to access the cloud REST API. Mandatory. Has no default.
 - `CLOUD_REST_API_PASSWORD` - Password to access the cloud REST API. Mandatory. Has no default.
+- `GOOGLE_MAPS_API_KEY` - Google Maps API key for location by cellular towers or WiFi networks. Mandatory. Has no default.
 
 Example of JSON with environment variables (when Cloud REST API is [emulated on another Imp](#simple-cloud-emulation)):
 ```

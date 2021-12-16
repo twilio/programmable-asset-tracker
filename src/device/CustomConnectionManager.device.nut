@@ -56,12 +56,16 @@ class CustomConnectionManager extends ConnectionManager {
             return _connectPromise;
         }
 
+        ::info("Connecting..", "@{CLASS_NAME}");
+
+        local baseConnect = base.connect;
+
         _connectPromise = Promise(function(resolve, reject) {
             onConnect(resolve, "@{CLASS_NAME}.connect");
             onTimeout(reject, "@{CLASS_NAME}.connect");
             onDisconnect(reject, "@{CLASS_NAME}.connect");
 
-            base.connect();
+            baseConnect();
         }.bindenv(this));
 
         // A workaround to avoid "Unhandled promise rejection" message in case of connection failure

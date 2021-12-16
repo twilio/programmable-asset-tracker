@@ -12,6 +12,9 @@ const CLOUD_REST_API_TIMEOUT = 60;
 // "Data is accepted" status code returned from the cloud
 const CLOUD_REST_API_SUCCESS_CODE = 200;
 
+// API endpoints
+const CLOUD_REST_API_DATA_ENDPOINT = "/data";
+
 class CloudClient {
 
     /**
@@ -30,8 +33,8 @@ class CloudClient {
             "Content-Type" : "Application/JSON",
             "Content-Length" : json.len(),
             "Authorization" : "Basic " + http.base64encode(__VARS.CLOUD_REST_API_USERNAME + ":" + __VARS.CLOUD_REST_API_PASSWORD)
-        }
-        local req = http.post(__VARS.CLOUD_REST_API_URL, hdr, json);
+        };
+        local req = http.post(__VARS.CLOUD_REST_API_URL + CLOUD_REST_API_DATA_ENDPOINT, hdr, json);
 
         return Promise(function(resolve, reject) {
             req.sendasync(function(resp) {
@@ -42,7 +45,7 @@ class CloudClient {
                 }
             }.bindenv(this),
             null,
-            CLOUD_REST_API_TIMEOUT)
+            CLOUD_REST_API_TIMEOUT);
         }.bindenv(this));
     }
 }

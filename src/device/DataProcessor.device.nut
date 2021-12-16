@@ -103,8 +103,6 @@ class DataProcessor {
         _ad = accelDriver;
         _mm = motionMon;
         _ts = temperDriver;
-        _curAlertState = 0;
-        _prevAlertState = 0;
         _curBatteryLev = DP_INIT_BAT_LEVEL;
         _curTemper = DP_INIT_TEMPER_VALUE;
         _inMotion = false;
@@ -375,9 +373,9 @@ class DataProcessor {
                     ::info(item, "@{CLASS_NAME}");
                 }
             }
-        }
 
-        rm.send(APP_RM_MSG_NAME.DATA, _dataMessg, RM_IMPORTANCE_HIGH);
+            rm.send(APP_RM_MSG_NAME.DATA, clone _dataMessg, RM_IMPORTANCE_HIGH);
+        }
 
         // If current alerts count more then previous, or alert are different
         if ((alertsCount > _lastAlertsCount) ||

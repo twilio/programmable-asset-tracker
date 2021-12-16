@@ -46,7 +46,7 @@ class Application {
         ::debug("Data received from imp-device");
 
         CloudClient.send(msg.data)
-        .then(function() {
+        .then(function(_) {
             ::info("Data has been successfully sent to the cloud");
         }.bindenv(this), function(err) {
             ::error("Cloud reported an error while receiving data: " + err);

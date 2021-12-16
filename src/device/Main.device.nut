@@ -84,6 +84,9 @@ class Application {
             _dataProc.start();
         }.bindenv(this), function(err) {
             ::error("Replay Messenger initialization error: " + err);
+        }.bindenv(this))
+        .fail(function(err) {
+            ::error("Error during initialization of business logic modules: " + err);
         }.bindenv(this));
     }
 

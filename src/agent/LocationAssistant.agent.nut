@@ -6,9 +6,6 @@ const LA_BG96_ASSIST_DATA_URL = "http://xtrapath4.izatcloud.net/xtra3grc.bin";
 // Google Maps Geolocation API URL
 const LA_GOOGLE_MAPS_LOCATION_URL = "https://www.googleapis.com/geolocation/v1/geolocate?key=";
 
-// Google Maps Geolocation API Key
-const LA_GOOGLE_MAPS_API_KEY = "";
-
 // Location Assistant class:
 // - obtains GNSS Assist data for BG96
 // - obtains the location by cell towers info using Google Maps Geolocation API
@@ -52,7 +49,7 @@ class LocationAssistant {
         ::debug("Requesting location from Google Geolocation API. Cell towers passed: " + cellInfo.cellTowers.len(), "@{CLASS_NAME}");
 
         // Set up an HTTP request to get the location
-        local url = format("%s%s", LA_GOOGLE_MAPS_LOCATION_URL, LA_GOOGLE_MAPS_API_KEY);
+        local url = format("%s%s", LA_GOOGLE_MAPS_LOCATION_URL, __VARS.GOOGLE_MAPS_API_KEY);
         local headers = { "Content-Type" : "application/json" };
         local body = {
             "considerIp" : "false",

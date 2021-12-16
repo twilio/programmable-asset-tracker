@@ -48,18 +48,9 @@ function onRequest(req, resp) {
         return;
     }
 
-    try {
-        local data = http.jsondecode(req.body.tolower());
-        server.log("Received the following data:");
-        server.log(data);
-        resp.send(200, "OK");
-        return;
-    } catch(exp) {
-        server.error("Bad request - JSON can not be decoded: " + exp);
-        resp.send(400, "Bad request - JSON can not be decoded: " + exp);
-        return;
-    }
-
+    server.log("Received the following data:");
+    server.log(req.body);
+    resp.send(200, "OK");
 }
 
 // Setting a request handler
