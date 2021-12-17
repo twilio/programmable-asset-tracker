@@ -73,7 +73,8 @@ Example of JSON with environment variables (when Cloud REST API is [emulated on 
 {
   "CLOUD_REST_API_URL": "https://agent.electricimp.com/7jiDVu1t_w--",
   "CLOUD_REST_API_USERNAME": "test",
-  "CLOUD_REST_API_PASSWORD": "test"
+  "CLOUD_REST_API_PASSWORD": "test",
+  "GOOGLE_MAPS_API_KEY": "AIzaSyDJQV2m_qNMjdw5snP6qPjdtoMRau-ger8"
 }
 ```
 
