@@ -1,16 +1,16 @@
 @set CLASS_NAME = "DataProcessor" // Class name for logging
 
-// Alert bit numbers in alert state variable
-enum DP_ALERTS_SHIFTS {
-    DP_SHOCK_DETECTED,
-    DP_MOTION_STARTED,
-    DP_MOTION_STOPPED,
-    DP_GEOFENCE_ENTERED,
-    DP_GEOFENCE_EXITED,
-    DP_TEMPER_HIGH,
-    DP_TEMPER_LOW,
-    DP_BATTERY_LOW,
-    DP_ALERTS_MAX
+// Temperature state enum
+enum DP_TEMPERATURE_LEVEL {
+    T_BELOW_RANGE,
+    T_IN_RANGE,
+    T_HIGHER_RANGE
+};
+
+// Battery voltage state enum
+enum DP_BATTERY_VOLT_LEVEL {
+    V_IN_RANGE,
+    V_NOT_IN_RANGE
 };
 
 // Temperature hysteresis
@@ -20,7 +20,7 @@ const DP_TEMPER_HYST = 1.0;
 const DP_INIT_TEMPER_VALUE = -300.0;
 
 // Init battery level
-const DP_INIT_BAT_LEVEL = 0;
+const DP_INIT_BATTERY_LEVEL = 0;
 
 // Battery level hysteresis
 const DP_BATTERY_LEV_HYST = 2.0;
@@ -83,14 +83,14 @@ class DataProcessor {
     // Array of alerts
     _allAlerts = null;
 
-    // Last alerts count
-    _lastAlertsCount = null;
-
-    // Last alerts hash
-    _lastAlertHash = null;
-
     // Shock threshold value
     _shockThreshold = null;
+
+    // state battery (voltage in permissible range or not)
+    _batteryState = null;
+
+    // temperature state (temperature in permissible range or not)
+    _temperatureState = null;
 
     /**
      *  Constructor for Data Processor class.
@@ -280,26 +280,7 @@ class DataProcessor {
         _dataProc();
     }
 
-    /**
-     *  Calculate hash of alerts.
-     */
-    function _getAlertHash() {
-        local hash = 0;
-        local cntr = 0;
-        foreach (key, val in _allAlerts) {
-            hash += (val.tointeger() << cntr);
-            cntr++;
-        }
-        return hash;
-    }
-
-    /**
-     *  Data and alerts reading and processing.
-     */
-    function _dataProc() {
-
-        _dataReadingTimer && imp.cancelwakeup(_dataReadingTimer);
-
+    function _checkTemperature() {
         // get the current temperature, check alert conditions
         local res = _ts.read();
         if ("error" in res) {
@@ -309,32 +290,61 @@ class DataProcessor {
             _curTemper = res.temperature;
             ::debug("Temperature: " + _curTemper);
         }
+        
         if (_curTemper > _temperatureHighAlertThr) {
-            _allAlerts.temperatureHigh = true;
+            if (_temperatureState != DP_TEMPERATURE_LEVEL.T_HIGHER_RANGE) {
+                _allAlerts.temperatureHigh = true;
+                _temperatureState = DP_TEMPERATURE_LEVEL.T_HIGHER_RANGE;
+            }
         }
 
-        if (_curTemper < (_temperatureHighAlertThr - DP_TEMPER_HYST)) {
-            _allAlerts.temperatureHigh = false;
+        if ((_temperatureState == DP_TEMPERATURE_LEVEL.T_HIGHER_RANGE) &&
+            (_curTemper < (_temperatureHighAlertThr - DP_TEMPER_HYST)) &&
+            (_curTemper > _temperatureLowAlertThr)) {
+            _temperatureState = DP_TEMPERATURE_LEVEL.T_IN_RANGE;
         }
 
         if (_curTemper < _temperatureLowAlertThr && 
             _curTemper != DP_INIT_TEMPER_VALUE) {
-            _allAlerts.temperatureLow = true;
+            if (_temperatureState != DP_TEMPERATURE_LEVEL.T_BELOW_RANGE) {
+                _allAlerts.temperatureLow = true;
+                _temperatureState = DP_TEMPERATURE_LEVEL.T_BELOW_RANGE;
+            }
         }
 
-        if (_curTemper > (_temperatureLowAlertThr + DP_TEMPER_HYST)) {
-            _allAlerts.temperatureLow = false;
+        if ((_temperatureState == DP_TEMPERATURE_LEVEL.T_BELOW_RANGE) &&
+            (_curTemper > (_temperatureLowAlertThr + DP_TEMPER_HYST)) &&
+            (_curTemper < _temperatureHighAlertThr)) {
+            _temperatureState = DP_TEMPERATURE_LEVEL.T_IN_RANGE;
         }
+    }
 
+    function _checkBatteryVoltLevel() {
         // get the current battery level, check alert conditions - TODO
         if (_curBatteryLev < _batteryLowThr &&
-            _curBatteryLev != DP_INIT_BAT_LEVEL) {
-            _allAlerts.batteryLow = true;
+            _curBatteryLev != DP_INIT_BATTERY_LEVEL) {
+                if (_batteryState == DP_BATTERY_VOLT_LEVEL.V_IN_RANGE) {
+                    _allAlerts.batteryLow = true;
+                    _batteryState = DP_BATTERY_VOLT_LEVEL.V_NOT_IN_RANGE;
+                }
         }
 
         if (_curBatteryLev > (_batteryLowThr + DP_BATTERY_LEV_HYST)) {
-            _allAlerts.batteryLow = false;
+            _batteryState = DP_BATTERY_VOLT_LEVEL.V_IN_RANGE;
         }
+    }
+
+    /**
+     *  Data and alerts reading and processing.
+     */
+    function _dataProc() {
+
+        _dataReadingTimer && imp.cancelwakeup(_dataReadingTimer);
+
+        // check temperature
+        _checkTemperature();
+        // check battery level
+        _checkBatteryVoltLevel();
 
         local alerts = [];
         local alertHash = _getAlertHash();
@@ -377,13 +387,10 @@ class DataProcessor {
             rm.send(APP_RM_MSG_NAME.DATA, clone _dataMessg, RM_IMPORTANCE_HIGH);
         }
 
-        // If current alerts count more then previous, or alert are different
-        if ((alertsCount > _lastAlertsCount) ||
-            ((alertsCount == _lastAlertsCount) && (alertHash != _lastAlertHash))) {
+        // If current alerts count more then 0
+        if (alertsCount > 0) {
             _dataSend();
         }
-        _lastAlertsCount = alertsCount;
-        _lastAlertHash = alertHash;
 
         _dataReadingTimer = imp.wakeup(_dataReadingPeriod,
                                        _dataProcTimerCb.bindenv(this));
@@ -401,7 +408,7 @@ class DataProcessor {
      *           "latitude": {float}    - Latitude in degrees
      */
     function _onNewLocation(isFresh, loc) {
-        if (typeof loc == "table" && typeof isFresh == "bool") {
+        if (loc && typeof loc == "table" && typeof isFresh == "bool") {
             _isFreshCurLoc = isFresh;
             _curLoc = loc;
         } else {

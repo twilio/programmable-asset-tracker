@@ -75,8 +75,6 @@ class MotionMonitor {
 
         _motionStopAssumption = false;
         _inMotion = false;
-        // TODO: Why false? Is null not ok?
-        _prevLoc = false;
         _curLocFresh = false;
         _prevLocFresh = false;
         _locReadingPeriod = DEFAULT_LOCATION_READING_PERIOD;
@@ -111,6 +109,9 @@ class MotionMonitor {
      *                                        Default: DEFAULT_MOTION_DISTANCE
      */
     function start(motionMonSettings = {}) {
+        // start delay, in seconds
+        const startDelay = 1;
+
         _locReadingPeriod = DEFAULT_LOCATION_READING_PERIOD;
         _movementMax = DEFAULT_MOVEMENT_ACCELERATION_MAX;
         _movementMin = DEFAULT_MOVEMENT_ACCELERATION_MIN;
@@ -121,6 +122,18 @@ class MotionMonitor {
 
         // Check and set the settings
         _checkMotionMonSettings(motionMonSettings);
+
+        imp.wakeup(startDelay, function() {
+            // get current location
+            _locReading();
+            // check - not in motion
+            _ad.detectMotion(_onAccelMotionDetected.bindenv(this), {"movementMax"      : _movementMax,
+                                                                    "movementMin"      : _movementMin,
+                                                                    "movementDur"      : _movementDur,
+                                                                    "motionTimeout"    : _motionTimeout,
+                                                                    "motionVelocity"   : _motionVelocity,
+                                                                    "motionDistance"   : _motionDistance});
+        }.bindenv(this));
 
         _locReadingTimer = imp.wakeup(_locReadingPeriod, _locReadingTimerCb.bindenv(this));
     }
@@ -310,7 +323,7 @@ class MotionMonitor {
             _curLoc = _prevLoc;
             _curLocFresh = false;
             if (_newLocCb) {
-                // TODO: What if _curLoc is null/false? Because _curLoc = _prevLoc and _prevLoc can be null/false
+                // in cb location null check exist
                 _newLocCb(_curLocFresh, _curLoc);
             }
         }.bindenv(this));
@@ -320,20 +333,27 @@ class MotionMonitor {
      *  Check if the motion is stopped
      */
     function _checkMotionStop() {
-        if (_curLocFresh && _prevLocFresh) {
+        if (_curLocFresh) {
 
-            // calculate distance between two locations
-            // https://en.wikipedia.org/wiki/Great-circle_distance
-            local deltaLat = math.fabs(_curLoc.latitude - _prevLoc.latitude)*PI/180.0;
-            local deltaLong = math.fabs(_curLoc.longitude - _prevLoc.longitude)*PI/180.0;
-            local deltaSigma = math.pow(math.sin(0.5*deltaLat), 2);
-            deltaSigma += math.cos(_curLoc.latitude*PI/180.0)*
-                          math.cos(_prevLoc.latitude*PI/180.0)*
-                          math.pow(math.sin(0.5*deltaLong), 2);
-            deltaSigma = 2*math.asin(math.sqrt(deltaSigma));
+            // first execution (_prevLoc is null)
+            if (_prevLoc == null) {
+                _prevLoc = _curLoc;
+            }
+            local dist = 0;
+            if (_curLoc && _prevLoc) {
+                // calculate distance between two locations
+                // https://en.wikipedia.org/wiki/Great-circle_distance
+                local deltaLat = math.fabs(_curLoc.latitude - _prevLoc.latitude)*PI/180.0;
+                local deltaLong = math.fabs(_curLoc.longitude - _prevLoc.longitude)*PI/180.0;
+                local deltaSigma = math.pow(math.sin(0.5*deltaLat), 2);
+                deltaSigma += math.cos(_curLoc.latitude*PI/180.0)*
+                              math.cos(_prevLoc.latitude*PI/180.0)*
+                              math.pow(math.sin(0.5*deltaLong), 2);
+                deltaSigma = 2*math.asin(math.sqrt(deltaSigma));
 
-            // actual arc length on a sphere of radius r (mean Earth radius)
-            local dist = MM_EARTH_RAD*deltaSigma;
+                // actual arc length on a sphere of radius r (mean Earth radius)
+                dist = MM_EARTH_RAD*deltaSigma;
+            }
             ::debug("Distance: " + dist, "@{CLASS_NAME}");
 
             // check if the distance is less than 2 radius of accuracy
