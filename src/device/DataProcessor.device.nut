@@ -103,7 +103,7 @@ class DataProcessor {
         _ad = accelDriver;
         _mm = motionMon;
         _ts = temperDriver;
-        _curBatteryLev = DP_INIT_BAT_LEVEL;
+        _curBatteryLev = DP_INIT_BATTERY_LEVEL;
         _curTemper = DP_INIT_TEMPER_VALUE;
         _inMotion = false;
         _isFreshCurLoc = false;
@@ -115,8 +115,6 @@ class DataProcessor {
                        "temperatureHigh"    : false,
                        "temperatureLow"     : false,
                        "batteryLow"         : false};
-        _lastAlertsCount = 0;
-        _lastAlertHash = 0;
         _temperatureHighAlertThr = DEFAULT_TEMPERATURE_HIGH;
         _temperatureLowAlertThr = DEFAULT_TEMPERATURE_LOW;
         _dataReadingPeriod = DEFAULT_DATA_READING_PERIOD;
@@ -347,7 +345,6 @@ class DataProcessor {
         _checkBatteryVoltLevel();
 
         local alerts = [];
-        local alertHash = _getAlertHash();
         foreach (key, val in _allAlerts) {
             if (val) {
                 alerts.append(key.tostring());
