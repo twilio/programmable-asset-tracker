@@ -105,6 +105,8 @@ class DataProcessor {
         _ts = temperDriver;
         _curBatteryLev = DP_INIT_BATTERY_LEVEL;
         _curTemper = DP_INIT_TEMPER_VALUE;
+        _batteryState = DP_BATTERY_VOLT_LEVEL.V_IN_RANGE;
+        _temperatureState = DP_TEMPERATURE_LEVEL.T_IN_RANGE;
         _inMotion = false;
         _isFreshCurLoc = false;
         _allAlerts = {"shockDetected"       : false,
@@ -353,36 +355,34 @@ class DataProcessor {
         }
         local alertsCount = alerts.len();
 
-        if (_curLoc) {
-            _dataMessg = {"trackerId":hardware.getdeviceid(),
-                          "timestamp": time(),
-                          "status":{"inMotion":_inMotion},
-                                    "location":{"timestamp": _curLoc.timestamp,
-                                        "type": _curLoc.type,
-                                        "accuracy": _curLoc.accuracy,
-                                        "lng": _curLoc.longitude,
-                                        "lat": _curLoc.latitude},
-                          "sensors":{"batteryLevel": _curBatteryLev,
-                                     "temperature": _curTemper == DP_INIT_TEMPER_VALUE ? 0 : _curTemper}, // send 0 degrees of Celsius if termosensor error
-                          "alerts":alerts};
+        _dataMessg = {"trackerId":hardware.getdeviceid(),
+                      "timestamp": time(),
+                      "status":{"inMotion":_inMotion},
+                                "location":{"timestamp": _curLoc.timestamp,
+                                    "type": _curLoc.type,
+                                    "accuracy": _curLoc.accuracy,
+                                    "lng": _curLoc.longitude,
+                                    "lat": _curLoc.latitude},
+                       "sensors":{"batteryLevel": _curBatteryLev,
+                                   "temperature": _curTemper == DP_INIT_TEMPER_VALUE ? 0 : _curTemper}, // send 0 degrees of Celsius if termosensor error
+                       "alerts":alerts};
 
-            ::info("Message:", "@{CLASS_NAME}");
-            ::info("trackerId: " + _dataMessg.trackerId + ", timestamp: " + _dataMessg.timestamp +
-                   ", inMotion: " + _inMotion + ", fresh: " + _isFreshCurLoc +
-                   ", location timestamp: " + _curLoc.timestamp + ", type: " +
-                   _curLoc.type + ", accuracy: " + _curLoc.accuracy +
-                   ", lng: " + _curLoc.longitude + ", lat: " + _curLoc.latitude +
-                   ", batteryLevel: " + _curBatteryLev + ", temperature: " +
-                   _curTemper, "@{CLASS_NAME}");
-            ::info("Alerts:", "@{CLASS_NAME}");
-            if (alertsCount) {
-                foreach (item in alerts) {
-                    ::info(item, "@{CLASS_NAME}");
-                }
+        ::info("Message:", "@{CLASS_NAME}");
+        ::info("trackerId: " + _dataMessg.trackerId + ", timestamp: " + _dataMessg.timestamp +
+               ", inMotion: " + _inMotion + ", fresh: " + _isFreshCurLoc +
+               ", location timestamp: " + _curLoc.timestamp + ", type: " +
+               _curLoc.type + ", accuracy: " + _curLoc.accuracy +
+               ", lng: " + _curLoc.longitude + ", lat: " + _curLoc.latitude +
+               ", batteryLevel: " + _curBatteryLev + ", temperature: " +
+               _curTemper, "@{CLASS_NAME}");
+        ::info("Alerts:", "@{CLASS_NAME}");
+        if (alertsCount > 0) {
+            foreach (item in alerts) {
+                ::info(item, "@{CLASS_NAME}");
             }
-
-            rm.send(APP_RM_MSG_NAME.DATA, clone _dataMessg, RM_IMPORTANCE_HIGH);
         }
+
+        rm.send(APP_RM_MSG_NAME.DATA, clone _dataMessg, RM_IMPORTANCE_HIGH);
 
         // If current alerts count more then 0
         if (alertsCount > 0) {
@@ -418,7 +418,7 @@ class DataProcessor {
      *  @param {float} lev - Сharge level in percent.
      */
     function _onNewBatteryLevel(lev) {
-        if (typeof lev == "float") {
+        if (lev && typeof lev == "float") {
             _curBatteryLev = lev;
         } else {
             ::error("Error type of battery level", "@{CLASS_NAME}");

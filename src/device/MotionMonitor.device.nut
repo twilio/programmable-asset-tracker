@@ -3,6 +3,12 @@
 // Mean earth radius in meters (https://en.wikipedia.org/wiki/Great-circle_distance)
 const MM_EARTH_RAD = 6371009;
 
+// Init latitude value (North Pole)
+const INIT_LATITUDE = 90.0;
+
+// Init longitude value (Greenwich)
+const INIT_LONGITUDE = 0.0;
+
 // Motion Monitor class.
 // Starts and stops motion monitoring.
 class MotionMonitor {
@@ -27,6 +33,9 @@ class MotionMonitor {
 
     // Location reading timer
     _locReadingTimer = null;
+
+    // Flag indicating if the location reading is in progress
+    _locReadingInProgress = false;
 
     // Motion stop assumption
     _motionStopAssumption = null;
@@ -77,6 +86,16 @@ class MotionMonitor {
         _inMotion = false;
         _curLocFresh = false;
         _prevLocFresh = false;
+        _curLoc = {"timestamp": 0,
+                   "type": "gnss",
+                   "accuracy": MM_EARTH_RAD,
+                   "longitude": INIT_LONGITUDE,
+                   "latitude": INIT_LATITUDE};
+        _prevLoc = {"timestamp": 0,
+                    "type": "gnss",
+                    "accuracy": MM_EARTH_RAD,
+                    "longitude": INIT_LONGITUDE,
+                    "latitude": INIT_LATITUDE};
         _locReadingPeriod = DEFAULT_LOCATION_READING_PERIOD;
         _movementMax = DEFAULT_MOVEMENT_ACCELERATION_MAX;
         _movementMin = DEFAULT_MOVEMENT_ACCELERATION_MIN;
@@ -123,19 +142,15 @@ class MotionMonitor {
         // Check and set the settings
         _checkMotionMonSettings(motionMonSettings);
 
-        imp.wakeup(startDelay, function() {
-            // get current location
-            _locReading();
-            // check - not in motion
-            _ad.detectMotion(_onAccelMotionDetected.bindenv(this), {"movementMax"      : _movementMax,
-                                                                    "movementMin"      : _movementMin,
-                                                                    "movementDur"      : _movementDur,
-                                                                    "motionTimeout"    : _motionTimeout,
-                                                                    "motionVelocity"   : _motionVelocity,
-                                                                    "motionDistance"   : _motionDistance});
-        }.bindenv(this));
-
-        _locReadingTimer = imp.wakeup(_locReadingPeriod, _locReadingTimerCb.bindenv(this));
+        // get current location
+        _locReading();
+        // check - not in motion
+        _ad.detectMotion(_onAccelMotionDetected.bindenv(this), {"movementMax"      : _movementMax,
+                                                                "movementMin"      : _movementMin,
+                                                                "movementDur"      : _movementDur,
+                                                                "motionTimeout"    : _motionTimeout,
+                                                                "motionVelocity"   : _motionVelocity,
+                                                                "motionDistance"   : _motionDistance});
     }
 
     /**
@@ -307,11 +322,17 @@ class MotionMonitor {
      *  Try to determine the current location
      */
     function _locReading() {
+        if (_locReadingInProgress) {
+            return;
+        }
+
+        _locReadingInProgress = true;
         _prevLoc = _curLoc;
         _prevLocFresh = _curLocFresh;
         ::debug("Get location", "@{CLASS_NAME}");
         _ld.getLocation()
         .then(function(loc) {
+            _locReadingInProgress = false;
             _curLoc = loc;
             _curLocFresh = true;
             if (_newLocCb) {
@@ -319,6 +340,7 @@ class MotionMonitor {
             }
         }.bindenv(this))
         .fail(function(reason) {
+            _locReadingInProgress = false;
             // the current location becomes non-fresh
             _curLoc = _prevLoc;
             _curLocFresh = false;
@@ -335,10 +357,6 @@ class MotionMonitor {
     function _checkMotionStop() {
         if (_curLocFresh) {
 
-            // first execution (_prevLoc is null)
-            if (_prevLoc == null) {
-                _prevLoc = _curLoc;
-            }
             local dist = 0;
             if (_curLoc && _prevLoc) {
                 // calculate distance between two locations
@@ -353,6 +371,8 @@ class MotionMonitor {
 
                 // actual arc length on a sphere of radius r (mean Earth radius)
                 dist = MM_EARTH_RAD*deltaSigma;
+            } else {
+                ::error("Location is null", "@{CLASS_NAME}");
             }
             ::debug("Distance: " + dist, "@{CLASS_NAME}");
 
