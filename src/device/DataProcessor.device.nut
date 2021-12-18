@@ -366,8 +366,7 @@ class DataProcessor {
                                     "accuracy": _currentLocation.accuracy,
                                     "lng": _currentLocation.longitude,
                                     "lat": _currentLocation.latitude},
-                       "sensors":{"batteryLevel": _curBatteryLev,
-                                   "temperature": _curTemper == DP_INIT_TEMPER_VALUE ? 0 : _curTemper}, // send 0 degrees of Celsius if termosensor error
+                       "sensors":{"temperature": _curTemper == DP_INIT_TEMPER_VALUE ? 0 : _curTemper}, // send 0 degrees of Celsius if termosensor error
                        "alerts":alerts};
 
         ::info("Message:", "@{CLASS_NAME}");
@@ -376,8 +375,7 @@ class DataProcessor {
                ", location timestamp: " + _currentLocation.timestamp + ", type: " +
                _currentLocation.type + ", accuracy: " + _currentLocation.accuracy +
                ", lng: " + _currentLocation.longitude + ", lat: " + _currentLocation.latitude +
-               ", batteryLevel: " + _curBatteryLev + ", temperature: " +
-               _curTemper, "@{CLASS_NAME}");
+               ", temperature: " + _curTemper, "@{CLASS_NAME}");
         ::info("Alerts:", "@{CLASS_NAME}");
         if (alertsCount > 0) {
             foreach (item in alerts) {
