@@ -62,9 +62,6 @@ class DataProcessor {
     // Last location
     _currentLocation = null;
 
-    // Sign of the location relevance
-    _isFreshCurLoc = null;
-
     // Moton state
     _inMotion = null;
 
@@ -113,7 +110,6 @@ class DataProcessor {
         _batteryState = DP_BATTERY_VOLT_LEVEL.V_IN_RANGE;
         _temperatureState = DP_TEMPERATURE_LEVEL.T_IN_RANGE;
         _inMotion = false;
-        _isFreshCurLoc = false;
         _allAlerts = {"shockDetected"       : false,
                        "motionStarted"      : false,
                        "motionStopped"      : false,
@@ -376,7 +372,7 @@ class DataProcessor {
 
         ::info("Message:", "@{CLASS_NAME}");
         ::info("trackerId: " + _dataMesg.trackerId + ", timestamp: " + _dataMesg.timestamp +
-               ", inMotion: " + _inMotion + ", fresh: " + _isFreshCurLoc +
+               ", inMotion: " + _inMotion +
                ", location timestamp: " + _currentLocation.timestamp + ", type: " +
                _currentLocation.type + ", accuracy: " + _currentLocation.accuracy +
                ", lng: " + _currentLocation.longitude + ", lat: " + _currentLocation.latitude +
@@ -413,7 +409,6 @@ class DataProcessor {
      */
     function _onNewLocation(isFresh, loc) {
         if (loc && typeof loc == "table" && typeof isFresh == "bool") {
-            _isFreshCurLoc = isFresh;
             _currentLocation = loc;
         } else {
             ::error("Error type of location value", "@{CLASS_NAME}");

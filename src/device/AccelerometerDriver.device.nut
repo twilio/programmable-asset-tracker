@@ -70,9 +70,9 @@ const ACCEL_DEFAULT_WTM = 15;
 // Velocity zeroing counter (for stop motion)
 const ACCEL_VELOCITY_RESET_CNTR = 2;
 // Discrimination window applied low threshold
-const ACCEL_DISCR_WNDW_LOW_THR = -0.1;
+const ACCEL_DISCR_WNDW_LOW_THR = -0.07;
 // Discrimination window applied high threshold
-const ACCEL_DISCR_WNDW_HIGH_THR = 0.1;
+const ACCEL_DISCR_WNDW_HIGH_THR = 0.07;
 
 // States of the motion detection - FSM (finite state machine):
 // Motion detection is disabled (initial state; motion detection is disabled automatically after motion is detected)

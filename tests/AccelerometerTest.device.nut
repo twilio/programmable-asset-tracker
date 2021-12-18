@@ -1,6 +1,6 @@
 #require "LIS3DH.device.lib.nut:3.0.0"
 
-@include once "../src/shared/Logger.shared.nut"
+@include once "../src/shared/Logger/Logger.shared.nut"
 @include once "../src/device/AccelerometerDriver.device.nut"
 
 // Test for AccelerometerDriver:
@@ -29,7 +29,7 @@ const TEST_MOTION_TIME = 20.0;
 const TEST_MOTION_VEL = 0.6;
 
 // Minimal movement distance to determine motion detection condition, in meters
-const TEST_MOTION_DIST = 10.0;
+const TEST_MOTION_DIST = 5.0;
 
 // Delay between motion event and enabling the next motion detection, in seconds
 const TEST_MOTION_CHECK_DELAY = 15;
