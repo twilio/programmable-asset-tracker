@@ -34,8 +34,8 @@ class MotionMonitor {
     // Location reading timer
     _locReadingTimer = null;
 
-    // Flag indicating if the location reading is in progress
-    _locReadingInProgress = false;
+    // Promise of the location reading process or null
+    _locReadingPromise = null;
 
     // Motion stop assumption
     _motionStopAssumption = null;
@@ -301,6 +301,8 @@ class MotionMonitor {
      *  Location reading timer callback function.
      */
     function _locReadingTimerCb() {
+        local start = hardware.millis();
+
         if (_motionStopAssumption) {
             // no movement during location reading period =>
             // motion stop is confirmed
@@ -310,11 +312,15 @@ class MotionMonitor {
                 _motionEventCb(_inMotion);
             }
         } else {
-            _locReading();
-            _checkMotionStop();
+            _locReading()
+            .finally(function(_) {
+                _checkMotionStop();
 
-            _locReadingTimer && imp.cancelwakeup(_locReadingTimer);
-            _locReadingTimer = imp.wakeup(_locReadingPeriod, _locReadingTimerCb.bindenv(this));
+                // Calculate the delay for the timer according to the time spent on location reading and etc.
+                local delay = _locReadingPeriod - (hardware.millis() - start) / 1000.0;
+                _locReadingTimer && imp.cancelwakeup(_locReadingTimer);
+                _locReadingTimer = imp.wakeup(delay, _locReadingTimerCb.bindenv(this));
+            }.bindenv(this));
         }
     }
 
@@ -322,32 +328,30 @@ class MotionMonitor {
      *  Try to determine the current location
      */
     function _locReading() {
-        if (_locReadingInProgress) {
-            return;
+        if (_locReadingPromise) {
+            return _locReadingPromise;
         }
 
-        _locReadingInProgress = true;
         _prevLoc = _curLoc;
         _prevLocFresh = _curLocFresh;
-        ::debug("Get location", "@{CLASS_NAME}");
-        _ld.getLocation()
+
+        ::debug("Getting location..", "@{CLASS_NAME}");
+
+        return _locReadingPromise = _ld.getLocation()
         .then(function(loc) {
-            _locReadingInProgress = false;
+            _locReadingPromise = null;
+
             _curLoc = loc;
             _curLocFresh = true;
-            if (_newLocCb) {
-                _newLocCb(_curLocFresh, _curLoc);
-            }
-        }.bindenv(this))
-        .fail(function(reason) {
-            _locReadingInProgress = false;
+            _newLocCb && _newLocCb(_curLocFresh, _curLoc);
+        }.bindenv(this), function(_) {
+            _locReadingPromise = null;
+
             // the current location becomes non-fresh
             _curLoc = _prevLoc;
             _curLocFresh = false;
-            if (_newLocCb) {
-                // in cb location null check exist
-                _newLocCb(_curLocFresh, _curLoc);
-            }
+            // in cb location null check exist
+            _newLocCb && _newLocCb(_curLocFresh, _curLoc);
         }.bindenv(this));
     }
 
@@ -382,11 +386,10 @@ class MotionMonitor {
                 _motionStopAssumption = true;
             } else {
                 // still in motion
+                // TODO: A bug? No such variable "inMotion"
                 if (!inMotion) {
                     inMotion = true;
-                    if (_motionEventCb) {
-                        _motionEventCb(_inMotion);
-                    }
+                    _motionEventCb && _motionEventCb(_inMotion);
                 }
             }
         }
@@ -415,12 +418,12 @@ class MotionMonitor {
         _motionStopAssumption = false;
         if (!_inMotion) {
             _inMotion = true;
-            _locReadingTimer && imp.cancelwakeup(_locReadingTimer);
+
             // start reading location
             _locReading();
-            if (_motionEventCb) {
-                _motionEventCb(_inMotion);
-            }
+            _motionEventCb && _motionEventCb(_inMotion);
+
+            _locReadingTimer && imp.cancelwakeup(_locReadingTimer);
             _locReadingTimer = imp.wakeup(_locReadingPeriod, _locReadingTimerCb.bindenv(this));
         }
     }
