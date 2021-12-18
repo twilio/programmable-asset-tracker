@@ -37,7 +37,7 @@ const ACCEL_DEFAULT_DATA_RATE = 10;
 // -----------------------------
 
 // Acceleration threshold, in g
-const ACCEL_DEFAULT_SHOCK_THR = 2;    // (for LIS2DH12 register 0x3A)
+const ACCEL_DEFAULT_SHOCK_THR = 4;    // (for LIS2DH12 register 0x3A)
 
 // Defaults for motion detection:
 // ------------------------------
@@ -61,6 +61,8 @@ const ACCEL_DEFAULT_MOTION_DIST = 0.0;
 // Internal constants:
 // -------------------
 
+// Acceleration range, in g.
+const ACCEL_RANGE = 8;
 // Acceleration of gravity (m / s^2)
 const ACCEL_G = 9.81;
 // Default accelerometer's FIFO watermark
@@ -343,6 +345,7 @@ class AccelerometerDriver {
             _i2c.configure(CLOCK_SPEED_400_KHZ);
             _accel = LIS3DH(_i2c, _addr);
             _accel.reset();
+            local range = _accel.setRange(ACCEL_RANGE);
             local rate = _accel.setDataRate(ACCEL_DEFAULT_DATA_RATE);
             ::debug(format("Accelerometer rate %d Hz", rate), "@{CLASS_NAME}");
             _accel.setMode(LIS3DH_MODE_LOW_POWER);

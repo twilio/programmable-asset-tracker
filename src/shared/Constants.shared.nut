@@ -6,3 +6,9 @@ enum APP_RM_MSG_NAME {
     GNSS_ASSIST = "gnssAssist",
     LOCATION_CELL = "locationCell"
 }
+
+// Init latitude value (North Pole)
+const INIT_LATITUDE = 90.0;
+
+// Init longitude value (Greenwich)
+const INIT_LONGITUDE = 0.0;

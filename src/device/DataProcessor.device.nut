@@ -45,7 +45,7 @@ class DataProcessor {
     _dataSendingTimer = null;
 
     // Result message
-    _dataMessg = null;
+    _dataMesg = null;
 
     // Thermosensor driver object
     _ts = null;
@@ -60,7 +60,7 @@ class DataProcessor {
     _curTemper = null;
 
     // Last location
-    _curLoc = null;
+    _currentLocation = null;
 
     // Sign of the location relevance
     _isFreshCurLoc = null;
@@ -103,6 +103,11 @@ class DataProcessor {
         _ad = accelDriver;
         _mm = motionMon;
         _ts = temperDriver;
+        _currentLocation = {"timestamp": 0,
+                            "type": "gnss",
+                            "accuracy": MM_EARTH_RAD,
+                            "longitude": INIT_LONGITUDE,
+                            "latitude": INIT_LATITUDE};
         _curBatteryLev = DP_INIT_BATTERY_LEVEL;
         _curTemper = DP_INIT_TEMPER_VALUE;
         _batteryState = DP_BATTERY_VOLT_LEVEL.V_IN_RANGE;
@@ -355,24 +360,26 @@ class DataProcessor {
         }
         local alertsCount = alerts.len();
 
-        _dataMessg = {"trackerId":hardware.getdeviceid(),
+        
+
+        _dataMesg = {"trackerId":hardware.getdeviceid(),
                       "timestamp": time(),
                       "status":{"inMotion":_inMotion},
-                                "location":{"timestamp": _curLoc.timestamp,
-                                    "type": _curLoc.type,
-                                    "accuracy": _curLoc.accuracy,
-                                    "lng": _curLoc.longitude,
-                                    "lat": _curLoc.latitude},
+                                "location":{"timestamp": _currentLocation.timestamp,
+                                    "type": _currentLocation.type,
+                                    "accuracy": _currentLocation.accuracy,
+                                    "lng": _currentLocation.longitude,
+                                    "lat": _currentLocation.latitude},
                        "sensors":{"batteryLevel": _curBatteryLev,
                                    "temperature": _curTemper == DP_INIT_TEMPER_VALUE ? 0 : _curTemper}, // send 0 degrees of Celsius if termosensor error
                        "alerts":alerts};
 
         ::info("Message:", "@{CLASS_NAME}");
-        ::info("trackerId: " + _dataMessg.trackerId + ", timestamp: " + _dataMessg.timestamp +
+        ::info("trackerId: " + _dataMesg.trackerId + ", timestamp: " + _dataMesg.timestamp +
                ", inMotion: " + _inMotion + ", fresh: " + _isFreshCurLoc +
-               ", location timestamp: " + _curLoc.timestamp + ", type: " +
-               _curLoc.type + ", accuracy: " + _curLoc.accuracy +
-               ", lng: " + _curLoc.longitude + ", lat: " + _curLoc.latitude +
+               ", location timestamp: " + _currentLocation.timestamp + ", type: " +
+               _currentLocation.type + ", accuracy: " + _currentLocation.accuracy +
+               ", lng: " + _currentLocation.longitude + ", lat: " + _currentLocation.latitude +
                ", batteryLevel: " + _curBatteryLev + ", temperature: " +
                _curTemper, "@{CLASS_NAME}");
         ::info("Alerts:", "@{CLASS_NAME}");
@@ -382,7 +389,7 @@ class DataProcessor {
             }
         }
 
-        rm.send(APP_RM_MSG_NAME.DATA, clone _dataMessg, RM_IMPORTANCE_HIGH);
+        rm.send(APP_RM_MSG_NAME.DATA, clone _dataMesg, RM_IMPORTANCE_HIGH);
 
         // If current alerts count more then 0
         if (alertsCount > 0) {
@@ -407,7 +414,7 @@ class DataProcessor {
     function _onNewLocation(isFresh, loc) {
         if (loc && typeof loc == "table" && typeof isFresh == "bool") {
             _isFreshCurLoc = isFresh;
-            _curLoc = loc;
+            _currentLocation = loc;
         } else {
             ::error("Error type of location value", "@{CLASS_NAME}");
         }

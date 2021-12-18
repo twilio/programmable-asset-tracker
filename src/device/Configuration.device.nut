@@ -15,7 +15,7 @@ const DEFAULT_TEMPERATURE_LOW = 10.0;
 // Battery low alert threshold, in %
 const DEFAULT_BATTERY_LOW = 7.0;
 // Shock acceleration alert threshold, in g
-const DEFAULT_SHOCK_THRESHOLD = 2.0;
+const DEFAULT_SHOCK_THRESHOLD = 4.0;
 
 // Tracking settings:
 

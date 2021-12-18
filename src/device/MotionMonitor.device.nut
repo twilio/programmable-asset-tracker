@@ -3,12 +3,6 @@
 // Mean earth radius in meters (https://en.wikipedia.org/wiki/Great-circle_distance)
 const MM_EARTH_RAD = 6371009;
 
-// Init latitude value (North Pole)
-const INIT_LATITUDE = 90.0;
-
-// Init longitude value (Greenwich)
-const INIT_LONGITUDE = 0.0;
-
 // Motion Monitor class.
 // Starts and stops motion monitoring.
 class MotionMonitor {
@@ -128,9 +122,6 @@ class MotionMonitor {
      *                                        Default: DEFAULT_MOTION_DISTANCE
      */
     function start(motionMonSettings = {}) {
-        // start delay, in seconds
-        const startDelay = 1;
-
         _locReadingPeriod = DEFAULT_LOCATION_READING_PERIOD;
         _movementMax = DEFAULT_MOVEMENT_ACCELERATION_MAX;
         _movementMin = DEFAULT_MOVEMENT_ACCELERATION_MIN;
@@ -386,9 +377,8 @@ class MotionMonitor {
                 _motionStopAssumption = true;
             } else {
                 // still in motion
-                // TODO: A bug? No such variable "inMotion"
-                if (!inMotion) {
-                    inMotion = true;
+                if (!_inMotion) {
+                    _inMotion = true;
                     _motionEventCb && _motionEventCb(_inMotion);
                 }
             }
