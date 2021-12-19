@@ -45,12 +45,18 @@ class Application {
     function _onData(msg, customAck) {
         ::debug("Data received from imp-device");
 
-        CloudClient.send(msg.data)
+        local ack = customAck();
+        local data = http.jsonencode(msg.data);
+
+        CloudClient.send(data)
         .then(function(_) {
-            ::info("Data has been successfully sent to the cloud");
+            ::info("Data has been successfully sent to the cloud: " + data);
+            ack();
         }.bindenv(this), function(err) {
             ::error("Cloud reported an error while receiving data: " + err);
-            // TODO - decide if we need RM noack here
+            ::error("The data caused this error: " + data)
+            // Don't ACK the message if we couldn't send the data to the cloud.
+            // This message will be saved on the device and re-sent later
         }.bindenv(this));
     }
 
@@ -66,6 +72,7 @@ class Application {
             ack(data);
         }.bindenv(this), function(err) {
             ::error("Error during downloading BG96 Assist data: " + err);
+            // Send `null` in reply to the request
             ack(null);
         }.bindenv(this));
     }
@@ -82,6 +89,7 @@ class Application {
             ack(location);
         }.bindenv(this), function(err) {
             ::error("Error during location obtaining using Google Geolocation API: " + err);
+            // Send `null` in reply to the request
             ack(null);
         }.bindenv(this));
     }

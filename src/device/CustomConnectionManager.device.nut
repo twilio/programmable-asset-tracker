@@ -156,7 +156,6 @@ class CustomConnectionManager extends ConnectionManager {
             ::debug(format("Disconnection scheduled in %d seconds", delay), "@{CLASS_NAME}");
             _disconnectTimer = imp.wakeup(delay, disconnect.bindenv(this));
         }
-
     }
 }
 

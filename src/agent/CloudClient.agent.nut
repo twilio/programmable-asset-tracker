@@ -20,21 +20,19 @@ class CloudClient {
     /**
     * Sends a message to the cloud
     *
-    * @param {Table} data - Table with data to send to the cloud
+    * @param {string} data - Data to send to the cloud
     *
     * @return {Promise} that:
     * - resolves if the cloud accepted the data
     * - rejects with an error if the operation failed
     */
     function send(data) {
-        local json = http.jsonencode(data);
-
-        local hdr = {
-            "Content-Type" : "Application/JSON",
-            "Content-Length" : json.len(),
+        local headers = {
+            "Content-Type" : "application/json",
+            "Content-Length" : data.len(),
             "Authorization" : "Basic " + http.base64encode(__VARS.CLOUD_REST_API_USERNAME + ":" + __VARS.CLOUD_REST_API_PASSWORD)
         };
-        local req = http.post(__VARS.CLOUD_REST_API_URL + CLOUD_REST_API_DATA_ENDPOINT, hdr, json);
+        local req = http.post(__VARS.CLOUD_REST_API_URL + CLOUD_REST_API_DATA_ENDPOINT, headers, body);
 
         return Promise(function(resolve, reject) {
             req.sendasync(function(resp) {

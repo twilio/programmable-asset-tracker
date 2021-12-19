@@ -11,15 +11,25 @@ const PMGR_MAX_ERROR_LEN = 512;
 // Connection timeout (sec)
 const PMGR_CONNECT_TIMEOUT = 240;
 
-
+// Implements useful in production features:
+// - Emergency mode (If an unhandled error occurred, device goes to sleep and periodically connects to the server waiting for a SW update)
+// - Shipping mode (When released from the factory, the device sleeps until it is woken up by the end-user) (NOT IMPLEMENTED)
 class ProductionManager {
     _debugOn = false;
     _startAppFunc = null;
 
+    /**
+     * Constructor for Production Manager
+     *
+     * @param {function} startAppFunc - The function to be called to start the main application
+     */
     constructor(startAppFunc) {
         _startAppFunc = startAppFunc;
     }
 
+    /**
+     * Start the manager. It will check the conditions and either start the main application or go to sleep
+     */
     function start() {
         // NOTE: The app may override this handler but it must call enterEmergencyMode in case of a runtime error
         imp.onunhandledexception(_onUnhandledException.bindenv(this));
@@ -55,32 +65,60 @@ class ProductionManager {
         _startAppFunc();
     }
 
+    /**
+     * Manually enter the Emergency mode
+     *
+     * @param {string} [error] - The error that caused entering the Emergency mode
+     */
     function enterEmergencyMode(error = null) {
         _setErrorFlag(error);
         server.restart();
     }
 
+    /**
+     * Turn on/off the debug logging
+     *
+     * @param {boolean} value - True to turn on the debug logging, otherwise false
+     */
     function setDebug(value) {
         _debugOn = value;
     }
 
+    /**
+     * Print the last saved error
+     *
+     * @param {table} lastError - Last saved error with timestamp and description
+     */
     function _printLastError(lastError) {
         if ("ts" in lastError && "desc" in lastError) {
             _info(format("Last error (at %d): \"%s\"", lastError.ts, lastError.desc));
         }
     }
 
+    /**
+     * Go to sleep once Squirrel VM is idle
+     */
     function _sleep(unusedParam = null) {
         imp.onidle(function() {
             server.sleepfor(PMGR_CHECK_UPDATES_PERIOD);
         });
     }
 
+    /**
+     * Global handler for exceptions
+     *
+     * @param {string} error - The exception description
+     */
     function _onUnhandledException(error) {
         _error("Globally caught error: " + error);
         _setErrorFlag(error);
     }
 
+    /**
+     * Create and return the initial user configuration data
+     *
+     * @return {table} The initial user configuration data
+     */
     function _initialUserConfData() {
         return {
             "errorFlag": false,
@@ -89,6 +127,11 @@ class ProductionManager {
         };
     }
 
+    /**
+     * Set the error flag which will restrict running the main application on the next boot
+     *
+     * @param {string} error - The error description
+     */
     function _setErrorFlag(error) {
         local userConf = _readUserConf();
         // If not null, this is just a pointer to the field of userConf. Hence modification of this object updates the userConf object
@@ -117,6 +160,11 @@ class ProductionManager {
         _storeUserConf(userConf);
     }
 
+    /**
+     * Store the user configuration
+     *
+     * @param {table} userConf - The table to be converted to JSON and stored
+     */
     function _storeUserConf(userConf) {
         local dataStr = JSONEncoder.encode(userConf);
         _debug("Storing new user configuration: " + dataStr);
@@ -128,6 +176,11 @@ class ProductionManager {
         }
     }
 
+    /**
+     * Read the user configuration
+     *
+     * @return {table} The user configuration converted from JSON to a Squirrel table
+     */
     function _readUserConf() {
         local config = imp.getuserconfiguration();
 
@@ -154,6 +207,13 @@ class ProductionManager {
         return config;
     }
 
+    /**
+     * Extract and check the data belonging to Production Manager from the user configuration
+     *
+     * @param {table} userConf - The user configuration
+     *
+     * @return {table|null} The data extracted or null
+     */
     function _extractDataFromUserConf(userConf) {
         try {
             local data = userConf[PMGR_USER_CONFIG_FIELD];
@@ -169,14 +229,29 @@ class ProductionManager {
         return null;
     }
 
+    /**
+     * Log a debug message if debug logging is on
+     *
+     * @param {string} msg - The message to log
+     */
     function _debug(msg) {
         _debugOn && server.log("[@{CLASS_NAME}] " + msg);
     }
 
+    /**
+     * Log an info message
+     *
+     * @param {string} msg - The message to log
+     */
     function _info(msg) {
         server.log("[@{CLASS_NAME}] " + msg);
     }
 
+    /**
+     * Log an error message
+     *
+     * @param {string} msg - The message to log
+     */
     function _error(msg) {
         server.error("[@{CLASS_NAME}] " + msg);
     }

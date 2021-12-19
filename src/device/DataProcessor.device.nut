@@ -156,7 +156,7 @@ class DataProcessor {
         _checkDataProcSettings(dataProcSettings);
 
         if (_ad) {
-            _ad.enableShockDetection(_onShockDetectedEvent.bindenv(this), 
+            _ad.enableShockDetection(_onShockDetectedEvent.bindenv(this),
                                      {"shockThreshold" : _shockThreshold});
         } else {
             ::info("Accelerometer driver object is null", "@{CLASS_NAME}");
@@ -291,7 +291,7 @@ class DataProcessor {
             _curTemper = res.temperature;
             ::debug("Temperature: " + _curTemper);
         }
-        
+
         if (_curTemper > _temperatureHighAlertThr) {
             if (_temperatureState != DP_TEMPERATURE_LEVEL.T_HIGHER_RANGE) {
                 _allAlerts.temperatureHigh = true;
@@ -305,7 +305,7 @@ class DataProcessor {
             _temperatureState = DP_TEMPERATURE_LEVEL.T_IN_RANGE;
         }
 
-        if (_curTemper < _temperatureLowAlertThr && 
+        if (_curTemper < _temperatureLowAlertThr &&
             _curTemper != DP_INIT_TEMPER_VALUE) {
             if (_temperatureState != DP_TEMPERATURE_LEVEL.T_BELOW_RANGE) {
                 _allAlerts.temperatureLow = true;
@@ -356,7 +356,7 @@ class DataProcessor {
         }
         local alertsCount = alerts.len();
 
-        
+
 
         _dataMesg = {"trackerId":hardware.getdeviceid(),
                       "timestamp": time(),
@@ -369,15 +369,14 @@ class DataProcessor {
                        "sensors":{"temperature": _curTemper == DP_INIT_TEMPER_VALUE ? 0 : _curTemper}, // send 0 degrees of Celsius if termosensor error
                        "alerts":alerts};
 
-        ::info("Message:", "@{CLASS_NAME}");
-        ::info("trackerId: " + _dataMesg.trackerId + ", timestamp: " + _dataMesg.timestamp +
+        ::debug("Message: trackerId: " + _dataMesg.trackerId + ", timestamp: " + _dataMesg.timestamp +
                ", inMotion: " + _inMotion +
                ", location timestamp: " + _currentLocation.timestamp + ", type: " +
                _currentLocation.type + ", accuracy: " + _currentLocation.accuracy +
                ", lng: " + _currentLocation.longitude + ", lat: " + _currentLocation.latitude +
                ", temperature: " + _curTemper, "@{CLASS_NAME}");
-        ::info("Alerts:", "@{CLASS_NAME}");
         if (alertsCount > 0) {
+            ::info("Alerts:", "@{CLASS_NAME}");
             foreach (item in alerts) {
                 ::info(item, "@{CLASS_NAME}");
             }
