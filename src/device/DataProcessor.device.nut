@@ -110,7 +110,7 @@ class DataProcessor {
         _batteryState = DP_BATTERY_VOLT_LEVEL.V_IN_RANGE;
         _temperatureState = DP_TEMPERATURE_LEVEL.T_IN_RANGE;
         _inMotion = false;
-        _allAlerts = {"shockDetected"       : false,
+        _allAlerts = { "shockDetected"      : false,
                        "motionStarted"      : false,
                        "motionStopped"      : false,
                        "geofenceEntered"    : false,
@@ -265,10 +265,13 @@ class DataProcessor {
     }
 
     /**
-     *  Data sending function.
+     *  Send data
      */
     function _dataSend() {
+        // Try to connect.
+        // ReplayMessenger will automatically send all saved messages after that
         cm.connect();
+
         _dataSendingTimer && imp.cancelwakeup(_dataSendingTimer);
         _dataSendingTimer = imp.wakeup(_dataSendingPeriod,
                                        _dataSendTimerCb.bindenv(this));
@@ -281,8 +284,69 @@ class DataProcessor {
         _dataProc();
     }
 
+    /**
+     *  Data and alerts reading and processing.
+     */
+    function _dataProc() {
+
+        _dataReadingTimer && imp.cancelwakeup(_dataReadingTimer);
+
+        // read temperature, check alert conditions
+        _checkTemperature();
+
+        // read battery level, check alert conditions
+        _checkBatteryVoltLevel();
+
+        // check if alerts have been triggered
+        local alerts = [];
+        foreach (key, val in _allAlerts) {
+            if (val) {
+                alerts.append(key.tostring());
+            }
+            _allAlerts[key] = false;
+        }
+        local alertsCount = alerts.len();
+
+        _dataMesg = {"trackerId":hardware.getdeviceid(),
+                      "timestamp": time(),
+                      "status":{"inMotion":_inMotion},
+                                "location":{"timestamp": _currentLocation.timestamp,
+                                    "type": _currentLocation.type,
+                                    "accuracy": _currentLocation.accuracy,
+                                    "lng": _currentLocation.longitude,
+                                    "lat": _currentLocation.latitude},
+                       "sensors":{"temperature": _curTemper == DP_INIT_TEMPER_VALUE ? 0 : _curTemper}, // send 0 degrees of Celsius if termosensor error
+                       "alerts":alerts};
+
+        ::debug("Message: trackerId: " + _dataMesg.trackerId + ", timestamp: " + _dataMesg.timestamp +
+               ", inMotion: " + _inMotion +
+               ", location timestamp: " + _currentLocation.timestamp + ", type: " +
+               _currentLocation.type + ", accuracy: " + _currentLocation.accuracy +
+               ", lng: " + _currentLocation.longitude + ", lat: " + _currentLocation.latitude +
+               ", temperature: " + _curTemper, "@{CLASS_NAME}");
+        if (alertsCount > 0) {
+            ::info("Alerts:", "@{CLASS_NAME}");
+            foreach (item in alerts) {
+                ::info(item, "@{CLASS_NAME}");
+            }
+        }
+
+        // ReplayMessenger saves the message till imp-device is connected
+        rm.send(APP_RM_MSG_NAME.DATA, clone _dataMesg, RM_IMPORTANCE_HIGH);
+
+        // If at least one alert, try to send data immediately
+        if (alertsCount > 0) {
+            _dataSend();
+        }
+
+        _dataReadingTimer = imp.wakeup(_dataReadingPeriod,
+                                       _dataProcTimerCb.bindenv(this));
+    }
+
+    /**
+     *  Read temperature, check alert conditions
+     */
     function _checkTemperature() {
-        // get the current temperature, check alert conditions
         local res = _ts.read();
         if ("error" in res) {
             ::error("Failed to read temperature: " + res.error, "@{CLASS_NAME}");
@@ -320,6 +384,9 @@ class DataProcessor {
         }
     }
 
+    /**
+     *  Read battery level, check alert conditions
+     */
     function _checkBatteryVoltLevel() {
         // get the current battery level, check alert conditions - TODO
         if (_curBatteryLev < _batteryLowThr &&
@@ -336,66 +403,7 @@ class DataProcessor {
     }
 
     /**
-     *  Data and alerts reading and processing.
-     */
-    function _dataProc() {
-
-        _dataReadingTimer && imp.cancelwakeup(_dataReadingTimer);
-
-        // check temperature
-        _checkTemperature();
-        // check battery level
-        _checkBatteryVoltLevel();
-
-        local alerts = [];
-        foreach (key, val in _allAlerts) {
-            if (val) {
-                alerts.append(key.tostring());
-            }
-            _allAlerts[key] = false;
-        }
-        local alertsCount = alerts.len();
-
-
-
-        _dataMesg = {"trackerId":hardware.getdeviceid(),
-                      "timestamp": time(),
-                      "status":{"inMotion":_inMotion},
-                                "location":{"timestamp": _currentLocation.timestamp,
-                                    "type": _currentLocation.type,
-                                    "accuracy": _currentLocation.accuracy,
-                                    "lng": _currentLocation.longitude,
-                                    "lat": _currentLocation.latitude},
-                       "sensors":{"temperature": _curTemper == DP_INIT_TEMPER_VALUE ? 0 : _curTemper}, // send 0 degrees of Celsius if termosensor error
-                       "alerts":alerts};
-
-        ::debug("Message: trackerId: " + _dataMesg.trackerId + ", timestamp: " + _dataMesg.timestamp +
-               ", inMotion: " + _inMotion +
-               ", location timestamp: " + _currentLocation.timestamp + ", type: " +
-               _currentLocation.type + ", accuracy: " + _currentLocation.accuracy +
-               ", lng: " + _currentLocation.longitude + ", lat: " + _currentLocation.latitude +
-               ", temperature: " + _curTemper, "@{CLASS_NAME}");
-        if (alertsCount > 0) {
-            ::info("Alerts:", "@{CLASS_NAME}");
-            foreach (item in alerts) {
-                ::info(item, "@{CLASS_NAME}");
-            }
-        }
-
-        rm.send(APP_RM_MSG_NAME.DATA, clone _dataMesg, RM_IMPORTANCE_HIGH);
-
-        // If current alerts count more then 0
-        if (alertsCount > 0) {
-            _dataSend();
-        }
-
-        _dataReadingTimer = imp.wakeup(_dataReadingPeriod,
-                                       _dataProcTimerCb.bindenv(this));
-    }
-
-    /**
      *  The handler is called when a new location is received.
-     *  @param {bool} isFresh - false if the latest location has not been determined, the provided data is the previous location
      *  @param {table} loc - Location information.
      *      The fields:
      *          "timestamp": {integer}  - Time value
@@ -404,8 +412,8 @@ class DataProcessor {
      *          "longitude": {float}    - Longitude in degrees
      *           "latitude": {float}    - Latitude in degrees
      */
-    function _onNewLocation(isFresh, loc) {
-        if (loc && typeof loc == "table" && typeof isFresh == "bool") {
+    function _onNewLocation(loc) {
+        if (loc && typeof loc == "table") {
             _currentLocation = loc;
         } else {
             ::error("Error type of location value", "@{CLASS_NAME}");

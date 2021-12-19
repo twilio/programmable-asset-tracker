@@ -25,12 +25,13 @@ This version (Proof-Of-Concept) supports:
   - Shock Detected
   - Motion Started
   - Motion Stopped
-- Staying offline most of time. Connection to the Internet (from Imp-device to Imp-Agent) only for:
+- Staying offline most of time. Connect to the Internet (from Imp-device to Imp-Agent) when required only. Internet connection is used for:
   - Data/alerts sending
   - GNSS Assist data obtaining
   - Location obtaining by cellular towers information
 - If no/bad cellular network, saving messages in the flash and re-sending them later.
 - Sending data/alerts from Imp-Agent to a cloud with the predefined REST API.
+- Emergency (recovery) mode.
 - The cloud REST API simple emulation on another Imp.
 
 ## Source Code ##
@@ -66,15 +67,15 @@ Variables:
 - `CLOUD_REST_API_URL` - Cloud REST API URL. Mandatory. Has no default.
 - `CLOUD_REST_API_USERNAME` - Username to access the cloud REST API. Mandatory. Has no default.
 - `CLOUD_REST_API_PASSWORD` - Password to access the cloud REST API. Mandatory. Has no default.
-- `GOOGLE_MAPS_API_KEY` - Google Maps API key for location by cellular towers or WiFi networks. Mandatory. Has no default.
+- `GOOGLE_MAPS_API_KEY` - API Key for Google Maps Platform. Required by [Google Maps Geolocation API](https://developers.google.com/maps/documentation/geolocation/overview) to determine the location by cell towers info or by WiFi networks. See [here](https://developers.google.com/maps/documentation/geolocation/get-api-key) how to obtain the Key.
 
 Example of JSON with environment variables (when Cloud REST API is [emulated on another Imp](#simple-cloud-emulation)):
 ```
 {
-  "CLOUD_REST_API_URL": "https://agent.electricimp.com/7jiDVu1t_w--",
+  "CLOUD_REST_API_URL": "https://agent.electricimp.com/7jiDVu1t_w-1", // not a real url
   "CLOUD_REST_API_USERNAME": "test",
   "CLOUD_REST_API_PASSWORD": "test",
-  "GOOGLE_MAPS_API_KEY": "AIzaSyDJQV2m_qNMjdw5snP6qPjdtoMRau-ger8"
+  "GOOGLE_MAPS_API_KEY": "AIzaSyDJQV2m_qNMjdw5snP6qPjdtoMRau-ger8" // not a real key
 }
 ```
 

@@ -130,12 +130,17 @@ class MotionMonitor {
         _motionVelocity = DEFAULT_MOTION_VELOCITY;
         _motionDistance = DEFAULT_MOTION_DISTANCE;
 
-        // Check and set the settings
+        // check and set the settings
         _checkMotionMonSettings(motionMonSettings);
 
         // get current location
         _locReading();
-        // check - not in motion
+
+        // initial state after start: not in motion
+        _motionStopAssumption = false;
+        _inMotion = false;
+
+        // detect motion start
         _ad.detectMotion(_onAccelMotionDetected.bindenv(this), {"movementMax"      : _movementMax,
                                                                 "movementMin"      : _movementMin,
                                                                 "movementDur"      : _movementDur,
@@ -154,8 +159,7 @@ class MotionMonitor {
     /**
      *  Set new location callback function.
      *  @param {function | null} locCb - The callback will be called every time the new location is received (null - disables the callback)
-     *                 locCb(isFresh, loc), where
-     *                 @param {bool} isFresh - false if the latest location has not beed determined, the provided data is the previous location
+     *                 locCb(loc), where
      *                 @param {table} loc - Location information
      *                      The fields:
      *                          "timestamp": {integer}  - The number of seconds that have elapsed since midnight on 1 January 1970.
@@ -303,6 +307,7 @@ class MotionMonitor {
                 _motionEventCb(_inMotion);
             }
         } else {
+            // read location and, after that, check if it is the same as the previous one
             _locReading()
             .finally(function(_) {
                 _checkMotionStop();
@@ -334,7 +339,7 @@ class MotionMonitor {
 
             _curLoc = loc;
             _curLocFresh = true;
-            _newLocCb && _newLocCb(_curLocFresh, _curLoc);
+            _newLocCb && _newLocCb(_curLoc);
         }.bindenv(this), function(_) {
             _locReadingPromise = null;
 
@@ -342,7 +347,7 @@ class MotionMonitor {
             _curLoc = _prevLoc;
             _curLocFresh = false;
             // in cb location null check exist
-            _newLocCb && _newLocCb(_curLocFresh, _curLoc);
+            _newLocCb && _newLocCb(_curLoc);
         }.bindenv(this));
     }
 
