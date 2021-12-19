@@ -400,12 +400,12 @@ class AccelerometerDriver {
             _shockCb = shockCb;
             _enShockDetect = true;
             _accel.configureClickInterrupt(true, LIS3DH_SINGLE_CLICK, _shockThr);
-            ::debug("Shock detection enabled", "@{CLASS_NAME}");
+            ::info("Shock detection enabled", "@{CLASS_NAME}");
         } else {
             _shockCb = null;
             _enShockDetect = false;
             _accel.configureClickInterrupt(false);
-            ::debug("Shock detection disabled", "@{CLASS_NAME}");
+            ::info("Shock detection disabled", "@{CLASS_NAME}");
         }
     }
 
@@ -522,7 +522,7 @@ class AccelerometerDriver {
             _motionState = ACCEL_MOTION_STATE_WAITING;
             _accel.configureFifoInterrupts(false);
             _accel.configureInertialInterrupt(true, _movementCurThr, (_movementDur*ACCEL_DEFAULT_DATA_RATE).tointeger());
-            ::debug("Motion detection enabled", "@{CLASS_NAME}");
+            ::info("Motion detection enabled", "@{CLASS_NAME}");
         } else {
             _mtnCb = null;
             _enMtnDetect = false;
@@ -533,7 +533,7 @@ class AccelerometerDriver {
             _enMtnDetect = false;
             _accel.configureFifoInterrupts(false);
             _accel.configureInertialInterrupt(false);
-            ::debug("Motion detection disabled", "@{CLASS_NAME}");
+            ::info("Motion detection disabled", "@{CLASS_NAME}");
         }
     }
 
@@ -724,7 +724,7 @@ class AccelerometerDriver {
      * Motion callback function execute and disable interrupts.
      */
     function _motionConfirmed() {
-        ::debug("Motion confirmed", "@{CLASS_NAME}");
+        ::info("Motion confirmed", "@{CLASS_NAME}");
         _motionState = ACCEL_MOTION_STATE_DISABLED;
         if (_mtnCb && _enMtnDetect) {
             // clear current and previous position for new motion detection
