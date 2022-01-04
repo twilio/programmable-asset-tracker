@@ -1,4 +1,4 @@
-ver 2022-01-03
+ver 2022-01-04
 
 Prog-X: scope
 ------------------
@@ -266,6 +266,12 @@ REST API in imp-Agent.
 Algorithm for cfg processing.
 Safeguards for non-effective cfg.
 
+- Desired (requested) cfg - new configuration requested by a cloud.
+- Reported (actual) cfg - known actual configuration of the tracker.
+- All fields are mandatory, if not specified otherwise.
+- No fields have default values.
+- In case of any error in any part of a desired configuration, the configuration is rejected.
+
 {
   "description": {              // read-only, exists in the reported cfg only
     "trackerId": <string>,        // unique tracker Id (imp deviceId)
@@ -278,99 +284,137 @@ Safeguards for non-effective cfg.
                                 //   2) "motionMonitoring" is enabled and the tracker is in motion
                                 //   3) "repossessionMode" is enabled and the current timestamp is greater than the specified one
 
-    "locReadingPeriod": <number>, // how often the tracker reads location when location obtaining is activated, in seconds, >0
+    "locReadingPeriod": <number>, // how often the tracker reads location when location obtaining is activated, in seconds,
+                                  // [LOC_READING_SAFEGUARD_MIN..LOC_READING_SAFEGUARD_MAX]
 
     "alwaysOn": true/false,       // true - location obtaining is always activated
 
     "motionMonitoring": {         // motion start/stop monitoring. When in motion, location obtaining becomes activated
       "enabled": true/false,        // true - motion monitoring is enabled
-      "settings": {                 // motion start detection settings
-                                      // movement acceleration threshold range [min..max]:
-        "movementAccMin": <number>,     // minimum (starting) level, in g, >0
-        "movementAccMax": <number>,     // maximum level, in g, >0
-        "movementAccDur": <number>,   // duration of exceeding movement acceleration threshold, in seconds, >0
-        "motionTime": <number>,       // maximum time to determine motion detection after the initial movement, in seconds, >0
-        "motionVelocity": <number>,   // minimum instantaneous velocity to determine motion detection condition, in meters per second, >0
-        "motionDistance": <number>    // minimum movement distance to determine motion detection condition, in meters, >=0
-                                      // (if 0, distance is not calculated, ie. not used for motion detection)
-      }
+                                    // Below are motion start detection settings. Optional if "enabled": false
+                                    // May have some safeguard borders - TBD
+                                    // movement acceleration threshold range [min..max]:
+      "movementAccMin": <number>,     // minimum (starting) level, in g, >0
+      "movementAccMax": <number>,     // maximum level, in g, >0
+      "movementAccDur": <number>,   // duration of exceeding movement acceleration threshold, in seconds, >0
+      "motionTime": <number>,       // maximum time to determine motion detection after the initial movement, in seconds, >0
+      "motionVelocity": <number>,   // minimum instantaneous velocity to determine motion detection condition, in meters per second, >0
+      "motionDistance": <number>    // minimum movement distance to determine motion detection condition, in meters, >=0
+                                    // (if 0, distance is not calculated, ie. not used for motion detection)
     },
 
     "repossessionMode": {         // location obtaining activation after some date
       "enabled": true/false,        // true - repossession mode is enabled
-      "after": <string>             // date/timestamp (TBD) after which location obtaining is activated
+                                    // Below fields are optional if "enabled": false
+      "after": <string>             // UNIX timestamp after which location obtaining is activated, >SOME_RESONABLE_TIMESTAMP
     },
 
     "bleBeacons": {               // BLE beacons for location obtaining
       "enabled": true/false,        // true - location obtaining using BLE beacons is enabled
-      "beacons": [                  // array of beacons
-        {
-          "id": <string>,             // beacon (BLE tag) unique identifier
+      "beacons": {                  // set of beacons. Optional if "enabled": false
+        <id>: {                     // beacon unique identifier (MAC address)
           "lng": <number>,            // longitude, in degrees, [-90..90]
           "lat": <number>             // latitude, in degrees, [-90..90]
         },
         ...
-      ],
-      "filter": {}                  // BLE tags filter (TBD)
+      }
     },
 
     "geofence": {                 // circle geofence (center, radius)
       "enabled": true/false,        // true - geofence is enabled
+                                    // Below fields are optional if "enabled": false
       "lng": <number>,              // center longitude, in degrees, [-90..90]
       "lat": <number>,              // center latitude, in degrees, [-90..90]
-      "radius": <number>            // radius, in meters, >0
+      "radius": <number>            // radius, in meters, [EARTH_RADIUS..0]
     }
   },
 
-  "sendingPeriod": <number>,    // how often the tracker sends messages when no alert happens, in seconds, >=0
-                                // (if 0, messages are sent in case of alerts only)
+  "connectingPeriod": <number>, // how often the tracker connects to network, in seconds,
+                                // [CONNECTING_SAFEGUARD_MIN..CONNECTING_SAFEGUARD_MAX]
 
-  "readingPeriod": <number>,    // how often the tracker polls various data, in seconds, >0
+  "readingPeriod": <number>,    // how often the tracker polls various data, in seconds,
+                                // [READING_SAFEGUARD_MIN..READING_SAFEGUARD_MAX]
 
   "alerts": {                   // additional (not tracking related) alerts
 
     "shockDetected" : {           // one-time shock acceleration
       "enabled": true/false,        // true - alert is enabled
+                                    // Below fields are optional if "enabled": false
       "threshold": <number>         // shock acceleration alert threshold, in g, >0
     },
 
-    "temperatureLow": {           // temperature crosses the boarder (becomes below the threshold)
+    "temperatureLow": {           // temperature crosses the border (becomes below the threshold)
       "enabled": true/false,        // true - alert is enabled
+                                    // Below fields are optional if "enabled": false
       "threshold": <number>,        // temperature low alert threshold, in Celsius
       "hysteresis": <number>        // "hysteresis" to avoid alerts "bounce", in Celsius, >=0
     },
 
-    "temperatureHigh": {          // temperature crosses the boarder (becomes above the threshold)
+    "temperatureHigh": {          // temperature crosses the border (becomes above the threshold)
       "enabled": true/false,        // true - alert is enabled
+                                    // Below fields are optional if "enabled": false
       "threshold": <number>,        // temperature high alert threshold, in Celsius
       "hysteresis": <number>        // "hysteresis" to avoid alerts "bounce", in Celsius, >=0
     },
 
-    "batteryLow": {               // battery level crosses the boarder (becomes below the threshold)
+    "batteryLow": {               // battery level crosses the border (becomes below the threshold)
       "enabled": true/false,        // true - alert is enabled
-      "threshold": <number>,        // battery low alert threshold, in %, [0..100]
-      "hysteresis": <number>        // TBD
+                                    // Below fields are optional if "enabled": false
+      "threshold": <number>         // battery low alert threshold, in %, [0..100]
     },
 
-    "tamperingDetected": {}       // TBD
+    "tamperingDetected": {        // TBD
+      "enabled": true/false        // true - alert is enabled
+    }
   },
 
-  "impLogging": {               // imp logging level ("ERROR", "INFO", "DEBUG")
+  "impLogging": {               // imp logging level ("ERROR", "INFO", "DEBUG"). Optional.
     "agentLevel": "DEBUG",        // on Imp-Agent
     "deviceLevel": "INFO"         // on Imp-Device
   }
 }
 
-- another sendingPeriod when inside geofence ?
-- default after first start ?
-- defaults for fields ?
-- several cfg requests when offline -> aggregation ?
-- cfg error -> ?
-- desired cfg
-  -- full desired cfg
-  -- patch ?
-- reported cfg = full desired cfg + description
-- safeguards -> error or default ?
+Initial configuration after the first start:
+- In a production version (moving from the shipping mode):
+{
+  "locationTracking": {
+    "locReadingPeriod": 3600, // can be any, location obtaining is never activated
+    "alwaysOn": false,
+    "motionMonitoring": {
+      "enabled": false
+    },
+    "repossessionMode": {
+      "enabled": false
+    },
+    "bleBeacons": {
+      "enabled": false
+    },
+    "geofence": {
+      "enabled": false
+    }
+  },
+  "connectingPeriod": 1800, // important - TBD
+  "readingPeriod": 900,     // not very important - TBD
+  "alerts": {
+    "shockDetected" : {
+      "enabled": false
+    },
+    "temperatureLow": {
+      "enabled": false
+    },
+    "temperatureHigh": {
+      "enabled": false
+    },
+    "batteryLow": {
+      "enabled": false
+    },
+    "tamperingDetected": {
+      "enabled": false
+    }
+  }
+}
+- In a development version: can be something useful for testing
+
 
 Recovery Mode
 -------------
