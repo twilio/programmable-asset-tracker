@@ -1,19 +1,14 @@
-# The esp-at software #
+# ESP32 Firmware #
 
-**The esp-at software downloading to the wifi-ble-click board**
+Firmware for the [WiFi BLE click](https://www.mikroe.com/wifi-ble-click) board with ESP32-WROOM-32 module.
 
-The esp-at software is loaded onto the wifi-ble-click board using the utility [Flash download tool](https://www.espressif.com/sites/default/files/tools/flash_download_tool_3.9.2.zip) (platform - Windows PC).
+## Compile Firmware ##
 
-The wifi-ble-click board has an internal bootloader accessible through the uart interface (pins: GND, EN, IO0, RX, TX). The [schematic](https://download.mikroe.com/documents/add-on-boards/click/wifi-ble/wifi-ble-click-schematic-v102.pdf).
+How to prepare (compile) a firmware is described [here](https://docs.espressif.com/projects/esp-at/en/latest/Compile_and_Develop/).
 
-For flashing software, you need a usb-uart converter (e.g. FT2232 FTDI).
-The esp-at software version 2.3.0.0 is [used](https://github.com/espressif/esp-at.git).
-The software build sequence is described in [compile and download chapter](https://docs.espressif.com/projects/esp-at/en/latest/Compile_and_Develop/How_to_clone_project_and_compile_it).
-The software dowload sequence is described in [downloading guide chapter](https://docs.espressif.com/projects/esp-at/en/latest/Get_Started/Downloading_guide.html).
+Firmware version [2.3.0.0](https://github.com/espressif/esp-at/releases/tag/v2.3.0.0_esp32c3) is already built and placed in the [./fw](./fw) folder.
 
-**The fw directory**
-
-The fw directory contains necessary binary files. List of files and addresses of their location (in external SPI NOR FLASH):
+List of binary files and addresses of their location (in external SPI NOR FLASH):
 1) Address: 0x8000, binary image: partition-table.bin 
 2) Address: 0x10000, binary image: ota_data_initial.bin 
 3) Address: 0xf000, binary image: phy_init_data.bin 
@@ -32,9 +27,23 @@ The fw directory contains necessary binary files. List of files and addresses of
 16) Address: 0x3B000, binary image: mqtt_ca.bin 
 17) Address: 0x30000, binary image: factory_param.bin
 
-**Test script**
+## Flash Firmware ##
 
-The correct operation of the wifi-ble-click board after loading the software is checked using a test script Esp32Test.device.nut (the software version, SDK version requested). Board: imp006. Uart: uartXEFGH. Uart settings: 115200 baud, 8N1. Upon successful software update, the following response is returned:
+The WiFi BLE click board has an internal bootloader accessible through the uart interface (pins: `GND, EN, IO0, RX, TX`) - [schematics](https://download.mikroe.com/documents/add-on-boards/click/wifi-ble/wifi-ble-click-schematic-v102.pdf).
+
+The following is needed for the flashing:
+- A usb-uart converter (e.g. FT2232 FTDI).
+- A flash utility. For Windows platform - [Flash download tool](https://www.espressif.com/sites/default/files/tools/flash_download_tool_3.9.2.zip).
+
+How to flash a firmware is described [here](https://docs.espressif.com/projects/esp-at/en/latest/Get_Started/Downloading_guide.html).
+
+## Test Firmware ##
+
+A simple Squirrel test which gets a version from ESP32 - [./Esp32Test.device.nut](./Esp32Test.device.nut)
+
+It is setup for the `imp006` module with the WiFi BLE click board connected to the `uartXEFGH` UART port.
+
+Example of the correct log after running the test:
 ```
 2022-01-05 00:36:30+0400 [Device] AT+GMR
 2022-01-05 00:36:33+0400 [Device] AT version:2.3.0.0-dev(e98993f - ESP32 - Dec 23 2021 09:03:31)
