@@ -6,7 +6,8 @@ Firmware for the [WiFi BLE click](https://www.mikroe.com/wifi-ble-click) board w
 
 How to prepare (compile) a firmware is described [here](https://docs.espressif.com/projects/esp-at/en/latest/Compile_and_Develop/).
 
-Firmware version [2.3.0.0](https://github.com/espressif/esp-at/releases/tag/v2.3.0.0_esp32c3) is already built and placed in the [./fw](./fw) folder.
+Firmware version [2.2.0.0](https://github.com/espressif/esp-at/releases/tag/v2.2.0.0_esp32) is already built.
+Compiled firmware [link](https://github.com/espressif/esp-at/files/6767464/ESP32-WROOM_AT_V2.2.0.0.zip).
 
 List of binary files and addresses of their location (in external SPI NOR FLASH):
 1) Address: 0x8000, binary image: partition-table.bin 
@@ -45,10 +46,10 @@ It is setup for the `imp006` module with the WiFi BLE click board connected to t
 
 Example of the correct log after running the test:
 ```
-2022-01-05 00:36:30+0400 [Device] AT+GMR
-2022-01-05 00:36:33+0400 [Device] AT version:2.3.0.0-dev(e98993f - ESP32 - Dec 23 2021 09:03:31)
-2022-01-05 00:36:35+0400 [Device] SDK version:v4.2.2-331-g5595042-dirty
-2022-01-05 00:36:39+0400 [Device] compile time(9ff133D):Dec 30 2021  
-2022-01-05 00:36:41+0400 [Device] Bin version:2.3.0(WROOM-32)
-2022-01-05 00:36:44+0400 [Device] OK
+2022-01-08T13:26:59.239 +00:00	[Device]	AT+GMR
+2022-01-08T13:26:59.334 +00:00	[Device]	AT version:2.2.0.0(c6fa6bf - ESP32 - Jul  2 2021 06:44:05)
+2022-01-08T13:26:59.395 +00:00	[Device]	SDK version:v4.2.2-76-gefa6eca
+2022-01-08T13:26:59.478 +00:00	[Device]	compile time(3a696ba):Jul  2 2021 11:54:43
+2022-01-08T13:26:59.537 +00:00	[Device]	Bin version:2.2.0(WROOM-32)
+2022-01-08T13:26:59.597 +00:00	[Device]	OK
 ```
