@@ -1,6 +1,9 @@
+// Simple test for communication with ESP32 module via AT interface:
+// - request ESP32 firmware version (AT+GMR) periodically
 
-// request period
+// request period, in seconds
 const VERSION_REQ_PERIOD = 60;
+
 // new RX FIFO size
 const RX_FIFO_SIZE = 200;
 
