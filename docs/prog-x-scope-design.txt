@@ -1,4 +1,4 @@
-ver 2022-01-04
+ver 2022-01-10
 
 Prog-X: scope
 ------------------
@@ -262,22 +262,47 @@ Data Message JSON
 
 Southbound API (Configuration sending from the cloud) (not in POC)
 -----------------------------------------------------
-REST API in imp-Agent.
-Algorithm for cfg processing.
-Safeguards for non-effective cfg.
 
-- Desired (requested) cfg - new configuration requested by a cloud.
-- Reported (actual) cfg - known actual configuration of the tracker.
-- All fields are mandatory, if not specified otherwise.
-- No fields have default values.
-- In case of any error in any part of a desired configuration, the configuration is rejected.
+Definitions:
+- Full cfg - contains all fields.
+- Partial cfg - contains a subset of fields.
+- Empty cfg - contains no fields.
+- Default cfg - hardcoded configuration. Always a full cfg. Always exists. Can be different for different builds (different production flavors, different in development builds).
+- Saved cfg - configuration saved in the flash. Always a full cfg.
+- Reported cfg - known actual configuration of the tracker. Always a full cfg.
+- Cfg update - configuration update from the cloud. Can be full or partial cfg.
+- Pending cfg update - cfg update which is not applied yet, waiting for the tracker becomes online.
+- There can be not more than one pending cfg update at a time. A new cfg update from the cloud overwrites the current pending cfg update (if any).
+- Every cfg update has a unique Id specified by the cloud (default cfg has predefined Id).
+- Reported cfg includes Id of the latest applied cfg update.
+
+Imp-Agent implements REST API:
+
+  1) GET /cfg
+    - Returns reported cfg.
+    - If no reported cfg known (when after Imp-Agent restart, Imp-Device has not reported it's cfg yet), then empty cfg is returned.
+    - Every time after cfg update is processed by Imp-Device it sends actual configuration to Imp-Agent. Imp-Agent saves it as reported cfg.
+
+  2) PUT (TBD) /cfg
+    - Request for cfg update.
+    - Imp-Agent checks the correctness of the configuration (type of field values, supported range of field values). If something is wrong, the request is failed and an error is responded.
+    - If Imp-Device is online, then cfg update is immediately sent to Imp-Device. 
+    - Otherwise, the request becomes pending cfg update, till Imp-Device becomes online. If there was another pending cfg, it is overwritten by the new one.
+
+JSON format:
+- all keys and values are case sensitive/insensitive - TBD
 
 {
-  "description": {              // read-only, exists in the reported cfg only
-    "trackerId": <string>,        // unique tracker Id (imp deviceId)
-    "cfgSchemeVersion": <string>, // supported JSON cfg format/scheme version: "<major>.<minor>"
-    "online": true/false          // Imp-Device is online
-  },
+  "updateId": <string>,         // unique Id of the cfg update:
+                                // - specified in the desired cfg
+                                // - in the reported cfg: Id of the last known applied update
+
+                                // These fields are read-only, exists in the reported cfg only
+  "updateTimestamp": <number>,    // timestamp (Unix time) when this update has been applied
+  "pendingUpdate": true/false,    // true - a new cfg update is pending (not applied yet)
+  "pendingUpdateId: <string>,     // id of the pending cfg update. Exists if "pendingUpdate" is true
+  "trackerId": <string>,          // unique tracker Id (imp deviceId)
+  "cfgSchemeVersion": <string>,   // supported JSON cfg format/scheme version: "<major>.<minor>"
 
   "locationTracking": {         // location obtaining is activated if any of the following occurs:
                                 //   1) "alwaysOn" is true
@@ -291,27 +316,29 @@ Safeguards for non-effective cfg.
 
     "motionMonitoring": {         // motion start/stop monitoring. When in motion, location obtaining becomes activated
       "enabled": true/false,        // true - motion monitoring is enabled
-                                    // Below are motion start detection settings. Optional if "enabled": false
-                                    // May have some safeguard borders - TBD
+                                    // motion start detection settings
                                     // movement acceleration threshold range [min..max]:
-      "movementAccMin": <number>,     // minimum (starting) level, in g, >0
-      "movementAccMax": <number>,     // maximum level, in g, >0
-      "movementAccDur": <number>,   // duration of exceeding movement acceleration threshold, in seconds, >0
-      "motionTime": <number>,       // maximum time to determine motion detection after the initial movement, in seconds, >0
-      "motionVelocity": <number>,   // minimum instantaneous velocity to determine motion detection condition, in meters per second, >0
-      "motionDistance": <number>    // minimum movement distance to determine motion detection condition, in meters, >=0
+      "movementAccMin": <number>,     // minimum (starting) level, in g, [>0..TBD]
+      "movementAccMax": <number>,     // maximum level, in g, [>0..TBD],
+                                      // if movementAccMax < movementAccMin, they are assumed equal to movementAccMin
+      "movementAccDur": <number>,   // duration of exceeding movement acceleration threshold, in seconds, [>0..TBD]
+      "motionTime": <number>,       // maximum time to determine motion detection after the initial movement, in seconds,
+                                    // [MOTION_TIME_SAFEGUARD_MIN..MOTION_TIME_SAFEGUARD_MAX]
+      "motionVelocity": <number>,   // minimum instantaneous velocity to determine motion detection condition, in meters per second,
+                                    // [MOTION_VEL_SAFEGUARD_MIN..MOTION_VEL_SAFEGUARD_MAX]
+      "motionDistance": <number>    // minimum movement distance to determine motion detection condition, in meters,
+                                    // [0, MOTION_DIST_SAFEGUARD_MIN..MOTION_DIST_SAFEGUARD_MAX]
                                     // (if 0, distance is not calculated, ie. not used for motion detection)
     },
 
     "repossessionMode": {         // location obtaining activation after some date
       "enabled": true/false,        // true - repossession mode is enabled
-                                    // Below fields are optional if "enabled": false
       "after": <string>             // UNIX timestamp after which location obtaining is activated, >SOME_RESONABLE_TIMESTAMP
     },
 
     "bleBeacons": {               // BLE beacons for location obtaining
       "enabled": true/false,        // true - location obtaining using BLE beacons is enabled
-      "beacons": {                  // set of beacons. Optional if "enabled": false
+      "beacons": {                  // set of beacons
         <id>: {                     // beacon unique identifier (MAC address)
           "lng": <number>,            // longitude, in degrees, [-90..90]
           "lat": <number>             // latitude, in degrees, [-90..90]
@@ -322,7 +349,6 @@ Safeguards for non-effective cfg.
 
     "geofence": {                 // circle geofence (center, radius)
       "enabled": true/false,        // true - geofence is enabled
-                                    // Below fields are optional if "enabled": false
       "lng": <number>,              // center longitude, in degrees, [-90..90]
       "lat": <number>,              // center latitude, in degrees, [-90..90]
       "radius": <number>            // radius, in meters, [EARTH_RADIUS..0]
@@ -339,27 +365,24 @@ Safeguards for non-effective cfg.
 
     "shockDetected" : {           // one-time shock acceleration
       "enabled": true/false,        // true - alert is enabled
-                                    // Below fields are optional if "enabled": false
-      "threshold": <number>         // shock acceleration alert threshold, in g, >0
+      "threshold": <number>         // shock acceleration alert threshold, in g,
+                                    // [SHOCK_ACC_SAFEGUARD_MIN..SHOCK_ACC_SAFEGUARD_MAX]
     },
 
     "temperatureLow": {           // temperature crosses the border (becomes below the threshold)
       "enabled": true/false,        // true - alert is enabled
-                                    // Below fields are optional if "enabled": false
       "threshold": <number>,        // temperature low alert threshold, in Celsius
       "hysteresis": <number>        // "hysteresis" to avoid alerts "bounce", in Celsius, >=0
     },
 
     "temperatureHigh": {          // temperature crosses the border (becomes above the threshold)
       "enabled": true/false,        // true - alert is enabled
-                                    // Below fields are optional if "enabled": false
       "threshold": <number>,        // temperature high alert threshold, in Celsius
       "hysteresis": <number>        // "hysteresis" to avoid alerts "bounce", in Celsius, >=0
     },
 
     "batteryLow": {               // battery level crosses the border (becomes below the threshold)
       "enabled": true/false,        // true - alert is enabled
-                                    // Below fields are optional if "enabled": false
       "threshold": <number>         // battery low alert threshold, in %, [0..100]
     },
 
@@ -368,54 +391,46 @@ Safeguards for non-effective cfg.
     }
   },
 
-  "impLogging": {               // imp logging level ("ERROR", "INFO", "DEBUG"). Optional.
+  "impLogging": {               // imp logging level ("ERROR", "INFO", "DEBUG")
     "agentLevel": "DEBUG",        // on Imp-Agent
     "deviceLevel": "INFO"         // on Imp-Device
   }
 }
 
-Initial configuration after the first start:
-- In a production version (moving from the shipping mode):
-{
-  "locationTracking": {
-    "locReadingPeriod": 3600, // can be any, location obtaining is never activated
-    "alwaysOn": false,
-    "motionMonitoring": {
-      "enabled": false
-    },
-    "repossessionMode": {
-      "enabled": false
-    },
-    "bleBeacons": {
-      "enabled": false
-    },
-    "geofence": {
-      "enabled": false
-    }
-  },
-  "connectingPeriod": 1800, // important - TBD
-  "readingPeriod": 900,     // not very important - TBD
-  "alerts": {
-    "shockDetected" : {
-      "enabled": false
-    },
-    "temperatureLow": {
-      "enabled": false
-    },
-    "temperatureHigh": {
-      "enabled": false
-    },
-    "batteryLow": {
-      "enabled": false
-    },
-    "tamperingDetected": {
-      "enabled": false
-    }
-  }
-}
-- In a development version: can be something useful for testing
+Cfg processing on Imp-Device
+----------------------------
 
+- Every module has constructor/start() (TBD) where full cfg is provided.
+- The module extracts the needed fields, makes setup and starts working.
+- It is assumed that always full and correct cfg is provided. No need in defaults and additional checks (except few cases).
+- If any problem, the module throws an exception.
+
+- Every module has an additional updateCfg() method where cfg update is provided.
+- The module extracts the fields related to it (if any) and makes an update in settings. How is it done - is a module-specific.
+- It is assumed that always correct cfg update is provided. No need in defaults and additional checks (except few cases).
+- If any problem, the module throws an exception.
+
+After Imp-Device restart:
+  - If it is a new deployment and ERASE_FLASH builder-variable is defined, erase the flash.
+  - If there is saved cfg in the flash, actual_cfg = saved cfg, use it to setup and start all modules.
+    -- If an exception or any other problems (eg. with reading cfg from the flash), log the error, erase saved cfg in the flash and restart Imp-Device.
+  - If there is no saved cfg in the flash, actual_cfg = default cfg, use it to setup and start all modules.
+    -- If an exception, log the error, go to recovery mode (TBD).
+  - If all modules are started w/o problems, send actual_cfg to Imp-Agent.
+
+When cfg update comes from Imp-Agent:
+  - Wait (using Promises or whatever, TBD) till any other cfg setup/update process is completed. Including completion of initial setup after Imp-Device restart.
+  - I.e. actual_cfg always exists.
+  - Make a diff between actual_cfg and cfg update.
+  - Call updateCfg(diff) for all modules.
+    -- If an exception, log the error, restart Imp-Device.
+  - If no problems:
+    -- actual_cfg = actual_cfg + diff
+    -- save actual_cfg in the flash
+       - if problems - ignore / erase flash (TBD)
+    -- send actual_cfg to Imp-Agent.
+  - When to confirm cfg update message receiving - TBD
 
 Recovery Mode
 -------------
-If an unhandled error occurred, device goes to sleep and periodically connects to the server waiting for a SW update
+If an unhandled error occurred (or there are other conditions when need to go to the recovery mode - TBD), device goes to sleep and periodically connects to the server waiting for a SW update
