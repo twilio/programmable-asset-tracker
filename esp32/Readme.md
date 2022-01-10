@@ -11,23 +11,23 @@ The latest official firmware version is [2.2.0.0](https://github.com/espressif/e
 It is already compiled and available [here](https://github.com/espressif/esp-at/files/6767464/ESP32-WROOM_AT_V2.2.0.0.zip).
 
 List of binary files and addresses of their location (in external SPI NOR FLASH):
-1) Address: 0x8000, binary image: partition-table.bin 
+1) Address: 0x8000, binary image: partition_table/partition-table.bin 
 2) Address: 0x10000, binary image: ota_data_initial.bin 
 3) Address: 0xf000, binary image: phy_init_data.bin 
-4) Address: 0x1000, binary image: bootloader.bin 
+4) Address: 0x1000, binary image: bootloader/bootloader.bin 
 5) Address: 0x100000, binary image: esp-at.bin 
 6) Address: 0x20000, binary image: at_customize.bin 
-7) Address: 0x21000, binary image: ble_data.bin 
-8) Address: 0x24000, binary image: server_cert.bin 
-9) Address: 0x26000, binary image: server_key.bin 
-10) Address: 0x28000, binary image: server_ca.bin 
-11) Address: 0x2a000, binary image: client_cert.bin 
-12) Address: 0x2c000, binary image: client_key.bin 
-13) Address: 0x2e000, binary image: client_ca.bin 
-14) Address: 0x37000, binary image: mqtt_cert.bin 
-15) Address: 0x39000, binary image: mqtt_key.bin 
-16) Address: 0x3B000, binary image: mqtt_ca.bin 
-17) Address: 0x30000, binary image: factory_param.bin
+7) Address: 0x21000, binary image: customized_partitions/ble_data.bin 
+8) Address: 0x24000, binary image: customized_partitions/server_cert.bin 
+9) Address: 0x26000, binary image: customized_partitions/server_key.bin 
+10) Address: 0x28000, binary image: customized_partitions/server_ca.bin 
+11) Address: 0x2a000, binary image: customized_partitions/client_cert.bin 
+12) Address: 0x2c000, binary image: customized_partitions/client_key.bin 
+13) Address: 0x2e000, binary image: customized_partitions/client_ca.bin 
+14) Address: 0x37000, binary image: customized_partitions/mqtt_cert.bin 
+15) Address: 0x39000, binary image: customized_partitions/mqtt_key.bin 
+16) Address: 0x3B000, binary image: customized_partitions/mqtt_ca.bin 
+17) Address: 0x30000, binary image: customized_partitions/factory_param.bin
 
 ## Flash Firmware ##
 
