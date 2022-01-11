@@ -13,6 +13,15 @@
 @include once "../shared/Version.shared.nut"
 @include once "../shared/Constants.shared.nut"
 @include once "../shared/Logger/Logger.shared.nut"
+
+@if UART_LOGGING || !defined(UART_LOGGING)
+@include once "../shared/Logger/stream/UartOutputStream.device.nut"
+@endif
+
+@if LED_INDICATION || !defined(LED_INDICATION)
+@include once "LedIndication.device.nut"
+@endif
+
 @include once "Hardware.device.nut"
 @include once "ProductionManager.device.nut"
 @include once "Configuration.device.nut"
@@ -59,8 +68,17 @@ class Application {
         // (it sets the appropriate send timeout policy)
         _initConnectionManager();
 
+@if UART_LOGGING || !defined(UART_LOGGING)
+        local outStream = UartOutputStream(HW_LOGGING_UART);
+        Logger.setOutputStream(outStream);
+@endif
+
         ::info("Application Version: " + APP_VERSION);
         ::debug("Wake reason: " + hardware.wakereason());
+
+@if LED_INDICATION || !defined(LED_INDICATION)
+        ledIndication = LedIndication(HW_LED_RED_PIN, HW_LED_GREEN_PIN, HW_LED_BLUE_PIN);
+@endif
 
         // Create and intialize Replay Messenger
         _initReplayMessenger()
@@ -99,7 +117,11 @@ class Application {
     function _initConnectionManager() {
         // Customized Connection Manager is used
         local cmConfig = {
+@if LED_INDICATION || !defined(LED_INDICATION)
+            "blinkupBehavior"    : CM_BLINK_ON_CONNECT,
+@else
             "blinkupBehavior"    : CM_BLINK_NEVER,
+@endif
             "errorPolicy"        : RETURN_ON_ERROR_NO_DISCONNECT,
             "connectTimeout"     : APP_CM_CONNECT_TIMEOUT,
             "autoDisconnectDelay": APP_CM_AUTO_DISC_DELAY,
@@ -156,6 +178,9 @@ cm <- null;
 
 // Replay Messenger, communicates with Imp-Agent
 rm <- null;
+
+// LED indication
+ledIndication <- null;
 
 // Callback to be called by Production Manager if it allows to run the main application
 function startApp() {

@@ -13,6 +13,7 @@ const CRM_RESEND_RATE_LIMIT_PCT = 80;
 
 class CustomReplayMessenger extends ReplayMessenger {
     _persistedMessagesPending = false;
+    _eraseAllPending = false;
     _onIdleCb = null;
     _onAckCbs = null;
     _onAckDefaultCb = null;
@@ -294,6 +295,37 @@ class CustomReplayMessenger extends ReplayMessenger {
         _spiFL.read(onData, onFinish);
     }
 
+    // Callback called when async reading (in the _processPersistedMessages method) is finished
+    function _onReadingFinished() {
+        _readingInProcess = false;
+
+        if (_eraseAllPending) {
+            _eraseAllPending = false;
+            _spiFL.eraseAll(true);
+            ::debug("Flash logger erased", "@{CLASS_NAME}");
+
+            _eraseQueue = {};
+            _cleanupNeeded = false;
+            _processPersistMessagesQueue();
+        }
+
+        // Process the queue of messages to be erased
+        if (_eraseQueue.len() > 0) {
+            _log("Processing the queue of messages to be erased...");
+            foreach (id, address in _eraseQueue) {
+                _log("Message erased. Id: " + id);
+                _spiFL.erase(address);
+            }
+            _eraseQueue = {};
+            _log("Processing the queue of messages to be erased: finished");
+        }
+
+        if (_cleanupNeeded) {
+            // Restart the processing in order to cleanup the next sector
+            _processPersistedMessages();
+        }
+    }
+
     // Persists the message if there is enough space in the current sector.
     // If not, adds the message to the _persistMessagesQueue queue (if `enqueue` is `true`).
     // Returns true if the message has been persisted, otherwise false
@@ -318,8 +350,17 @@ class CustomReplayMessenger extends ReplayMessenger {
             } catch (err) {
                 ::error("Couldn't persist a message: " + err, "@{CLASS_NAME}");
                 ::error("Erasing the flash logger!", "@{CLASS_NAME}");
-                _spiFL.eraseAll();
-                enqueue && _persistMessagesQueue.push(msg);
+
+                if (_readingInProcess) {
+                    ::debug("Flash logger will be erased once reading is finished", "@{CLASS_NAME}");
+                    _eraseAllPending = true;
+                    enqueue && _persistMessagesQueue.push(msg);
+                } else {
+                    _spiFL.eraseAll(true);
+                    ::debug("Flash logger erased", "@{CLASS_NAME}");
+                    // Instead of enqueuing, we try to write it again because erasing must help. If it doesn't help, we will just drop this message
+                    enqueue && _persistMessage(msg, false);
+                }
 
                 _log(format("_sentQueue: %d, _persistMessagesQueue: %d, _eraseQueue: %d", _sentQueue.len(), _persistMessagesQueue.len(), _eraseQueue.len()));
                 return false;

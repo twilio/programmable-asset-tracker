@@ -31,13 +31,13 @@
 const ACCEL_DEFAULT_I2C_ADDR = 0x32;
 
 // Default Measurement rate - ODR, in Hz
-const ACCEL_DEFAULT_DATA_RATE = 10;
+const ACCEL_DEFAULT_DATA_RATE = 50;
 
 // Defaults for shock detection:
 // -----------------------------
 
 // Acceleration threshold, in g
-const ACCEL_DEFAULT_SHOCK_THR = 4;    // (for LIS2DH12 register 0x3A)
+const ACCEL_DEFAULT_SHOCK_THR = 8;    // (for LIS2DH12 register 0x3A)
 
 // Defaults for motion detection:
 // ------------------------------
@@ -45,9 +45,9 @@ const ACCEL_DEFAULT_SHOCK_THR = 4;    // (for LIS2DH12 register 0x3A)
 // Duration of exceeding the movement acceleration threshold, in seconds
 const ACCEL_DEFAULT_MOV_DUR  = 0.5;
 // Movement acceleration maximum threshold, in g
-const ACCEL_DEFAULT_MOV_MAX = 0.3;
+const ACCEL_DEFAULT_MOV_MAX = 0.4;
 // Movement acceleration minimum threshold, in g
-const ACCEL_DEFAULT_MOV_MIN = 0.1;
+const ACCEL_DEFAULT_MOV_MIN = 0.2;
 // Step change of movement acceleration threshold for bounce filtering, in g
 const ACCEL_DEFAULT_MOV_STEP = 0.1;
 // Default time to determine motion detection after the initial movement, in seconds.
@@ -66,13 +66,13 @@ const ACCEL_RANGE = 8;
 // Acceleration of gravity (m / s^2)
 const ACCEL_G = 9.81;
 // Default accelerometer's FIFO watermark
-const ACCEL_DEFAULT_WTM = 15;
+const ACCEL_DEFAULT_WTM = 31;
 // Velocity zeroing counter (for stop motion)
 const ACCEL_VELOCITY_RESET_CNTR = 2;
 // Discrimination window applied low threshold
-const ACCEL_DISCR_WNDW_LOW_THR = -0.07;
+const ACCEL_DISCR_WNDW_LOW_THR = -0.09;
 // Discrimination window applied high threshold
-const ACCEL_DISCR_WNDW_HIGH_THR = 0.07;
+const ACCEL_DISCR_WNDW_HIGH_THR = 0.09;
 
 // States of the motion detection - FSM (finite state machine):
 // Motion detection is disabled (initial state; motion detection is disabled automatically after motion is detected)
@@ -350,13 +350,14 @@ class AccelerometerDriver {
             ::debug(format("Accelerometer rate %d Hz", rate), "@{CLASS_NAME}");
             _accel.setMode(LIS3DH_MODE_LOW_POWER);
             _accel.enable(true);
-            _accel.configureFifo(true, LIS3DH_FIFO_BYPASS_MODE);
-            _accel.configureFifo(true, LIS3DH_FIFO_STREAM_TO_FIFO_MODE);
             _accel._setReg(LIS2DH12_CTRL_REG2, LIS2DH12_FDS | LIS2DH12_HPF_AOI_INT1);
             _accel._getReg(LIS2DH12_REFERENCE);
+            _accel.configureFifo(true, LIS3DH_FIFO_BYPASS_MODE);
+            _accel.configureFifo(true, LIS3DH_FIFO_STREAM_TO_FIFO_MODE);
             _accel.getInterruptTable();
             _accel.configureInterruptLatching(false);
             _intPin.configure(DIGITAL_IN_WAKEUP, _checkInt.bindenv(this));
+            _accel._getReg(LIS2DH12_REFERENCE);
             ::debug("Accelerometer configured", "@{CLASS_NAME}");
         } catch (e) {
             throw "Accelerometer configuration error: " + e;

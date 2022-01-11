@@ -333,6 +333,7 @@ class DataProcessor {
 
         // ReplayMessenger saves the message till imp-device is connected
         rm.send(APP_RM_MSG_NAME.DATA, clone _dataMesg, RM_IMPORTANCE_HIGH);
+        ledIndication && ledIndication.indicate(LI_EVENT_TYPE.NEW_MSG);
 
         // If at least one alert, try to send data immediately
         if (alertsCount > 0) {
@@ -360,6 +361,8 @@ class DataProcessor {
             if (_temperatureState != DP_TEMPERATURE_LEVEL.T_HIGHER_RANGE) {
                 _allAlerts.temperatureHigh = true;
                 _temperatureState = DP_TEMPERATURE_LEVEL.T_HIGHER_RANGE;
+
+                ledIndication && ledIndication.indicate(LI_EVENT_TYPE.ALERT_TEMP_HIGH);
             }
         }
 
@@ -374,6 +377,8 @@ class DataProcessor {
             if (_temperatureState != DP_TEMPERATURE_LEVEL.T_BELOW_RANGE) {
                 _allAlerts.temperatureLow = true;
                 _temperatureState = DP_TEMPERATURE_LEVEL.T_BELOW_RANGE;
+
+                ledIndication && ledIndication.indicate(LI_EVENT_TYPE.ALERT_TEMP_LOW);
             }
         }
 
@@ -438,6 +443,8 @@ class DataProcessor {
     function _onShockDetectedEvent() {
         _allAlerts.shockDetected = true;
         _dataProc();
+
+        ledIndication && ledIndication.indicate(LI_EVENT_TYPE.ALERT_SHOCK);
     }
 
     /**
@@ -448,9 +455,13 @@ class DataProcessor {
         if (eventType) {
             _allAlerts.motionStarted = true;
             _inMotion = true;
+
+            ledIndication && ledIndication.indicate(LI_EVENT_TYPE.ALERT_MOTION_STARTED);
         } else {
             _allAlerts.motionStopped = true;
             _inMotion = false;
+
+            ledIndication && ledIndication.indicate(LI_EVENT_TYPE.ALERT_MOTION_STOPPED);
         }
         _dataProc();
     }

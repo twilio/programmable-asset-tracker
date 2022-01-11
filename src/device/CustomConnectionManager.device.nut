@@ -34,6 +34,8 @@ class CustomConnectionManager extends ConnectionManager {
         onConnect(_onConnectCb.bindenv(this), "@{CLASS_NAME}");
         onTimeout(_onConnectionTimeoutCb.bindenv(this), "@{CLASS_NAME}");
         onDisconnect(_onDisconnectCb.bindenv(this), "@{CLASS_NAME}");
+
+        // TODO: Add periodic connection?
     }
 
     /**

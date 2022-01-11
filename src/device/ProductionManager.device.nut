@@ -31,6 +31,8 @@ class ProductionManager {
      * Start the manager. It will check the conditions and either start the main application or go to sleep
      */
     function start() {
+        // TODO: Erase the flash memory on first start (when awake from shipping mode)? Or in factory code?
+
         // NOTE: The app may override this handler but it must call enterEmergencyMode in case of a runtime error
         imp.onunhandledexception(_onUnhandledException.bindenv(this));
 
@@ -43,6 +45,7 @@ class ProductionManager {
         }
 
         if (data.lastError != null) {
+            // TODO: Improve logging!
             _printLastError(data.lastError);
         }
 

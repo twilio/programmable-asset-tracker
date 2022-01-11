@@ -1,6 +1,6 @@
 # Prog-X Asset Tracker #
 
-**Version of the Application: 1.0.0 (POC)**
+**Version of the Application: 1.2.0 (POC)**
 
 An application in Squirrel language for [Electric Imp platform](https://www.electricimp.com/platform) that implements asset tracking functionality.
 
@@ -32,6 +32,8 @@ This version (Proof-Of-Concept) supports:
 - If no/bad cellular network, saving messages in the flash and re-sending them later.
 - Sending data/alerts from Imp-Agent to a cloud with the predefined REST API.
 - Emergency (recovery) mode.
+- UART logging.
+- LED indication of the application behavior.
 - The cloud REST API simple emulation on another Imp.
 
 ## Source Code ##
@@ -41,6 +43,8 @@ Shared sources: [./src/shared](./src/shared)
 Imp-Agent sources: [./src/agent](./src/agent)
 
 Imp-Device sources: [./src/device](./src/device)
+
+Preprocessed files: [./build](./build)
 
 ## Setup ##
 
@@ -55,7 +59,9 @@ Should be passed to [Builder](https://github.com/electricimp/Builder/):
 - or using `--use-directives <path_to_json_file>` option, where the json file contains the variables with the values.
 
 Variables:
-- `LOGGER_LEVEL` - Logging level ("ERROR", "INFO", "DEBUG") on Imp-Agent/Device after the Imp firmware is deployed. Optional. Default: "INFO".
+- `LOGGER_LEVEL` - Logging level ("ERROR", "INFO", "DEBUG") on Imp-Agent/Device after the Imp firmware is deployed. Optional. Default: **"INFO"**
+- `UART_LOGGING` - Enable/disable [UART logging](#uart-logging) on Imp-Device. Optional. Default: **enabled**
+- `LED_INDICATION` - Enable/disable [LED indication](#led-indication) of events. Optional. Default: **enabled**
 
 ### User-Defined Environment Variables ###
 
@@ -81,13 +87,15 @@ Example of JSON with environment variables (when Cloud REST API is [emulated on 
 
 ## Build And Run ##
 
-- Change [Configuration Constants](#hardcoded-configuration), if needed.
-- Specify [Builder Variables](#builder-variables), if needed.
-- Run [Builder](https://github.com/electricimp/Builder/) for [./src/agent/Main.agent.nut](./src/agent/Main.agent.nut) file to get Imp-Agent preprocessed file.
-- Run [Builder](https://github.com/electricimp/Builder/) for [./src/device/Main.device.nut](./src/device/Main.device.nut) file to get Imp-Device preprocessed file.
+- If no need to change the default values of [Configuration Constants](#hardcoded-configuration) and [Builder Variables](#builder-variables), take already preprocessed files from the [./build](./build) folder.
+- Otherwise: 
+  - Change [Configuration Constants](#hardcoded-configuration), if needed.
+  - Specify [Builder Variables](#builder-variables), if needed.
+  - Run [Builder](https://github.com/electricimp/Builder/) for [./src/agent/Main.agent.nut](./src/agent/Main.agent.nut) file to get Imp-Agent preprocessed file.
+  - Run [Builder](https://github.com/electricimp/Builder/) for [./src/device/Main.device.nut](./src/device/Main.device.nut) file to get Imp-Device preprocessed file.
 - Specify mandatory [Environment Variables](#user-defined-environment-variables) in the impcentral Device Group where you plan to run the application.
 - Create and build a new deployment in the Device Group and restart Imp.
-- Check logs.
+- Control the application behavior using logs in the impcentral and/or via [UART logging](#uart-logging) (if enabled), and using [LED indication](#led-indication) (if enabled).
 
 ## Simple Cloud Integration ##
 
@@ -163,3 +171,35 @@ How to run the emulator:
 - Upload, build and run this file on the Imp which is used for emulation. No [Builder](https://github.com/electricimp/Builder/) is required. Imp-Device code can be empty.
 - [Setup](#setup) the asset tracker application according to the emulator REST API URL/username/password and [run](#build-and-run) the application.
 - Check the emulator and the application logs.
+
+## Debug Features ##
+
+### UART Logging ###
+
+When enabled by the [Builder variable](#builder-variables) Imp-Device outputs logs via UART, additionally to the standard output to the impcentral. This is helpful for testing and debugging when Imp-Device is offline.
+
+UART parameters:
+- Port: **uartXEFGH**
+- Baud rate: **115200**
+- Word size: **8 bits**
+- Parity: **none**
+- Stop bits: **1**
+- No CTS/RTS
+
+### LED Indication ###
+
+When enabled by the [Builder variable](#builder-variables) Imp-Device indicates different events using on-board LEDs. This is helpful for testing and debugging, especially when Imp-Device is offline.
+
+There are two LEDs:
+- **BlinkUp LED**
+  - When the indication is [enabled](#builder-variables), the BlinkUp LED indicates when Imp-Device is online.
+  - When the indication is disabled, the BlinkUp LED is active only at the application startup. See the BlinkUp codes [here](https://developer.electricimp.com/troubleshooting/blinkup).
+- **User LED** (multi-color)
+  - When the indication is [enabled](#builder-variables), the User LED blinks by different colors when the following events occur:
+    - New message generated: **green**
+    - Shock detected alert: **red**
+    - Motion started alert: **white**
+    - Motion stopped alert: **cyan**
+    - Temperature is low alert: **blue**
+    - Temperature is high alert: **yellow**
+  - When the indication is disabled, the User LED is not in use.
