@@ -7,6 +7,16 @@ HW_ACCEL_I2C <- hardware.i2cLM;
 // Accelerometer's interrupt pin
 HW_ACCEL_INT_PIN <- hardware.pinW;
 
+// UART port used for logging (if enabled)
+HW_LOGGING_UART <- hardware.uartXEFGH;
+
+// LED indication: RED pin
+HW_LED_RED_PIN <- hardware.pinR;
+// LED indication: GREEN pin
+HW_LED_GREEN_PIN <- hardware.pinXA;
+// LED indication: BLUE pin
+HW_LED_BLUE_PIN <- hardware.pinXB;
+
 // SPI Flash allocations
 
 // Allocation for the SPI Flash Logger used by ReplayMessenger

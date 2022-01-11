@@ -11,13 +11,13 @@
 // Settings for manual testing:
 
 // Acceleration threshold for shock detection, in g
-const TEST_SHOCK_THR = 2.0;
+const TEST_SHOCK_THR = 8.0;
 
 // Movement acceleration maximum threshold, in g
-const TEST_MOV_MAX = 0.3;
+const TEST_MOV_MAX = 0.4;
 
 // Movement acceleration minimum threshold, in g
-const TEST_MOV_MIN = 0.1;
+const TEST_MOV_MIN = 0.2;
 
 // Duration of exceeding the movement acceleration threshold, in seconds
 const TEST_MOV_DUR = 0.5;
@@ -26,10 +26,10 @@ const TEST_MOV_DUR = 0.5;
 const TEST_MOTION_TIME = 20.0;
 
 // Minimum instantaneous velocity to determine motion detection condition, in meters per second
-const TEST_MOTION_VEL = 0.6;
+const TEST_MOTION_VEL = 0.9;
 
 // Minimal movement distance to determine motion detection condition, in meters
-const TEST_MOTION_DIST = 5.0;
+const TEST_MOTION_DIST = 10.0;
 
 // Delay between motion event and enabling the next motion detection, in seconds
 const TEST_MOTION_CHECK_DELAY = 15;
