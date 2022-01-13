@@ -1,4 +1,4 @@
-ver 2022-01-10
+ver 2022-01-13
 
 Prog-X: scope
 ------------------
@@ -266,11 +266,11 @@ Southbound API (Configuration sending from the cloud) (not in POC)
 Definitions:
 - Full cfg - contains all fields.
 - Partial cfg - contains a subset of fields.
-- Empty cfg - contains no fields.
 - Default cfg - hardcoded configuration. Always a full cfg. Always exists. Can be different for different builds (different production flavors, different in development builds).
 - Saved cfg - configuration saved in the flash. Always a full cfg.
 - Reported cfg - known actual configuration of the tracker. Always a full cfg.
-- Cfg update - configuration update from the cloud. Can be full or partial cfg.
+- Reported cfg contains two parts - description (always exists) and configuration itself (does not exist if actual configuration is not known.
+- Cfg update - configuration update from the cloud. Can be full or partial cfg. Note, some of the fields can be updated/specified together only.
 - Pending cfg update - cfg update which is not applied yet, waiting for the tracker becomes online.
 - There can be not more than one pending cfg update at a time. A new cfg update from the cloud overwrites the current pending cfg update (if any).
 - Every cfg update has a unique Id specified by the cloud (default cfg has predefined Id).
@@ -280,29 +280,38 @@ Imp-Agent implements REST API:
 
   1) GET /cfg
     - Returns reported cfg.
-    - If no reported cfg known (when after Imp-Agent restart, Imp-Device has not reported it's cfg yet), then empty cfg is returned.
-    - Every time after cfg update is processed by Imp-Device it sends actual configuration to Imp-Agent. Imp-Agent saves it as reported cfg.
+    - Every time after cfg update (or default/saved cfg) is applied, Imp-Device reports actual configuration to Imp-Agent. Imp-Agent saves it as reported cfg.
+    - If actual configuration is not known (Imp-Device has not reported its cfg yet after Imp-Agent is restarted), then only description is returned, w/o configuration itself.
 
-  2) PUT (TBD) /cfg
+  2) PATCH /cfg
     - Request for cfg update.
-    - Imp-Agent checks the correctness of the configuration (type of field values, supported range of field values). If something is wrong, the request is failed and an error is responded.
+    - Imp-Agent checks the correctness of the configuration (type of field values, supported range of field values, all fields which can be updated together only are specified). If something is wrong, the request is failed and an error is responded.
     - If Imp-Device is online, then cfg update is immediately sent to Imp-Device. 
     - Otherwise, the request becomes pending cfg update, till Imp-Device becomes online. If there was another pending cfg, it is overwritten by the new one.
 
 JSON format:
-- all keys and values are case sensitive/insensitive - TBD
+- all keys and values are case sensitive
 
 {
-  "updateId": <string>,         // unique Id of the cfg update:
-                                // - specified in the desired cfg
-                                // - in the reported cfg: Id of the last known applied update
+"description": {              // description, read-only
+                              //   - does not exist in cfg update
+                              //   - always exists in reported cfg
 
-                                // These fields are read-only, exists in the reported cfg only
-  "updateTimestamp": <number>,    // timestamp (Unix time) when this update has been applied
-  "pendingUpdate": true/false,    // true - a new cfg update is pending (not applied yet)
-  "pendingUpdateId: <string>,     // id of the pending cfg update. Exists if "pendingUpdate" is true
-  "trackerId": <string>,          // unique tracker Id (imp deviceId)
-  "cfgSchemeVersion": <string>,   // supported JSON cfg format/scheme version: "<major>.<minor>"
+  "trackerId": <string>,        // unique tracker Id (imp deviceId)
+  "cfgSchemeVersion": <string>, // supported JSON cfg format/scheme version: "<major>.<minor>"
+  "cfgTimestamp": <number>,     // timestamp (Unix time) when the latest cfg update has been applied
+                                //   Does not exist if actual cfg is not known at this moment,
+                                //   "configuration" does not exist in this case either.
+  "pendingUpdateId": <string>   // id of the pending cfg update. Does not exist if there is no pending cfg at this moment.
+},
+
+"configuration": {            // configuration
+                              //   - in cfg update: can be full or partial cfg
+                              //   - in reported cfg: always full cfg. Does not exist if actual cfg is not known at this moment.
+
+  "updateId": <string>,         // unique Id of the cfg update:
+                                //   - must be specified for every cfg update
+                                //   - in reported cfg: Id of the last known applied update
 
   "locationTracking": {         // location obtaining is activated if any of the following occurs:
                                 //   1) "alwaysOn" is true
@@ -317,10 +326,10 @@ JSON format:
     "motionMonitoring": {         // motion start/stop monitoring. When in motion, location obtaining becomes activated
       "enabled": true/false,        // true - motion monitoring is enabled
                                     // motion start detection settings
-                                    // movement acceleration threshold range [min..max]:
+                                    // movement acceleration threshold range [movementAccMin..movementAccMax]:
+                                      // can be updated together only, movementAccMax >= movementAccMin
       "movementAccMin": <number>,     // minimum (starting) level, in g, [>0..TBD]
       "movementAccMax": <number>,     // maximum level, in g, [>0..TBD],
-                                      // if movementAccMax < movementAccMin, they are assumed equal to movementAccMin
       "movementAccDur": <number>,   // duration of exceeding movement acceleration threshold, in seconds, [>0..TBD]
       "motionTime": <number>,       // maximum time to determine motion detection after the initial movement, in seconds,
                                     // [MOTION_TIME_SAFEGUARD_MIN..MOTION_TIME_SAFEGUARD_MAX]
@@ -338,8 +347,9 @@ JSON format:
 
     "bleBeacons": {               // BLE beacons for location obtaining
       "enabled": true/false,        // true - location obtaining using BLE beacons is enabled
-      "beacons": {                  // set of beacons
+      "beacons": {                  // new set of beacons - fully replaces the previous set of beacons
         <id>: {                     // beacon unique identifier (MAC address)
+                                      // location - lng, lat - can be specified together only
           "lng": <number>,            // longitude, in degrees, [-90..90]
           "lat": <number>             // latitude, in degrees, [-90..90]
         },
@@ -347,8 +357,9 @@ JSON format:
       }
     },
 
-    "geofence": {                 // circle geofence (center, radius)
+    "geofence": {                 // circle geofence (center, radius) TBD
       "enabled": true/false,        // true - geofence is enabled
+                                    // lng, lat, radius - can be updated together only
       "lng": <number>,              // center longitude, in degrees, [-90..90]
       "lat": <number>,              // center latitude, in degrees, [-90..90]
       "radius": <number>            // radius, in meters, [EARTH_RADIUS..0]
@@ -395,6 +406,7 @@ JSON format:
     "agentLevel": "DEBUG",        // on Imp-Agent
     "deviceLevel": "INFO"         // on Imp-Device
   }
+}
 }
 
 Cfg processing on Imp-Device
