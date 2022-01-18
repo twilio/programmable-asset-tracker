@@ -43,20 +43,15 @@ class Application {
      * Handler for Data received from Imp-Device
      */
     function _onData(msg, customAck) {
-        ::debug("Data received from imp-device");
-
-        local ack = customAck();
+        ::debug("Data received from imp-device, msgId = " + msg.id);
         local data = http.jsonencode(msg.data);
 
         CloudClient.send(data)
         .then(function(_) {
             ::info("Data has been successfully sent to the cloud: " + data);
-            ack();
         }.bindenv(this), function(err) {
             ::error("Cloud reported an error while receiving data: " + err);
-            ::error("The data caused this error: " + data)
-            // Don't ACK the message if we couldn't send the data to the cloud.
-            // This message will be saved on the device and re-sent later
+            ::error("The data caused this error: " + data);
         }.bindenv(this));
     }
 
@@ -96,9 +91,6 @@ class Application {
 }
 
 // ---------------------------- THE MAIN CODE ---------------------------- //
-
-// Set default log level
-Logger.setLogLevel(LGR_LOG_LEVEL.@{DEFAULT_LOG_LEVEL ? DEFAULT_LOG_LEVEL : "INFO"});
 
 // Run the application
 app <- Application();

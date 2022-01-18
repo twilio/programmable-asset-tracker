@@ -31,56 +31,57 @@
 const ACCEL_DEFAULT_I2C_ADDR = 0x32;
 
 // Default Measurement rate - ODR, in Hz
-const ACCEL_DEFAULT_DATA_RATE = 10;
+const ACCEL_DEFAULT_DATA_RATE = 100;
 
 // Defaults for shock detection:
 // -----------------------------
 
 // Acceleration threshold, in g
-const ACCEL_DEFAULT_SHOCK_THR = 4;    // (for LIS2DH12 register 0x3A)
+const ACCEL_DEFAULT_SHOCK_THR = 8.0; // (for LIS2DH12 register 0x3A)
 
 // Defaults for motion detection:
 // ------------------------------
 
 // Duration of exceeding the movement acceleration threshold, in seconds
-const ACCEL_DEFAULT_MOV_DUR  = 0.5;
+const ACCEL_DEFAULT_MOV_DUR  = 0.25;
 // Movement acceleration maximum threshold, in g
-const ACCEL_DEFAULT_MOV_MAX = 0.3;
+const ACCEL_DEFAULT_MOV_MAX = 0.4;
 // Movement acceleration minimum threshold, in g
-const ACCEL_DEFAULT_MOV_MIN = 0.1;
+const ACCEL_DEFAULT_MOV_MIN = 0.2;
 // Step change of movement acceleration threshold for bounce filtering, in g
 const ACCEL_DEFAULT_MOV_STEP = 0.1;
 // Default time to determine motion detection after the initial movement, in seconds.
-const ACCEL_DEFAULT_MOTION_TIME = 20;
+const ACCEL_DEFAULT_MOTION_TIME = 10.0;
 // Default instantaneous velocity to determine motion detection condition, in meters per second.
-const ACCEL_DEFAULT_MOTION_VEL = 0.6;
+const ACCEL_DEFAULT_MOTION_VEL = 0.5;
 // Default movement distance to determine motion detection condition, in meters.
 // If 0, distance is not calculated (not used for motion detection).
 const ACCEL_DEFAULT_MOTION_DIST = 0.0;
 
 // Internal constants:
 // -------------------
-
 // Acceleration range, in g.
 const ACCEL_RANGE = 8;
 // Acceleration of gravity (m / s^2)
 const ACCEL_G = 9.81;
 // Default accelerometer's FIFO watermark
-const ACCEL_DEFAULT_WTM = 15;
+const ACCEL_DEFAULT_WTM = 8;
 // Velocity zeroing counter (for stop motion)
-const ACCEL_VELOCITY_RESET_CNTR = 2;
+const ACCEL_VELOCITY_RESET_CNTR = 4;
 // Discrimination window applied low threshold
-const ACCEL_DISCR_WNDW_LOW_THR = -0.07;
+const ACCEL_DISCR_WNDW_LOW_THR = -0.09;
 // Discrimination window applied high threshold
-const ACCEL_DISCR_WNDW_HIGH_THR = 0.07;
+const ACCEL_DISCR_WNDW_HIGH_THR = 0.09;
 
-// States of the motion detection - FSM (finite state machine):
-// Motion detection is disabled (initial state; motion detection is disabled automatically after motion is detected)
-const ACCEL_MOTION_STATE_DISABLED = 1;
-// Motion detection is enabled, waiting for initial movement detection
-const ACCEL_MOTION_STATE_WAITING = 2;
-// Motion is being confirmed after initial movement is detected
-const ACCEL_MOTION_STATE_CONFIRMING = 3;
+// States of the motion detection - FSM (finite state machine)
+enum ACCEL_MOTION_STATE {
+    // Motion detection is disabled (initial state; motion detection is disabled automatically after motion is detected)
+    DISABLED = 1,
+    // Motion detection is enabled, waiting for initial movement detection
+    WAITING = 2,
+    // Motion is being confirmed after initial movement is detected
+    CONFIRMING = 3
+};
 
 const LIS2DH12_CTRL_REG2 = 0x21; // HPF config
 const LIS2DH12_REFERENCE = 0x26; // Reference acceleration/tilt value.
@@ -319,10 +320,8 @@ class AccelerometerDriver {
         _movementDur = ACCEL_DEFAULT_MOV_DUR;
         _motionCurTime = time();
         _motionVelocity = ACCEL_DEFAULT_MOTION_VEL;
-        _motionVelocity /= ACCEL_G;
         _motionTimeout = ACCEL_DEFAULT_MOTION_TIME;
         _motionDistance = ACCEL_DEFAULT_MOTION_DIST;
-        _motionDistance /= ACCEL_G;
 
         _velCur = FloatVector();
         _velPrev = FloatVector();
@@ -335,7 +334,7 @@ class AccelerometerDriver {
         _cntrAccLowY = ACCEL_VELOCITY_RESET_CNTR;
         _cntrAccLowZ = ACCEL_VELOCITY_RESET_CNTR;
 
-        _motionState = ACCEL_MOTION_STATE_DISABLED;
+        _motionState = ACCEL_MOTION_STATE.DISABLED;
 
         _i2c = i2c;
         _addr = addr;
@@ -346,17 +345,19 @@ class AccelerometerDriver {
             _accel = LIS3DH(_i2c, _addr);
             _accel.reset();
             local range = _accel.setRange(ACCEL_RANGE);
+            ::info(format("Accelerometer range +-%d g", range), "@{CLASS_NAME}");
             local rate = _accel.setDataRate(ACCEL_DEFAULT_DATA_RATE);
             ::debug(format("Accelerometer rate %d Hz", rate), "@{CLASS_NAME}");
             _accel.setMode(LIS3DH_MODE_LOW_POWER);
             _accel.enable(true);
-            _accel.configureFifo(true, LIS3DH_FIFO_BYPASS_MODE);
-            _accel.configureFifo(true, LIS3DH_FIFO_STREAM_TO_FIFO_MODE);
             _accel._setReg(LIS2DH12_CTRL_REG2, LIS2DH12_FDS | LIS2DH12_HPF_AOI_INT1);
             _accel._getReg(LIS2DH12_REFERENCE);
+            _accel.configureFifo(true, LIS3DH_FIFO_BYPASS_MODE);
+            _accel.configureFifo(true, LIS3DH_FIFO_STREAM_TO_FIFO_MODE);
             _accel.getInterruptTable();
             _accel.configureInterruptLatching(false);
             _intPin.configure(DIGITAL_IN_WAKEUP, _checkInt.bindenv(this));
+            _accel._getReg(LIS2DH12_REFERENCE);
             ::debug("Accelerometer configured", "@{CLASS_NAME}");
         } catch (e) {
             throw "Accelerometer configuration error: " + e;
@@ -381,10 +382,10 @@ class AccelerometerDriver {
         foreach (key, value in shockCnd) {
             if (typeof key == "string") {
                 if (key == "shockThreshold") {
-                    if (typeof value == "float" && value > 0.0) {
+                    if (typeof value == "float" && value > 0.0 && value <= 16.0) {
                         _shockThr = value;
                     } else {
-                        ::error("shockThreshold incorrect value", "@{CLASS_NAME}");
+                        ::error("shockThreshold incorrect value (must be in [0;16] g)", "@{CLASS_NAME}");
                         shockSettIsCorr = false;
                         break;
                     }
@@ -399,6 +400,10 @@ class AccelerometerDriver {
         if (_isFunction(shockCb) && shockSettIsCorr) {
             _shockCb = shockCb;
             _enShockDetect = true;
+            // TODO: deal with the shock after initialization
+            // accelerometer range determined by the value of shock threashold
+            local range = _accel.setRange(_shockThr.tointeger());
+            ::info(format("Accelerometer range +-%d g", range), "@{CLASS_NAME}");
             _accel.configureClickInterrupt(true, LIS3DH_SINGLE_CLICK, _shockThr);
             ::info("Shock detection enabled", "@{CLASS_NAME}");
         } else {
@@ -441,10 +446,8 @@ class AccelerometerDriver {
         _movementMax = ACCEL_DEFAULT_MOV_MAX;
         _movementDur = ACCEL_DEFAULT_MOV_DUR;
         _motionVelocity = ACCEL_DEFAULT_MOTION_VEL;
-        _motionVelocity /= ACCEL_G;
         _motionTimeout = ACCEL_DEFAULT_MOTION_TIME;
         _motionDistance = ACCEL_DEFAULT_MOTION_DIST;
-        _motionDistance /= ACCEL_G;
         foreach (key, value in motionCnd) {
             if (typeof key == "string") {
                 if (key == "movementMax") {
@@ -491,7 +494,6 @@ class AccelerometerDriver {
                 if (key == "motionVelocity") {
                     if (typeof value == "float"  && value >= 0) {
                         _motionVelocity = value;
-                        _motionVelocity /= ACCEL_G;
                     } else {
                         ::error("motionVelocity incorrect value", "@{CLASS_NAME}");
                         motionSettIsCorr = false;
@@ -502,7 +504,6 @@ class AccelerometerDriver {
                 if (key == "motionDistance") {
                     if (typeof value == "float"  && value >= 0) {
                         _motionDistance = value;
-                        _motionDistance /= ACCEL_G;
                     } else {
                         ::error("motionDistance incorrect value", "@{CLASS_NAME}");
                         motionSettIsCorr = false;
@@ -519,14 +520,16 @@ class AccelerometerDriver {
         if (_isFunction(motionCb) && motionSettIsCorr) {
             _mtnCb = motionCb;
             _enMtnDetect = true;
-            _motionState = ACCEL_MOTION_STATE_WAITING;
+            _motionState = ACCEL_MOTION_STATE.WAITING;
             _accel.configureFifoInterrupts(false);
-            _accel.configureInertialInterrupt(true, _movementCurThr, (_movementDur*ACCEL_DEFAULT_DATA_RATE).tointeger());
+            _accel.configureInertialInterrupt(true, 
+                                              _movementCurThr, 
+                                              (_movementDur*ACCEL_DEFAULT_DATA_RATE).tointeger());
             ::info("Motion detection enabled", "@{CLASS_NAME}");
         } else {
             _mtnCb = null;
             _enMtnDetect = false;
-            _motionState = ACCEL_MOTION_STATE_DISABLED;
+            _motionState = ACCEL_MOTION_STATE.DISABLED;
             _positionCur.clear();
             _positionPrev.clear();
             _movementCurThr = _movementMin;
@@ -565,28 +568,27 @@ class AccelerometerDriver {
         }
 
         if (intTable.int1) {
-            ::debug("Movement interrupt", "@{CLASS_NAME}");
             _accel.configureInertialInterrupt(false);
             _accel.configureFifoInterrupts(true, false, ACCEL_DEFAULT_WTM);
-            if (_motionState == ACCEL_MOTION_STATE_WAITING) {
-                _motionState = ACCEL_MOTION_STATE_CONFIRMING;
+            ledIndication && ledIndication.indicate(LI_EVENT_TYPE.MOVEMENT_DETECTED);
+            if (_motionState == ACCEL_MOTION_STATE.WAITING) {
+                _motionState = ACCEL_MOTION_STATE.CONFIRMING;
                 _motionCurTime = time();
             }
             _accAverage();
             _removeOffset();
             _calcVelosityAndPosition();
-            if (_motionState == ACCEL_MOTION_STATE_CONFIRMING) {
+            if (_motionState == ACCEL_MOTION_STATE.CONFIRMING) {
                 _confirmMotion();
             }
             _checkZeroValueAcc();
         }
 
         if (_checkFIFOWtrm()) {
-            ::debug("FIFO watermark", "@{CLASS_NAME}");
             _accAverage();
             _removeOffset();
             _calcVelosityAndPosition();
-            if (_motionState == ACCEL_MOTION_STATE_CONFIRMING) {
+            if (_motionState == ACCEL_MOTION_STATE.CONFIRMING) {
                 _confirmMotion();
             }
             _checkZeroValueAcc();
@@ -671,9 +673,19 @@ class AccelerometerDriver {
      */
     function _calcVelosityAndPosition() {
         //  errors of integration are reduced with a first order approximation (Trapezoidal method)
-        _velCur = _velPrev + _accPrev + (_accCur - _accPrev) / 2.0;
+        _velCur = (_accCur + _accPrev) / 2.0;
+        // a |  __/|\  half the sum of the bases ((acur + aprev)*0.5) multiplied by the height (dt)
+        //   | /|  | \___
+        //   |/ |  |   | \
+        //   |---------------------------------------- t
+        //   |   
+        //   |   dt
+        _velCur = _velCur*(ACCEL_G*ACCEL_DEFAULT_WTM.tofloat() / ACCEL_DEFAULT_DATA_RATE.tofloat());
+        _velCur = _velPrev + _velCur;
+
         if (_motionDistance > 0) {
-            _positionCur = _positionPrev + _velPrev + (_velCur - _velPrev) / 2.0;
+            _positionCur = (_velCur + _velPrev) / 2.0;
+            _positionCur = _positionPrev + _positionCur;
         }
         _accPrev = _accCur;
         _velPrev = _velCur;
@@ -688,7 +700,6 @@ class AccelerometerDriver {
         local vel = _velCur.length();
         local moving = _positionCur.length();
 
-        ::debug(format("V %f m/s, S %f m", vel*ACCEL_G, moving*ACCEL_G), "@{CLASS_NAME}");
         local diffTm = time() - _motionCurTime;
         if (diffTm < _motionTimeout) {
             if (vel > _motionVelocity) {
@@ -705,7 +716,7 @@ class AccelerometerDriver {
                 return;
             }
             // if motion not detected increase movement threshold (threshold -> [movMin;movMax])
-            _motionState = ACCEL_MOTION_STATE_WAITING;
+            _motionState = ACCEL_MOTION_STATE.WAITING;
             _thrVelExceeded = false;
             if (_movementCurThr < _movementMax) {
                 _movementCurThr += ACCEL_DEFAULT_MOV_STEP;
@@ -725,7 +736,7 @@ class AccelerometerDriver {
      */
     function _motionConfirmed() {
         ::info("Motion confirmed", "@{CLASS_NAME}");
-        _motionState = ACCEL_MOTION_STATE_DISABLED;
+        _motionState = ACCEL_MOTION_STATE.DISABLED;
         if (_mtnCb && _enMtnDetect) {
             // clear current and previous position for new motion detection
             _positionCur.clear();

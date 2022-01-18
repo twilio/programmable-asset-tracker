@@ -1,3 +1,26 @@
+//line 1 "/home/we/Develop/Squirrel/prog-x/src/agent/Main.agent.nut"
+#require "Promise.lib.nut:4.0.0"
+#require "Messenger.lib.nut:0.2.0"
+
+//line 1 "../shared/Version.shared.nut"
+// Application Version
+const APP_VERSION = "1.2.1";
+//line 1 "../shared/Constants.shared.nut"
+// Constants common for the imp-agent and the imp-device
+
+// ReplayMessenger message names
+enum APP_RM_MSG_NAME {
+    DATA = "data",
+    GNSS_ASSIST = "gnssAssist",
+    LOCATION_CELL = "locationCell"
+}
+
+// Init latitude value (North Pole)
+const INIT_LATITUDE = 90.0;
+
+// Init longitude value (Greenwich)
+const INIT_LONGITUDE = 0.0;
+//line 1 "../shared/Logger/Logger.shared.nut"
 // Logger for "DEBUG", "INFO" and "ERROR" information.
 // Prints out information to the standard impcentral log ("server.log").
 // The supported data types: string, table. Other types may be printed out incorrectly.
@@ -124,20 +147,8 @@ Logger <- {
      * @param {Logger.IStorage} iStorage - The instance of an object that implements the Logger.IStorage interface
      */
     function setStorage(iStorage) {
-@if LOGGER_STORAGE_ENABLE == "true"
-        if (Logger.IStorage == iStorage.getclass().getbase()) {
-            if (null == iStorage.type) {
-                throw "The type property of the iStorage not initialized. See Logger.IStorage class description";
-            }
-
-            _logStg = iStorage;
-        } else {
-            throw "The iStorage object must implement the Logger.IStorage interface"
-        }
-@else
         _logStg = null;
         server.error("Logger storage disabled. Set LOGGER_STORAGE_ENABLE parameter to true.");
-@endif
     },
 
     /**
@@ -146,12 +157,8 @@ Logger <- {
      * @return{Logger.IStorage | null} - Instance of the Logger.IStorage object or null.
      */
     function getStorage() {
-@if LOGGER_STORAGE_ENABLE == "true"
-        return _logStg;
-@else
         server.error("Logger storage disabled. Set LOGGER_STORAGE_ENABLE parameter to true.");
         return null;
-@endif
     }
 
     /**
@@ -164,27 +171,9 @@ Logger <- {
      * @param {integer} [num] - Maximum number of logs to store. Optional. Default: 0.
      */
     function setLogStorageCfg(enabled, level = "info") {
-@if LOGGER_STORAGE_ENABLE == "true"
-        assert(null != _logStg);
-
-        if (enabled) {
-            local stgLvl = _logLevelStrToEnum(level);
-            if (stgLvl > _logLevel) {
-                _logStgLvl = _logLevel;
-            } else {
-                _logStgLvl = stgLvl;
-            }
-        } else {
-            _logStgLvl = LGR_LOG_LEVEL.INFO;
-
-            _logStg.clear();
-        }
-        _logStgEnabled = enabled;
-@else
         _logStgLvl     = LGR_LOG_LEVEL.INFO;
         _logStgEnabled = false;
         server.error("Logger storage disabled. Set LOGGER_STORAGE_ENABLE parameter to true.");
-@endif
     },
 
     /**
@@ -195,83 +184,9 @@ Logger <- {
      *
      * @return {boolean} - True if successful, False otherwise.
      */
-@if LOGGER_STORAGE_ENABLE == "true"
-    _printCallQueue = [ ],
-    _printTId       = null,
-@endif
 
     function printStoredLogs(num = 0) {
-@if LOGGER_STORAGE_ENABLE == "true"
-        assert(null != _logStg);
-
-        local print;
-
-        print = function(num) {
-            local cntr   = 0;
-            local logStg = _logStg;
-
-            local logItem = function(item) {
-                local srvErr   = 0;
-                local multiRow = item.multiRow;
-                local prefix   = item.prefix;
-                local log      = item.log;
-
-                if (multiRow) {
-                    srvErr = _logMR(prefix, log);
-                } else {
-                    srvErr = _outStream.write(prefix + log);
-                }
-
-                return srvErr;
-            };
-
-            logStg.read(
-                function(data, next) {
-                    local keepGoing = true;
-                    if (!num) {
-                        if (logItem(data)) {
-                            keepGoing = false;
-                        }
-                    } else {
-                        if (cntr != num) {
-                            if (!logItem(data)) {
-                                cntr += 1;
-                            } else {
-                                keepGoing = false;
-                            }
-                        } else {
-                            keepGoing = false;
-                        }
-                    }
-                    next(keepGoing);
-                }.bindenv(this),
-
-                function(itemsQty) {
-                    // server.log("The number of read items from the storage: " + itemsQty);
-                    _printCallQueue.remove(0);
-                    if (_printCallQueue.len()) {
-                        // server.log("Process next job in the print queue... " + _printCallQueue[0]);
-                        _printTId = imp.wakeup(0, function() {
-                            print(_printCallQueue[0]);
-                        }.bindenv(this));
-                    } else {
-                        // server.log("No jobs in the print queue. Finishing...");
-                        _printTId = null;
-                    }
-                }.bindenv(this)
-            );
-        }.bindenv(this);
-
-        _printCallQueue.append(num);
-
-        if (null == _printTId) {
-            _printTId = imp.wakeup(0, function() {
-                print(_printCallQueue[0]);
-            }.bindenv(this));
-        }
-@else
         server.error("Logger storage disabled. Set LOGGER_STORAGE_ENABLE parameter to \"true\".");
-@endif
     },
 
     // -------------------- PRIVATE METHODS -------------------- //
@@ -314,28 +229,6 @@ Logger <- {
             srvErr = _outStream.write(prefix + lg);
         }
 
-@if LOGGER_STORAGE_ENABLE == "true"
-        local logStg = _logStg;
-
-        if (saveLog && srvErr) {
-            local fullPref = _getDateStr() + prefix;
-
-            try {
-                logStg.append({
-                    "multiRow": multiRow,
-                    "prefix"  : fullPref,
-                    "log"     : lg
-                });
-            } catch (ex) {
-                server.error("Can't save the log message. Reasone: " + ex);
-                return;
-            }
-        }
-
-        if (saveLog && !srvErr) {
-            printStoredLogs();
-        }
-@endif
     },
 
     /**
@@ -411,17 +304,6 @@ Logger <- {
         return ret;
     },
 
-@if LOGGER_STORAGE_ENABLE == "true"
-    /**
-     * Forms a string with the current date and time
-     *
-     * @return {string} - The current date and time.
-     */
-    function _getDateStr() {
-        local dateTbl = date();
-        return format("%u-%u-%uT%u:%u:%u ", dateTbl["year"], ++dateTbl["month"], dateTbl["day"], dateTbl["hour"], dateTbl["min"], dateTbl["sec"]);
-    },
-@endif
 
     /**
      * Converts log level specified by string to log level enum for Logger .
@@ -459,8 +341,227 @@ Logger <- {
 ::info  <- Logger.info.bindenv(Logger);
 ::error <- Logger.error.bindenv(Logger);
 
-Logger.setLogLevelStr("@{LOGGER_LEVEL}");
+Logger.setLogLevelStr("INFO");
 
-@if LOGGER_STORAGE_ENABLE == "true"
-@include once __PATH__+"/storage/LoggerStorage.shared.nut"
-@endif
+//line 2 "CloudClient.agent.nut"
+
+// Communicates with the cloud.
+//   - Sends data to the cloud using REST API
+//   - Basic HTTP authentication is used
+//   - No buffering, data is sent immediately
+
+// Timeout for waiting for a response from the cloud, in seconds
+// TODO - decide do we need it, how it correlates with RM ack timeout
+const CLOUD_REST_API_TIMEOUT = 60;
+
+// "Data is accepted" status code returned from the cloud
+const CLOUD_REST_API_SUCCESS_CODE = 200;
+
+// API endpoints
+const CLOUD_REST_API_DATA_ENDPOINT = "/data";
+
+class CloudClient {
+
+    /**
+    * Sends a message to the cloud
+    *
+    * @param {string} body - Data to send to the cloud
+    *
+    * @return {Promise} that:
+    * - resolves if the cloud accepted the data
+    * - rejects with an error if the operation failed
+    */
+    function send(body) {
+        local headers = {
+            "Content-Type" : "application/json",
+            "Content-Length" : body.len(),
+            "Authorization" : "Basic " + http.base64encode(__VARS.CLOUD_REST_API_USERNAME + ":" + __VARS.CLOUD_REST_API_PASSWORD)
+        };
+        local req = http.post(__VARS.CLOUD_REST_API_URL + CLOUD_REST_API_DATA_ENDPOINT, headers, body);
+
+        return Promise(function(resolve, reject) {
+            req.sendasync(function(resp) {
+                if (resp.statuscode == CLOUD_REST_API_SUCCESS_CODE) {
+                    resolve();
+                } else {
+                    reject(resp.statuscode);
+                }
+            }.bindenv(this),
+            null,
+            CLOUD_REST_API_TIMEOUT);
+        }.bindenv(this));
+    }
+}
+
+//line 2 "LocationAssistant.agent.nut"
+
+// URL to request BG96 Assist data
+const LA_BG96_ASSIST_DATA_URL = "http://xtrapath4.izatcloud.net/xtra3grc.bin";
+
+// Google Maps Geolocation API URL
+const LA_GOOGLE_MAPS_LOCATION_URL = "https://www.googleapis.com/geolocation/v1/geolocate?key=";
+
+// Location Assistant class:
+// - obtains GNSS Assist data for BG96
+// - obtains the location by cell towers info using Google Maps Geolocation API
+class LocationAssistant {
+
+    /**
+     * Obtains GNSS Assist data for BG96
+     *
+     * @return {Promise} that:
+     * - resolves with BG96 Assist data if the operation succeeded
+     * - rejects with an error if the operation failed
+     */
+    function getGnssAssistData() {
+        ::debug("Downloading BG96 assist data...", "LocationAssistant");
+        // Set up an HTTP request to get the assist data
+        local request = http.get(LA_BG96_ASSIST_DATA_URL);
+
+        return Promise(function(resolve, reject) {
+            request.sendasync(function(response) {
+                if (response.statuscode == 200) {
+                    local data = blob(response.body.len());
+                    data.writestring(response.body);
+                    resolve(data);
+                } else {
+                    reject("Unexpected response status code: " + response.statuscode);
+                }
+            }.bindenv(this));
+        }.bindenv(this));
+    }
+
+    /**
+     * Obtains the location by cell towers info using Google Maps Geolocation API
+     *
+     * @param {Table} cellInfo - table with cell towers info
+     *
+     * @return {Promise} that:
+     * - resolves with the location info if the operation succeeded
+     * - rejects with an error if the operation failed
+     */
+    function getLocationByCellInfo(cellInfo) {
+        ::debug("Requesting location from Google Geolocation API. Cell towers passed: " + cellInfo.cellTowers.len(), "LocationAssistant");
+
+        // Set up an HTTP request to get the location
+        local url = format("%s%s", LA_GOOGLE_MAPS_LOCATION_URL, __VARS.GOOGLE_MAPS_API_KEY);
+        local headers = { "Content-Type" : "application/json" };
+        local body = {
+            "considerIp" : "false",
+            "radioType"  : cellInfo.radioType,
+            "cellTowers" : cellInfo.cellTowers
+        };
+
+        local request = http.post(url, headers, http.jsonencode(body));
+
+        return Promise(function(resolve, reject) {
+            request.sendasync(function(resp) {
+                if (resp.statuscode == 200) {
+                    try {
+                        local parsed = http.jsondecode(resp.body);
+                        resolve({
+                            "accuracy" : parsed.accuracy,
+                            "lat"      : parsed.location.lat,
+                            "lon"      : parsed.location.lng,
+                            "time"     : time()
+                        });
+                    } catch(e) {
+                        reject("Response parsing error: " + e);
+                    }
+                } else {
+                    reject("Unexpected response status code: " + resp.statuscode);
+                }
+            }.bindenv(this))
+        }.bindenv(this));
+    }
+}
+
+//line 9 "/home/we/Develop/Squirrel/prog-x/src/agent/Main.agent.nut"
+
+// Main application on Imp-Agent:
+// - Forwards Data messages from Imp-Device to Cloud REST API
+// - Obtains GNSS Assist data for BG96 from server and returns it to Imp-Device
+// - Obtains the location by cell towers info using Google Maps Geolocation API
+//   and returns it to Imp-Device
+
+class Application {
+    // Messenger instance
+    _msngr = null;
+
+    /**
+     * Application Constructor
+     */
+    constructor() {
+        ::info("Application Version: " + APP_VERSION);
+
+        // Initialize library for communication with Imp-Device
+        _initMsngr();
+    }
+
+    // -------------------- PRIVATE METHODS -------------------- //
+
+    /**
+     * Create and initialize Messenger instance
+     */
+    function _initMsngr() {
+        _msngr = Messenger();
+        _msngr.on(APP_RM_MSG_NAME.DATA, _onData.bindenv(this));
+        _msngr.on(APP_RM_MSG_NAME.GNSS_ASSIST, _onGnssAssist.bindenv(this));
+        _msngr.on(APP_RM_MSG_NAME.LOCATION_CELL, _onLocationCell.bindenv(this));
+    }
+
+    /**
+     * Handler for Data received from Imp-Device
+     */
+    function _onData(msg, customAck) {
+        ::debug("Data received from imp-device, msgId = " + msg.id);
+        local data = http.jsonencode(msg.data);
+
+        CloudClient.send(data)
+        .then(function(_) {
+            ::info("Data has been successfully sent to the cloud: " + data);
+        }.bindenv(this), function(err) {
+            ::error("Cloud reported an error while receiving data: " + err);
+            ::error("The data caused this error: " + data);
+        }.bindenv(this));
+    }
+
+    /**
+     * Handler for GNSS Assist request received from Imp-Device
+     */
+    function _onGnssAssist(msg, customAck) {
+        local ack = customAck();
+
+        LocationAssistant.getGnssAssistData()
+        .then(function(data) {
+            ::info("BG96 Assist data downloaded");
+            ack(data);
+        }.bindenv(this), function(err) {
+            ::error("Error during downloading BG96 Assist data: " + err);
+            // Send `null` in reply to the request
+            ack(null);
+        }.bindenv(this));
+    }
+
+    /**
+     * Handler for Location By Cell Info request received from Imp-Device
+     */
+    function _onLocationCell(msg, customAck) {
+        local ack = customAck();
+
+        LocationAssistant.getLocationByCellInfo(msg.data)
+        .then(function(location) {
+            ::info("Location obtained using Google Geolocation API");
+            ack(location);
+        }.bindenv(this), function(err) {
+            ::error("Error during location obtaining using Google Geolocation API: " + err);
+            // Send `null` in reply to the request
+            ack(null);
+        }.bindenv(this));
+    }
+}
+
+// ---------------------------- THE MAIN CODE ---------------------------- //
+
+// Run the application
+app <- Application();
