@@ -19,7 +19,9 @@ enum LI_EVENT_TYPE {
     // Blue
     ALERT_TEMP_LOW = 0x001,
     // Yellow
-    ALERT_TEMP_HIGH = 0x110
+    ALERT_TEMP_HIGH = 0x110,
+    // Magenta
+    MOVEMENT_DETECTED = 0x101
 }
 
 // LED indication class.

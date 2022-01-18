@@ -1,4 +1,4 @@
-//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
+//line 1 "/home/we/Develop/Squirrel/prog-x/src/device/Main.device.nut"
 #require "Serializer.class.nut:1.0.0"
 #require "JSONParser.class.nut:1.0.1"
 #require "JSONEncoder.class.nut:2.0.0"
@@ -13,7 +13,7 @@
 
 //line 1 "../shared/Version.shared.nut"
 // Application Version
-const APP_VERSION = "1.2.0";
+const APP_VERSION = "1.2.1";
 //line 1 "../shared/Constants.shared.nut"
 // Constants common for the imp-agent and the imp-device
 
@@ -352,7 +352,7 @@ Logger <- {
 
 Logger.setLogLevelStr("INFO");
 
-//line 16 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
+//line 16 "/home/we/Develop/Squirrel/prog-x/src/device/Main.device.nut"
 
 //line 1 "../shared/Logger/stream/Logger.IOutputStream.shared.nut"
 /**
@@ -399,7 +399,7 @@ class UartOutputStream extends Logger.IOutputStream {
         return server.log(data);
     }
 }
-//line 20 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
+//line 20 "/home/we/Develop/Squirrel/prog-x/src/device/Main.device.nut"
 
 //line 2 "LedIndication.device.nut"
 
@@ -422,7 +422,9 @@ enum LI_EVENT_TYPE {
     // Blue
     ALERT_TEMP_LOW = 0x001,
     // Yellow
-    ALERT_TEMP_HIGH = 0x110
+    ALERT_TEMP_HIGH = 0x110,
+    // Magenta
+    MOVEMENT_DETECTED = 0x101
 }
 
 // LED indication class.
@@ -479,7 +481,7 @@ class LedIndication {
     }
 }
 
-//line 24 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
+//line 24 "/home/we/Develop/Squirrel/prog-x/src/device/Main.device.nut"
 
 //line 1 "Hardware.device.nut"
 // Temperature-humidity sensor's I2C bus
@@ -788,12 +790,16 @@ const DEFAULT_TEMPERATURE_LOW = 10.0;
 const DEFAULT_BATTERY_LOW = 7.0; // not supported
 
 // Shock acceleration alert threshold, in g
+// IMPORTANT: This value affects the measurement range and accuracy of the accelerometer:
+// the larger the range - the lower the accuracy.
+// This can affect the effectiveness of the MOVEMENT_ACCELERATION_MIN constant.
+// For example: if SHOCK_THRESHOLD > 4.0 g, then MOVEMENT_ACCELERATION_MIN should be > 0.1 g
 const DEFAULT_SHOCK_THRESHOLD = 8.0;
 
 // Location tracking settings:
 
 // Location reading period, in seconds
-const DEFAULT_LOCATION_READING_PERIOD = 300.0;
+const DEFAULT_LOCATION_READING_PERIOD = 180.0;
 
 // Motion start detection settings:
 
@@ -803,14 +809,14 @@ const DEFAULT_MOVEMENT_ACCELERATION_MIN = 0.2;
 // - maximum level, in g
 const DEFAULT_MOVEMENT_ACCELERATION_MAX = 0.4;
 // Duration of exceeding movement acceleration threshold, in seconds
-const DEFAULT_MOVEMENT_ACCELERATION_DURATION = 0.5;
+const DEFAULT_MOVEMENT_ACCELERATION_DURATION = 0.25;
 // Maximum time to determine motion detection after the initial movement, in seconds
-const DEFAULT_MOTION_TIME = 10.0;
+const DEFAULT_MOTION_TIME = 15.0;
 // Minimum instantaneous velocity to determine motion detection condition, in meters per second
-const DEFAULT_MOTION_VELOCITY = 0.8;
+const DEFAULT_MOTION_VELOCITY = 0.5;
 // Minimal movement distance to determine motion detection condition, in meters.
 // If 0, distance is not calculated (not used for motion detection)
-const DEFAULT_MOTION_DISTANCE = 10.0;
+const DEFAULT_MOTION_DISTANCE = 5.0;
 //line 2 "CustomConnectionManager.device.nut"
 
 // Customized ConnectionManager library
@@ -842,7 +848,11 @@ class CustomConnectionManager extends ConnectionManager {
 
         base.constructor(settings);
         _consumers = [];
-        _connectTime = hardware.millis();
+
+        if (_connected) {
+            _connectTime = hardware.millis();
+            _setDisconnectTimer();
+        }
 
         onConnect(_onConnectCb.bindenv(this), "CustomConnectionManager");
         onTimeout(_onConnectionTimeoutCb.bindenv(this), "CustomConnectionManager");
@@ -910,11 +920,11 @@ class CustomConnectionManager extends ConnectionManager {
         if (keep && idx == null) {
             ::debug("Connection will be kept for " + consumerId, "CustomConnectionManager");
             _consumers.push(consumerId);
-            _connected && _setDisconnectTimer();
+            _setDisconnectTimer();
         } else if (!keep && idx != null) {
             ::debug("Connection will not be kept for " + consumerId, "CustomConnectionManager");
             _consumers.remove(idx);
-            _connected && _setDisconnectTimer();
+            _setDisconnectTimer();
         }
     }
 
@@ -949,12 +959,17 @@ class CustomConnectionManager extends ConnectionManager {
         ::info(expected ? "Disconnected" : "Disconnected unexpectedly", "CustomConnectionManager");
         _disconnectTimer && imp.cancelwakeup(_disconnectTimer);
         _connectPromise = null;
+        _connectTime = null;
     }
 
     /**
      * Set the disconnection timer according to the parameters of automatic disconnection features
      */
     function _setDisconnectTimer() {
+        if (_connectTime == null) {
+            return;
+        }
+
         local delay = null;
 
         if (_maxConnectedTime != null) {
@@ -962,14 +977,20 @@ class CustomConnectionManager extends ConnectionManager {
         }
 
         if (_autoDisconnectDelay != null && _consumers.len() == 0) {
-            delay = delay > _autoDisconnectDelay ? _autoDisconnectDelay : delay;
+            delay = (delay == null || delay > _autoDisconnectDelay) ? _autoDisconnectDelay : delay;
         }
 
         _disconnectTimer && imp.cancelwakeup(_disconnectTimer);
 
         if (delay != null) {
             ::debug(format("Disconnection scheduled in %d seconds", delay), "CustomConnectionManager");
-            _disconnectTimer = imp.wakeup(delay, disconnect.bindenv(this));
+
+            local onDisconnectTimer = function() {
+                ::info("Disconnecting now..", "CustomConnectionManager");
+                disconnect();
+            }.bindenv(this);
+
+            _disconnectTimer = imp.wakeup(delay, onDisconnectTimer);
         }
     }
 }
@@ -2639,19 +2660,19 @@ class LocationDriver {
 const ACCEL_DEFAULT_I2C_ADDR = 0x32;
 
 // Default Measurement rate - ODR, in Hz
-const ACCEL_DEFAULT_DATA_RATE = 50;
+const ACCEL_DEFAULT_DATA_RATE = 100;
 
 // Defaults for shock detection:
 // -----------------------------
 
 // Acceleration threshold, in g
-const ACCEL_DEFAULT_SHOCK_THR = 8;    // (for LIS2DH12 register 0x3A)
+const ACCEL_DEFAULT_SHOCK_THR = 8.0; // (for LIS2DH12 register 0x3A)
 
 // Defaults for motion detection:
 // ------------------------------
 
 // Duration of exceeding the movement acceleration threshold, in seconds
-const ACCEL_DEFAULT_MOV_DUR  = 0.5;
+const ACCEL_DEFAULT_MOV_DUR  = 0.25;
 // Movement acceleration maximum threshold, in g
 const ACCEL_DEFAULT_MOV_MAX = 0.4;
 // Movement acceleration minimum threshold, in g
@@ -2659,36 +2680,37 @@ const ACCEL_DEFAULT_MOV_MIN = 0.2;
 // Step change of movement acceleration threshold for bounce filtering, in g
 const ACCEL_DEFAULT_MOV_STEP = 0.1;
 // Default time to determine motion detection after the initial movement, in seconds.
-const ACCEL_DEFAULT_MOTION_TIME = 20;
+const ACCEL_DEFAULT_MOTION_TIME = 10.0;
 // Default instantaneous velocity to determine motion detection condition, in meters per second.
-const ACCEL_DEFAULT_MOTION_VEL = 0.6;
+const ACCEL_DEFAULT_MOTION_VEL = 0.5;
 // Default movement distance to determine motion detection condition, in meters.
 // If 0, distance is not calculated (not used for motion detection).
 const ACCEL_DEFAULT_MOTION_DIST = 0.0;
 
 // Internal constants:
 // -------------------
-
 // Acceleration range, in g.
 const ACCEL_RANGE = 8;
 // Acceleration of gravity (m / s^2)
 const ACCEL_G = 9.81;
 // Default accelerometer's FIFO watermark
-const ACCEL_DEFAULT_WTM = 31;
+const ACCEL_DEFAULT_WTM = 8;
 // Velocity zeroing counter (for stop motion)
-const ACCEL_VELOCITY_RESET_CNTR = 2;
+const ACCEL_VELOCITY_RESET_CNTR = 4;
 // Discrimination window applied low threshold
 const ACCEL_DISCR_WNDW_LOW_THR = -0.09;
 // Discrimination window applied high threshold
 const ACCEL_DISCR_WNDW_HIGH_THR = 0.09;
 
-// States of the motion detection - FSM (finite state machine):
-// Motion detection is disabled (initial state; motion detection is disabled automatically after motion is detected)
-const ACCEL_MOTION_STATE_DISABLED = 1;
-// Motion detection is enabled, waiting for initial movement detection
-const ACCEL_MOTION_STATE_WAITING = 2;
-// Motion is being confirmed after initial movement is detected
-const ACCEL_MOTION_STATE_CONFIRMING = 3;
+// States of the motion detection - FSM (finite state machine)
+enum ACCEL_MOTION_STATE {
+    // Motion detection is disabled (initial state; motion detection is disabled automatically after motion is detected)
+    DISABLED = 1,
+    // Motion detection is enabled, waiting for initial movement detection
+    WAITING = 2,
+    // Motion is being confirmed after initial movement is detected
+    CONFIRMING = 3
+};
 
 const LIS2DH12_CTRL_REG2 = 0x21; // HPF config
 const LIS2DH12_REFERENCE = 0x26; // Reference acceleration/tilt value.
@@ -2927,10 +2949,8 @@ class AccelerometerDriver {
         _movementDur = ACCEL_DEFAULT_MOV_DUR;
         _motionCurTime = time();
         _motionVelocity = ACCEL_DEFAULT_MOTION_VEL;
-        _motionVelocity /= ACCEL_G;
         _motionTimeout = ACCEL_DEFAULT_MOTION_TIME;
         _motionDistance = ACCEL_DEFAULT_MOTION_DIST;
-        _motionDistance /= ACCEL_G;
 
         _velCur = FloatVector();
         _velPrev = FloatVector();
@@ -2943,7 +2963,7 @@ class AccelerometerDriver {
         _cntrAccLowY = ACCEL_VELOCITY_RESET_CNTR;
         _cntrAccLowZ = ACCEL_VELOCITY_RESET_CNTR;
 
-        _motionState = ACCEL_MOTION_STATE_DISABLED;
+        _motionState = ACCEL_MOTION_STATE.DISABLED;
 
         _i2c = i2c;
         _addr = addr;
@@ -2954,6 +2974,7 @@ class AccelerometerDriver {
             _accel = LIS3DH(_i2c, _addr);
             _accel.reset();
             local range = _accel.setRange(ACCEL_RANGE);
+            ::info(format("Accelerometer range +-%d g", range), "AccelerometerDriver");
             local rate = _accel.setDataRate(ACCEL_DEFAULT_DATA_RATE);
             ::debug(format("Accelerometer rate %d Hz", rate), "AccelerometerDriver");
             _accel.setMode(LIS3DH_MODE_LOW_POWER);
@@ -2990,10 +3011,10 @@ class AccelerometerDriver {
         foreach (key, value in shockCnd) {
             if (typeof key == "string") {
                 if (key == "shockThreshold") {
-                    if (typeof value == "float" && value > 0.0) {
+                    if (typeof value == "float" && value > 0.0 && value <= 16.0) {
                         _shockThr = value;
                     } else {
-                        ::error("shockThreshold incorrect value", "AccelerometerDriver");
+                        ::error("shockThreshold incorrect value (must be in [0;16] g)", "AccelerometerDriver");
                         shockSettIsCorr = false;
                         break;
                     }
@@ -3008,6 +3029,10 @@ class AccelerometerDriver {
         if (_isFunction(shockCb) && shockSettIsCorr) {
             _shockCb = shockCb;
             _enShockDetect = true;
+            // TODO: deal with the shock after initialization
+            // accelerometer range determined by the value of shock threashold
+            local range = _accel.setRange(_shockThr.tointeger());
+            ::info(format("Accelerometer range +-%d g", range), "AccelerometerDriver");
             _accel.configureClickInterrupt(true, LIS3DH_SINGLE_CLICK, _shockThr);
             ::info("Shock detection enabled", "AccelerometerDriver");
         } else {
@@ -3050,10 +3075,8 @@ class AccelerometerDriver {
         _movementMax = ACCEL_DEFAULT_MOV_MAX;
         _movementDur = ACCEL_DEFAULT_MOV_DUR;
         _motionVelocity = ACCEL_DEFAULT_MOTION_VEL;
-        _motionVelocity /= ACCEL_G;
         _motionTimeout = ACCEL_DEFAULT_MOTION_TIME;
         _motionDistance = ACCEL_DEFAULT_MOTION_DIST;
-        _motionDistance /= ACCEL_G;
         foreach (key, value in motionCnd) {
             if (typeof key == "string") {
                 if (key == "movementMax") {
@@ -3100,7 +3123,6 @@ class AccelerometerDriver {
                 if (key == "motionVelocity") {
                     if (typeof value == "float"  && value >= 0) {
                         _motionVelocity = value;
-                        _motionVelocity /= ACCEL_G;
                     } else {
                         ::error("motionVelocity incorrect value", "AccelerometerDriver");
                         motionSettIsCorr = false;
@@ -3111,7 +3133,6 @@ class AccelerometerDriver {
                 if (key == "motionDistance") {
                     if (typeof value == "float"  && value >= 0) {
                         _motionDistance = value;
-                        _motionDistance /= ACCEL_G;
                     } else {
                         ::error("motionDistance incorrect value", "AccelerometerDriver");
                         motionSettIsCorr = false;
@@ -3128,14 +3149,16 @@ class AccelerometerDriver {
         if (_isFunction(motionCb) && motionSettIsCorr) {
             _mtnCb = motionCb;
             _enMtnDetect = true;
-            _motionState = ACCEL_MOTION_STATE_WAITING;
+            _motionState = ACCEL_MOTION_STATE.WAITING;
             _accel.configureFifoInterrupts(false);
-            _accel.configureInertialInterrupt(true, _movementCurThr, (_movementDur*ACCEL_DEFAULT_DATA_RATE).tointeger());
+            _accel.configureInertialInterrupt(true, 
+                                              _movementCurThr, 
+                                              (_movementDur*ACCEL_DEFAULT_DATA_RATE).tointeger());
             ::info("Motion detection enabled", "AccelerometerDriver");
         } else {
             _mtnCb = null;
             _enMtnDetect = false;
-            _motionState = ACCEL_MOTION_STATE_DISABLED;
+            _motionState = ACCEL_MOTION_STATE.DISABLED;
             _positionCur.clear();
             _positionPrev.clear();
             _movementCurThr = _movementMin;
@@ -3174,28 +3197,27 @@ class AccelerometerDriver {
         }
 
         if (intTable.int1) {
-            ::debug("Movement interrupt", "AccelerometerDriver");
             _accel.configureInertialInterrupt(false);
             _accel.configureFifoInterrupts(true, false, ACCEL_DEFAULT_WTM);
-            if (_motionState == ACCEL_MOTION_STATE_WAITING) {
-                _motionState = ACCEL_MOTION_STATE_CONFIRMING;
+            ledIndication && ledIndication.indicate(LI_EVENT_TYPE.MOVEMENT_DETECTED);
+            if (_motionState == ACCEL_MOTION_STATE.WAITING) {
+                _motionState = ACCEL_MOTION_STATE.CONFIRMING;
                 _motionCurTime = time();
             }
             _accAverage();
             _removeOffset();
             _calcVelosityAndPosition();
-            if (_motionState == ACCEL_MOTION_STATE_CONFIRMING) {
+            if (_motionState == ACCEL_MOTION_STATE.CONFIRMING) {
                 _confirmMotion();
             }
             _checkZeroValueAcc();
         }
 
         if (_checkFIFOWtrm()) {
-            ::debug("FIFO watermark", "AccelerometerDriver");
             _accAverage();
             _removeOffset();
             _calcVelosityAndPosition();
-            if (_motionState == ACCEL_MOTION_STATE_CONFIRMING) {
+            if (_motionState == ACCEL_MOTION_STATE.CONFIRMING) {
                 _confirmMotion();
             }
             _checkZeroValueAcc();
@@ -3280,9 +3302,19 @@ class AccelerometerDriver {
      */
     function _calcVelosityAndPosition() {
         //  errors of integration are reduced with a first order approximation (Trapezoidal method)
-        _velCur = _velPrev + _accPrev + (_accCur - _accPrev) / 2.0;
+        _velCur = (_accCur + _accPrev) / 2.0;
+        // a |  __/|\  half the sum of the bases ((acur + aprev)*0.5) multiplied by the height (dt)
+        //   | /|  | \___
+        //   |/ |  |   | \
+        //   |---------------------------------------- t
+        //   |   
+        //   |   dt
+        _velCur = _velCur*(ACCEL_G*ACCEL_DEFAULT_WTM.tofloat() / ACCEL_DEFAULT_DATA_RATE.tofloat());
+        _velCur = _velPrev + _velCur;
+
         if (_motionDistance > 0) {
-            _positionCur = _positionPrev + _velPrev + (_velCur - _velPrev) / 2.0;
+            _positionCur = (_velCur + _velPrev) / 2.0;
+            _positionCur = _positionPrev + _positionCur;
         }
         _accPrev = _accCur;
         _velPrev = _velCur;
@@ -3297,7 +3329,6 @@ class AccelerometerDriver {
         local vel = _velCur.length();
         local moving = _positionCur.length();
 
-        ::debug(format("V %f m/s, S %f m", vel*ACCEL_G, moving*ACCEL_G), "AccelerometerDriver");
         local diffTm = time() - _motionCurTime;
         if (diffTm < _motionTimeout) {
             if (vel > _motionVelocity) {
@@ -3314,7 +3345,7 @@ class AccelerometerDriver {
                 return;
             }
             // if motion not detected increase movement threshold (threshold -> [movMin;movMax])
-            _motionState = ACCEL_MOTION_STATE_WAITING;
+            _motionState = ACCEL_MOTION_STATE.WAITING;
             _thrVelExceeded = false;
             if (_movementCurThr < _movementMax) {
                 _movementCurThr += ACCEL_DEFAULT_MOV_STEP;
@@ -3334,7 +3365,7 @@ class AccelerometerDriver {
      */
     function _motionConfirmed() {
         ::info("Motion confirmed", "AccelerometerDriver");
-        _motionState = ACCEL_MOTION_STATE_DISABLED;
+        _motionState = ACCEL_MOTION_STATE.DISABLED;
         if (_mtnCb && _enMtnDetect) {
             // clear current and previous position for new motion detection
             _positionCur.clear();
@@ -4294,7 +4325,7 @@ class DataProcessor {
     }
 }
 
-//line 36 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
+//line 36 "/home/we/Develop/Squirrel/prog-x/src/device/Main.device.nut"
 
 // Main application on Imp-Device: does the main logic of the application
 
