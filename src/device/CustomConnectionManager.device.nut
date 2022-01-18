@@ -29,7 +29,11 @@ class CustomConnectionManager extends ConnectionManager {
 
         base.constructor(settings);
         _consumers = [];
-        _connectTime = hardware.millis();
+
+        if (_connected) {
+            _connectTime = hardware.millis();
+            _setDisconnectTimer();
+        }
 
         onConnect(_onConnectCb.bindenv(this), "@{CLASS_NAME}");
         onTimeout(_onConnectionTimeoutCb.bindenv(this), "@{CLASS_NAME}");
@@ -97,11 +101,11 @@ class CustomConnectionManager extends ConnectionManager {
         if (keep && idx == null) {
             ::debug("Connection will be kept for " + consumerId, "@{CLASS_NAME}");
             _consumers.push(consumerId);
-            _connected && _setDisconnectTimer();
+            _setDisconnectTimer();
         } else if (!keep && idx != null) {
             ::debug("Connection will not be kept for " + consumerId, "@{CLASS_NAME}");
             _consumers.remove(idx);
-            _connected && _setDisconnectTimer();
+            _setDisconnectTimer();
         }
     }
 
@@ -136,12 +140,17 @@ class CustomConnectionManager extends ConnectionManager {
         ::info(expected ? "Disconnected" : "Disconnected unexpectedly", "@{CLASS_NAME}");
         _disconnectTimer && imp.cancelwakeup(_disconnectTimer);
         _connectPromise = null;
+        _connectTime = null;
     }
 
     /**
      * Set the disconnection timer according to the parameters of automatic disconnection features
      */
     function _setDisconnectTimer() {
+        if (_connectTime == null) {
+            return;
+        }
+
         local delay = null;
 
         if (_maxConnectedTime != null) {
@@ -149,14 +158,20 @@ class CustomConnectionManager extends ConnectionManager {
         }
 
         if (_autoDisconnectDelay != null && _consumers.len() == 0) {
-            delay = delay > _autoDisconnectDelay ? _autoDisconnectDelay : delay;
+            delay = (delay == null || delay > _autoDisconnectDelay) ? _autoDisconnectDelay : delay;
         }
 
         _disconnectTimer && imp.cancelwakeup(_disconnectTimer);
 
         if (delay != null) {
             ::debug(format("Disconnection scheduled in %d seconds", delay), "@{CLASS_NAME}");
-            _disconnectTimer = imp.wakeup(delay, disconnect.bindenv(this));
+
+            local onDisconnectTimer = function() {
+                ::info("Disconnecting now..", "@{CLASS_NAME}");
+                disconnect();
+            }.bindenv(this);
+
+            _disconnectTimer = imp.wakeup(delay, onDisconnectTimer);
         }
     }
 }

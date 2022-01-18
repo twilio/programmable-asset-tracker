@@ -1,6 +1,6 @@
 # Prog-X Asset Tracker #
 
-**Version of the Application: 1.2.0 (POC)**
+**Version of the Application: 1.2.1 (POC)**
 
 An application in Squirrel language for [Electric Imp platform](https://www.electricimp.com/platform) that implements asset tracking functionality.
 
@@ -198,6 +198,7 @@ There are two LEDs:
   - When the indication is [enabled](#builder-variables), the User LED blinks by different colors when the following events occur:
     - New message generated: **green**
     - Shock detected alert: **red**
+    - Movement detected: **magenta**
     - Motion started alert: **white**
     - Motion stopped alert: **cyan**
     - Temperature is low alert: **blue**

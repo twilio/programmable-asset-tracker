@@ -1,10 +1,10 @@
-//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/agent/Main.agent.nut"
+//line 1 "/home/we/Develop/Squirrel/prog-x/src/agent/Main.agent.nut"
 #require "Promise.lib.nut:4.0.0"
 #require "Messenger.lib.nut:0.2.0"
 
 //line 1 "../shared/Version.shared.nut"
 // Application Version
-const APP_VERSION = "1.2.0";
+const APP_VERSION = "1.2.1";
 //line 1 "../shared/Constants.shared.nut"
 // Constants common for the imp-agent and the imp-device
 
@@ -476,7 +476,7 @@ class LocationAssistant {
     }
 }
 
-//line 9 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/agent/Main.agent.nut"
+//line 9 "/home/we/Develop/Squirrel/prog-x/src/agent/Main.agent.nut"
 
 // Main application on Imp-Agent:
 // - Forwards Data messages from Imp-Device to Cloud REST API
@@ -514,20 +514,15 @@ class Application {
      * Handler for Data received from Imp-Device
      */
     function _onData(msg, customAck) {
-        ::debug("Data received from imp-device");
-
-        local ack = customAck();
+        ::debug("Data received from imp-device, msgId = " + msg.id);
         local data = http.jsonencode(msg.data);
 
         CloudClient.send(data)
         .then(function(_) {
             ::info("Data has been successfully sent to the cloud: " + data);
-            ack();
         }.bindenv(this), function(err) {
             ::error("Cloud reported an error while receiving data: " + err);
-            ::error("The data caused this error: " + data)
-            // Don't ACK the message if we couldn't send the data to the cloud.
-            // This message will be saved on the device and re-sent later
+            ::error("The data caused this error: " + data);
         }.bindenv(this));
     }
 
@@ -567,9 +562,6 @@ class Application {
 }
 
 // ---------------------------- THE MAIN CODE ---------------------------- //
-
-// Set default log level
-Logger.setLogLevel(LGR_LOG_LEVEL.INFO);
 
 // Run the application
 app <- Application();
