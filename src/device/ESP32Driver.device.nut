@@ -178,7 +178,7 @@ class ESP32Driver {
                     local req = "AT+GMR\r\n";
                     _parseATResponceCb = function() {
                         if (_resp.len() > req.len()) {
-                            if (_resp.find("OK") && _resp.find("AT version:2.2.0.0")) {
+                            if (_resp.find("OK")) {
                                 resolve("OK");
                             } else {
                                 reject("Error check version");
@@ -249,7 +249,13 @@ class ESP32Driver {
      * Scan WiFi networks.
      *  
      * @return {Promise} that:
-     * - resolves with the list of WiFi networks detectable by the click board
+     * - resolves with the table of WiFi networks detectable by the click board
+     * The result table:
+     *      "ssid"      : {string}  - SSID (network name).
+     *      "bssid"     : {string}  - BSSID (access point’s MAC address), in 0123456789ab format.
+     *      "channel"   : {integer} - Channel number: 1-13 (2.4GHz).
+     *      "rssi"      : {integer} - RSSI (signal strength).
+     *      "open"      : {bool}    - Whether the network is open (password-free).
      * - rejects if the operation failed
      */
     function scanWiFiNetworks() {
