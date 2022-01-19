@@ -1,5 +1,6 @@
 #require "Promise.lib.nut:4.0.0"
 
+@include once "../src/shared/Logger/Logger.shared.nut"
 @include once "../src/device/ESP32Driver.device.nut"
 
 // new RX FIFO size
@@ -12,6 +13,34 @@ const ESP_DRV_TEST_STOP_BITS = 1;
 const ESP_DRV_TEST_PARITY_NONE = 0;
 const ESP_DRV_TEST_NO_CRT_RTS = 4;
 
+// scan WiFi period, in seconds
+const ESP_DRV_TEST_SCAN_WIFI_PERIOD = 30;
+// ESP32 boot delay
+const ESP_DRV_TEST_CHIP_BOOT_DELAY = 6;
+
+server.log("ESP32 test start...");
+
+function scan() {
+    esp.scanWiFiNetworks().then(function(wifiNetworks) {
+        server.log("Find "  + wifiNetworks.len() + " WiFi network:");
+        foreach (ind, network in wifiNetworks) {
+            local networkStr = format("%d) ", ind + 1);
+            foreach (el, val in network) {
+                networkStr += el + ": " + val + ", "
+            }
+            local networkStrLen = networkStr.len();
+            // remove ", "
+            server.log(networkStr.slice(0, networkStrLen - 2));
+        }
+    }).fail(function(error) {
+        server.log("Scan WiFi network error: " + error);
+    }).finally(function(_) {
+        imp.wakeup(ESP_DRV_TEST_SCAN_WIFI_PERIOD, scan);
+    });
+}
+
+Logger.setLogLevel(LGR_LOG_LEVEL.DEBUG);
+
 // create ESP32 driver object
 esp <- ESP32Driver(hardware.pinXU,
                    hardware.uartXEFGH,
@@ -22,29 +51,14 @@ esp <- ESP32Driver(hardware.pinXU,
                         "stopBits"  : ESP_DRV_TEST_STOP_BITS,
                         "flags"     : ESP_DRV_TEST_NO_CRT_RTS,
                         "rxFifoSize": ESP_DRV_TEST_RX_FIFO_SIZE
-                   });
-// init
-esp && esp.init().then(function(initStatus) {
+                   }
+                );
+// esp chip boot delay
+imp.sleep(ESP_DRV_TEST_CHIP_BOOT_DELAY);
+esp.init().then(function(initStatus) {
     server.log("Init status: " + initStatus);
-    // scan
-    esp.scanWiFiNetworks().then(function(result) {
-        foreach (ind, val in result) {
-            local network = format("%d. ", ind);
-            foreach (el in val) {
-                switch (el) {
-                    case "ssid":
-                        network += "SSID: " + el.ssid;
-                        break;
-                    case ""
-                    default:
-                        break;
-                }
-            }
-            // server.log();
-        }
-    }).fail(function(error) {
-        server.log("Error: " + error);
-    });
+    server.log("Scan WiFi network...");
+    scan();
 }).fail(function(error) {
-    server.log("Error: " + error);
+    server.log("Init status: " + error);
 });

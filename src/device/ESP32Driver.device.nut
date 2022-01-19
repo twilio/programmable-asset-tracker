@@ -179,6 +179,13 @@ class ESP32Driver {
                     _parseATResponceCb = function() {
                         if (_resp.len() > req.len()) {
                             if (_resp.find("OK")) {
+                                local respStrArr = split(_resp, "\r\n");
+                                ::info("ESP AT software:", "@{CLASS_NAME}");
+                                foreach (ind, el in respStrArr) {
+                                    if (ind != 0 && ind != (respStrArr.len() - 1)) {
+                                        ::info(el, "@{CLASS_NAME}");
+                                    }
+                                }
                                 resolve("OK");
                             } else {
                                 reject("Error check version");
@@ -249,8 +256,8 @@ class ESP32Driver {
      * Scan WiFi networks.
      *  
      * @return {Promise} that:
-     * - resolves with the table of WiFi networks detectable by the click board
-     * The result table:
+     * - resolves with the table array of WiFi networks detectable by the click board
+     * The result array element table format:
      *      "ssid"      : {string}  - SSID (network name).
      *      "bssid"     : {string}  - BSSID (access point’s MAC address), in 0123456789ab format.
      *      "channel"   : {integer} - Channel number: 1-13 (2.4GHz).
@@ -289,7 +296,13 @@ class ESP32Driver {
                                             scanResEl.rssi = paramEl.tointeger();
                                             break;
                                         case ESP32_PARAM_ORDER.MAC:
-                                            scanResEl.bssid = paramEl;
+                                            // remove ":"
+                                            local macAddrArr = split(paramEl, ":");
+                                            local resMac = "";
+                                            foreach (el in macAddrArr) {
+                                                resMac += el;
+                                            }
+                                            scanResEl.bssid = resMac;
                                             break;
                                         case ESP32_PARAM_ORDER.CHANNEL:
                                             scanResEl.channel = paramEl.tointeger();
