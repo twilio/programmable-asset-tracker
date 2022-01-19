@@ -18,7 +18,7 @@ const ESP_DRV_TEST_SCAN_WIFI_PERIOD = 30;
 // ESP32 boot delay
 const ESP_DRV_TEST_CHIP_BOOT_DELAY = 6;
 
-server.log("ESP32 test start...");
+server.log("ESP AT test");
 
 function scan() {
     esp.scanWiFiNetworks().then(function(wifiNetworks) {
@@ -53,8 +53,11 @@ esp <- ESP32Driver(hardware.pinXU,
                         "rxFifoSize": ESP_DRV_TEST_RX_FIFO_SIZE
                    }
                 );
+server.log("ESP32 chip boot...");
 // esp chip boot delay
 imp.sleep(ESP_DRV_TEST_CHIP_BOOT_DELAY);
+server.log("init...");
+// init and start scan
 esp.init().then(function(initStatus) {
     server.log("Init status: " + initStatus);
     server.log("Scan WiFi network...");
