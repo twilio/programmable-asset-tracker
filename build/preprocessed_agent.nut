@@ -1,26 +1,7 @@
-//line 1 "/home/we/Develop/Squirrel/prog-x/src/agent/Main.agent.nut"
-#require "Promise.lib.nut:4.0.0"
-#require "Messenger.lib.nut:0.2.0"
-
-//line 1 "../shared/Version.shared.nut"
+//line 1 "../src/shared/Version.shared.nut"
 // Application Version
 const APP_VERSION = "1.2.1";
-//line 1 "../shared/Constants.shared.nut"
-// Constants common for the imp-agent and the imp-device
-
-// ReplayMessenger message names
-enum APP_RM_MSG_NAME {
-    DATA = "data",
-    GNSS_ASSIST = "gnssAssist",
-    LOCATION_CELL = "locationCell"
-}
-
-// Init latitude value (North Pole)
-const INIT_LATITUDE = 90.0;
-
-// Init longitude value (Greenwich)
-const INIT_LONGITUDE = 0.0;
-//line 1 "../shared/Logger/Logger.shared.nut"
+//line 1 "../src/shared/Logger/Logger.shared.nut"
 // Logger for "DEBUG", "INFO" and "ERROR" information.
 // Prints out information to the standard impcentral log ("server.log").
 // The supported data types: string, table. Other types may be printed out incorrectly.
@@ -343,225 +324,26 @@ Logger <- {
 
 Logger.setLogLevelStr("INFO");
 
-//line 2 "CloudClient.agent.nut"
-
-// Communicates with the cloud.
-//   - Sends data to the cloud using REST API
-//   - Basic HTTP authentication is used
-//   - No buffering, data is sent immediately
-
-// Timeout for waiting for a response from the cloud, in seconds
-// TODO - decide do we need it, how it correlates with RM ack timeout
-const CLOUD_REST_API_TIMEOUT = 60;
-
-// "Data is accepted" status code returned from the cloud
-const CLOUD_REST_API_SUCCESS_CODE = 200;
-
-// API endpoints
-const CLOUD_REST_API_DATA_ENDPOINT = "/data";
-
-class CloudClient {
-
-    /**
-    * Sends a message to the cloud
-    *
-    * @param {string} body - Data to send to the cloud
-    *
-    * @return {Promise} that:
-    * - resolves if the cloud accepted the data
-    * - rejects with an error if the operation failed
-    */
-    function send(body) {
-        local headers = {
-            "Content-Type" : "application/json",
-            "Content-Length" : body.len(),
-            "Authorization" : "Basic " + http.base64encode(__VARS.CLOUD_REST_API_USERNAME + ":" + __VARS.CLOUD_REST_API_PASSWORD)
-        };
-        local req = http.post(__VARS.CLOUD_REST_API_URL + CLOUD_REST_API_DATA_ENDPOINT, headers, body);
-
-        return Promise(function(resolve, reject) {
-            req.sendasync(function(resp) {
-                if (resp.statuscode == CLOUD_REST_API_SUCCESS_CODE) {
-                    resolve();
-                } else {
-                    reject(resp.statuscode);
-                }
-            }.bindenv(this),
-            null,
-            CLOUD_REST_API_TIMEOUT);
-        }.bindenv(this));
-    }
-}
-
-//line 2 "LocationAssistant.agent.nut"
-
-// URL to request BG96 Assist data
-const LA_BG96_ASSIST_DATA_URL = "http://xtrapath4.izatcloud.net/xtra3grc.bin";
-
-// Google Maps Geolocation API URL
-const LA_GOOGLE_MAPS_LOCATION_URL = "https://www.googleapis.com/geolocation/v1/geolocate?key=";
-
-// Location Assistant class:
-// - obtains GNSS Assist data for BG96
-// - obtains the location by cell towers info using Google Maps Geolocation API
-class LocationAssistant {
-
-    /**
-     * Obtains GNSS Assist data for BG96
-     *
-     * @return {Promise} that:
-     * - resolves with BG96 Assist data if the operation succeeded
-     * - rejects with an error if the operation failed
-     */
-    function getGnssAssistData() {
-        ::debug("Downloading BG96 assist data...", "LocationAssistant");
-        // Set up an HTTP request to get the assist data
-        local request = http.get(LA_BG96_ASSIST_DATA_URL);
-
-        return Promise(function(resolve, reject) {
-            request.sendasync(function(response) {
-                if (response.statuscode == 200) {
-                    local data = blob(response.body.len());
-                    data.writestring(response.body);
-                    resolve(data);
-                } else {
-                    reject("Unexpected response status code: " + response.statuscode);
-                }
-            }.bindenv(this));
-        }.bindenv(this));
-    }
-
-    /**
-     * Obtains the location by cell towers info using Google Maps Geolocation API
-     *
-     * @param {Table} cellInfo - table with cell towers info
-     *
-     * @return {Promise} that:
-     * - resolves with the location info if the operation succeeded
-     * - rejects with an error if the operation failed
-     */
-    function getLocationByCellInfo(cellInfo) {
-        ::debug("Requesting location from Google Geolocation API. Cell towers passed: " + cellInfo.cellTowers.len(), "LocationAssistant");
-
-        // Set up an HTTP request to get the location
-        local url = format("%s%s", LA_GOOGLE_MAPS_LOCATION_URL, __VARS.GOOGLE_MAPS_API_KEY);
-        local headers = { "Content-Type" : "application/json" };
-        local body = {
-            "considerIp" : "false",
-            "radioType"  : cellInfo.radioType,
-            "cellTowers" : cellInfo.cellTowers
-        };
-
-        local request = http.post(url, headers, http.jsonencode(body));
-
-        return Promise(function(resolve, reject) {
-            request.sendasync(function(resp) {
-                if (resp.statuscode == 200) {
-                    try {
-                        local parsed = http.jsondecode(resp.body);
-                        resolve({
-                            "accuracy" : parsed.accuracy,
-                            "lat"      : parsed.location.lat,
-                            "lon"      : parsed.location.lng,
-                            "time"     : time()
-                        });
-                    } catch(e) {
-                        reject("Response parsing error: " + e);
-                    }
-                } else {
-                    reject("Unexpected response status code: " + resp.statuscode);
-                }
-            }.bindenv(this))
-        }.bindenv(this));
-    }
-}
-
-//line 9 "/home/we/Develop/Squirrel/prog-x/src/agent/Main.agent.nut"
+//line 3 "/home/we/Develop/Squirrel/prog-x/tests/AccelerometerTest.agent.nut"
 
 // Main application on Imp-Agent:
-// - Forwards Data messages from Imp-Device to Cloud REST API
-// - Obtains GNSS Assist data for BG96 from server and returns it to Imp-Device
-// - Obtains the location by cell towers info using Google Maps Geolocation API
-//   and returns it to Imp-Device
+// - TBD
 
 class Application {
-    // Messenger instance
-    _msngr = null;
 
     /**
      * Application Constructor
      */
     constructor() {
         ::info("Application Version: " + APP_VERSION);
-
-        // Initialize library for communication with Imp-Device
-        _initMsngr();
     }
 
     // -------------------- PRIVATE METHODS -------------------- //
 
-    /**
-     * Create and initialize Messenger instance
-     */
-    function _initMsngr() {
-        _msngr = Messenger();
-        _msngr.on(APP_RM_MSG_NAME.DATA, _onData.bindenv(this));
-        _msngr.on(APP_RM_MSG_NAME.GNSS_ASSIST, _onGnssAssist.bindenv(this));
-        _msngr.on(APP_RM_MSG_NAME.LOCATION_CELL, _onLocationCell.bindenv(this));
-    }
-
-    /**
-     * Handler for Data received from Imp-Device
-     */
-    function _onData(msg, customAck) {
-        ::debug("Data received from imp-device, msgId = " + msg.id);
-        local data = http.jsonencode(msg.data);
-
-        CloudClient.send(data)
-        .then(function(_) {
-            ::info("Data has been successfully sent to the cloud: " + data);
-        }.bindenv(this), function(err) {
-            ::error("Cloud reported an error while receiving data: " + err);
-            ::error("The data caused this error: " + data);
-        }.bindenv(this));
-    }
-
-    /**
-     * Handler for GNSS Assist request received from Imp-Device
-     */
-    function _onGnssAssist(msg, customAck) {
-        local ack = customAck();
-
-        LocationAssistant.getGnssAssistData()
-        .then(function(data) {
-            ::info("BG96 Assist data downloaded");
-            ack(data);
-        }.bindenv(this), function(err) {
-            ::error("Error during downloading BG96 Assist data: " + err);
-            // Send `null` in reply to the request
-            ack(null);
-        }.bindenv(this));
-    }
-
-    /**
-     * Handler for Location By Cell Info request received from Imp-Device
-     */
-    function _onLocationCell(msg, customAck) {
-        local ack = customAck();
-
-        LocationAssistant.getLocationByCellInfo(msg.data)
-        .then(function(location) {
-            ::info("Location obtained using Google Geolocation API");
-            ack(location);
-        }.bindenv(this), function(err) {
-            ::error("Error during location obtaining using Google Geolocation API: " + err);
-            // Send `null` in reply to the request
-            ack(null);
-        }.bindenv(this));
-    }
 }
 
-// ---------------------------- THE MAIN CODE ---------------------------- //
+// Set Log Level
+Logger.setLogLevel(LGR_LOG_LEVEL.DEBUG);
 
 // Run the application
 app <- Application();

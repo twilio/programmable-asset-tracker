@@ -59,6 +59,11 @@ const ESP32_DEFAULT_STOP_BITS = 1;
 const ESP32_DEFAULT_FLAGS = 4;
 // Default RX FIFO size
 const ESP32_DEFAULT_RX_FIFO_SZ = 800;
+// Max ready wait time, in seconds
+const ESP32_MAX_READY_WAIT_DELAY = 8;
+// Max message response wait time, in seconds
+const ESP32_MAX_MSG_WAIT_DELAY = 8;
+
 
 // ESP32 Driver class.
 // Ability to work with WiFi networks and BLE.
@@ -79,8 +84,15 @@ class ESP32Driver {
     // response string
     _resp = null;
 
+    // time stamp on start
+    _msgWaitStart = null;
+
+    // ready flag (init success, device ready)
+    _devReady = null;
+
     /**
-     * Constructor for ESP32 Driver Class
+     * Constructor for ESP32 Driver Class.
+     * (constructor wait the ready message from ESP, max. wait - ESP32_MAX_READY_WAIT_DELAY)
      *
      * @param {object} enPin - Hardware pin object connected to load switch (1 - enable 3.3V to microBUS)
      * @param {object} uart - UART object connected to click board on microBUS
@@ -120,13 +132,6 @@ class ESP32Driver {
             _checkSettings(settings);
         }
 
-        // enable 3.3V to microBUS
-        if (_enable3VPin) {
-            _enable3VPin.configure(DIGITAL_OUT, 1);
-        } else {
-            throw "Hardware pin object is null.";
-        }
-
         // configure UART
         if (_serial) {
             _serial.setrxfifosize(_settings.rxFifoSize);
@@ -134,10 +139,27 @@ class ESP32Driver {
                               _settings.wordSize, 
                               _settings.parity, 
                               _settings.stopBits, 
-                              _settings.flags, 
-                              _rxCb.bindenv(this));
+                              _settings.flags);
         } else {
             throw "UART object is null.";
+        }
+
+        _resp = "";
+        _msgWaitStart = time();
+        _devReady = false;
+        // enable 3.3V to microBUS
+        if (_enable3VPin) {
+            _enable3VPin.configure(DIGITAL_OUT, 1);
+        } else {
+            throw "Hardware pin object is null.";
+        }
+        // wait ready
+        while((time() - _msgWaitStart < ESP32_MAX_READY_WAIT_DELAY)) {
+            if (_waitReady()) {
+                _devReady = true;
+                break;
+            }
+            imp.sleep(0.5);
         }
     }
 
@@ -151,22 +173,33 @@ class ESP32Driver {
     function init() {
         local funcArr = array();
 
+        if (!_devReady) {
+            return Promise.reject("ESP not ready");
+        }
+
+        _serial.configure(_settings.baudRate, 
+                          _settings.wordSize, 
+                          _settings.parity, 
+                          _settings.stopBits, 
+                          _settings.flags,
+                          _rxCb.bindenv(this));
+
         local atRestoreReq = function() {
             return function() {
                 return Promise(function(resolve, reject) {
                     _resp = "";
+                    _msgWaitStart = time();
                     local req = "AT+RESTORE\r\n";
                     _parseATResponceCb = function() {
-                        if (_resp.len() > req.len()) {
-                            if (_resp.find("OK")) {
-                                resolve("OK");
-                            } else {
+                        if (_resp.find("OK")  && _resp.find("ready")) {
+                            resolve("OK");
+                        } else {
+                            if ((time() - _msgWaitStart) > ESP32_MAX_READY_WAIT_DELAY) {
                                 reject("Error AT+RESTORE command");
                             }
                         }
                     }.bindenv(this);
                     _serial.write(req);
-                    imp.sleep(3);
                 }.bindenv(this));
             }.bindenv(this);
         }
@@ -177,19 +210,17 @@ class ESP32Driver {
                     _resp = "";
                     local req = "AT+GMR\r\n";
                     _parseATResponceCb = function() {
-                        if (_resp.len() > req.len()) {
-                            if (_resp.find("OK")) {
-                                local respStrArr = split(_resp, "\r\n");
-                                ::info("ESP AT software:", "@{CLASS_NAME}");
-                                foreach (ind, el in respStrArr) {
-                                    if (ind != 0 && ind != (respStrArr.len() - 1)) {
-                                        ::info(el, "@{CLASS_NAME}");
-                                    }
+                        if (_resp.find("OK")) {
+                            local respStrArr = split(_resp, "\r\n");
+                            ::info("ESP AT software:", "@{CLASS_NAME}");
+                            foreach (ind, el in respStrArr) {
+                                if (ind != 0 && ind != (respStrArr.len() - 1)) {
+                                    ::info(el, "@{CLASS_NAME}");
                                 }
-                                resolve("OK");
-                            } else {
-                                reject("Error check version");
                             }
+                            resolve("OK");
+                        } else {
+                            reject("Error check version");
                         }
                     }.bindenv(this);
                     _serial.write(req);
@@ -204,12 +235,10 @@ class ESP32Driver {
                     _resp = "";
                     local req = format("AT+CWMODE=%d\r\n", ESP32_WIFI_MODE.STATION);
                     _parseATResponceCb = function() {
-                        if (_resp.len() > req.len()) {
-                            if (_resp.find("OK")) {
-                                resolve("OK");
-                            } else {
-                                reject("Error set WiFi mode");
-                            }
+                        if (_resp.find("OK")) {
+                            resolve("OK");
+                        } else {
+                            reject("Error set WiFi mode");
                         }
                     }.bindenv(this);
                     _serial.write(req);
@@ -229,12 +258,10 @@ class ESP32Driver {
                                        ESP32_WIFI_SCAN_PRINT_MASK.SHOW_RSSI |
                                        ESP32_WIFI_SCAN_PRINT_MASK.SHOW_ECN);
                     _parseATResponceCb = function() {
-                        if (_resp.len() > req.len()) {
-                            if (_resp.find("OK")) {
-                                resolve("OK");
-                            } else {
-                                reject("Error set WiFi scan print mask info");
-                            }
+                        if (_resp.find("OK")) {
+                            resolve("OK");
+                        } else {
+                            reject("Error set WiFi scan print mask info");
                         }
                     }.bindenv(this);
                     _serial.write(req);
@@ -269,64 +296,75 @@ class ESP32Driver {
         return Promise(function(resolve, reject) {
             local scanRes = [];
             _resp = "";
+            _msgWaitStart = time();
             local req = "AT+CWLAP\r\n";
             _parseATResponceCb = function() {
-                if (_resp.len() > req.len()) {
-                    if (_resp.find("OK")) {
-                        local scanResRawArr = split(_resp, "\r\n");
-                        foreach (el in scanResRawArr) {
-                            local paramStartPos = el.find("(");
-                            local paramEndPos = el.find(")");
-                            local scanResEl = {"ssid"   : null,
-                                               "bssid"  : null,
-                                               "channel": null,
-                                               "rssi"   : null,
-                                               "open"   : null};
-                            if (paramStartPos && paramEndPos) {
-                                local networks = split(el.slice(paramStartPos + 1, paramEndPos), ",");
-                                foreach (ind, paramEl in networks) {
-                                    switch(ind) {
-                                        case ESP32_PARAM_ORDER.ECN:
-                                            scanResEl.open = paramEl.tointeger() == ESP32_ECN_METHOD.OPEN ? true : false;
-                                            break;
-                                        case ESP32_PARAM_ORDER.SSID:
-                                            scanResEl.ssid = paramEl;
-                                            break;
-                                        case ESP32_PARAM_ORDER.RSSI:
-                                            scanResEl.rssi = paramEl.tointeger();
-                                            break;
-                                        case ESP32_PARAM_ORDER.MAC:
-                                            // remove ":"
-                                            local macAddrArr = split(paramEl, ":");
-                                            local resMac = "";
-                                            foreach (el in macAddrArr) {
-                                                resMac += el;
-                                            }
-                                            scanResEl.bssid = resMac;
-                                            break;
-                                        case ESP32_PARAM_ORDER.CHANNEL:
-                                            scanResEl.channel = paramEl.tointeger();
-                                            break;
-                                        default:
-                                            ::error("Unknown index", "@{CLASS_NAME}");
-                                            break;
-                                    }      
+                if (_resp.find("OK")) {
+                    local scanResRawArr = split(_resp, "\r\n");
+                    foreach (el in scanResRawArr) {
+                        local paramStartPos = el.find("(");
+                        local paramEndPos = el.find(")");
+                        local scanResEl = {"ssid"   : null,
+                                           "bssid"  : null,
+                                           "channel": null,
+                                           "rssi"   : null,
+                                           "open"   : null};
+                        if (paramStartPos && paramEndPos) {
+                            local networks = split(el.slice(paramStartPos + 1, paramEndPos), ",");
+                            foreach (ind, paramEl in networks) {
+                                switch(ind) {
+                                    case ESP32_PARAM_ORDER.ECN:
+                                        scanResEl.open = paramEl.tointeger() == ESP32_ECN_METHOD.OPEN ? true : false;
+                                        break;
+                                    case ESP32_PARAM_ORDER.SSID:
+                                        scanResEl.ssid = paramEl;
+                                        break;
+                                    case ESP32_PARAM_ORDER.RSSI:
+                                        scanResEl.rssi = paramEl.tointeger();
+                                        break;
+                                    case ESP32_PARAM_ORDER.MAC:
+                                        // remove ":"
+                                        local macAddrArr = split(paramEl, ":");
+                                        local resMac = "";
+                                        foreach (el in macAddrArr) {
+                                            resMac += el;
+                                        }
+                                        scanResEl.bssid = resMac;
+                                        break;
+                                    case ESP32_PARAM_ORDER.CHANNEL:
+                                        scanResEl.channel = paramEl.tointeger();
+                                        break;
+                                    default:
+                                        ::error("Unknown index", "@{CLASS_NAME}");
+                                        break;
                                 }
-                                scanRes.push(scanResEl);
                             }
+                            scanRes.push(scanResEl);
                         }
-                        resolve(scanRes);
-                    } else {
+                    }
+                    resolve(scanRes);
+                } else {
+                    if ((time() - _msgWaitStart) > ESP32_MAX_MSG_WAIT_DELAY) {
                         reject("Error scan WiFi");
                     }
                 }
             }.bindenv(this);
             _serial.write(req);
-            imp.sleep(3);
         }.bindenv(this));
     }
 
     // -------------------- PRIVATE METHODS -------------------- //
+
+    function _waitReady() {
+        local data = _serial.read();
+        // read until FIFO not empty and accumulate to result string
+        while (data != -1) {
+            _resp += data.tochar();
+            data = _serial.read();
+        }
+
+        return _resp.find("ready");
+    }
 
     /**
      * Callback function on data received.
