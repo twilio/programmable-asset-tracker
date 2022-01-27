@@ -1,5 +1,6 @@
 #require "Promise.lib.nut:4.0.0"
 #require "Messenger.lib.nut:0.2.0"
+#require "UBloxAssistNow.agent.lib.nut:1.0.0"
 
 @include once "../shared/Version.shared.nut"
 @include once "../shared/Constants.shared.nut"
@@ -63,10 +64,10 @@ class Application {
 
         LocationAssistant.getGnssAssistData()
         .then(function(data) {
-            ::info("BG96 Assist data downloaded");
+            ::info("Assist data downloaded");
             ack(data);
         }.bindenv(this), function(err) {
-            ::error("Error during downloading BG96 Assist data: " + err);
+            ::error("Error during downloading assist data: " + err);
             // Send `null` in reply to the request
             ack(null);
         }.bindenv(this));

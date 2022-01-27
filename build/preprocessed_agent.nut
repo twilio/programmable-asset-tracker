@@ -1,6 +1,7 @@
-//line 1 "/home/we/Develop/Squirrel/prog-x/src/agent/Main.agent.nut"
+//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/agent/Main.agent.nut"
 #require "Promise.lib.nut:4.0.0"
 #require "Messenger.lib.nut:0.2.0"
+#require "UBloxAssistNow.agent.lib.nut:1.0.0"
 
 //line 1 "../shared/Version.shared.nut"
 // Application Version
@@ -402,12 +403,12 @@ const LA_BG96_ASSIST_DATA_URL = "http://xtrapath4.izatcloud.net/xtra3grc.bin";
 const LA_GOOGLE_MAPS_LOCATION_URL = "https://www.googleapis.com/geolocation/v1/geolocate?key=";
 
 // Location Assistant class:
-// - obtains GNSS Assist data for BG96
+// - obtains GNSS Assist data for u-blox/BG96
 // - obtains the location by cell towers info using Google Maps Geolocation API
 class LocationAssistant {
 
     /**
-     * Obtains GNSS Assist data for BG96
+     * Obtains GNSS Assist data for u-blox/BG96
      *
      * @return {Promise} that:
      * - resolves with BG96 Assist data if the operation succeeded
@@ -476,7 +477,7 @@ class LocationAssistant {
     }
 }
 
-//line 9 "/home/we/Develop/Squirrel/prog-x/src/agent/Main.agent.nut"
+//line 10 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/agent/Main.agent.nut"
 
 // Main application on Imp-Agent:
 // - Forwards Data messages from Imp-Device to Cloud REST API
@@ -534,10 +535,10 @@ class Application {
 
         LocationAssistant.getGnssAssistData()
         .then(function(data) {
-            ::info("BG96 Assist data downloaded");
+            ::info("Assist data downloaded");
             ack(data);
         }.bindenv(this), function(err) {
-            ::error("Error during downloading BG96 Assist data: " + err);
+            ::error("Error during downloading assist data: " + err);
             // Send `null` in reply to the request
             ack(null);
         }.bindenv(this));

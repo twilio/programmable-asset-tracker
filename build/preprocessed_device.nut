@@ -1,15 +1,19 @@
-//line 1 "/home/we/Develop/Squirrel/prog-x/src/device/Main.device.nut"
+//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
 #require "Serializer.class.nut:1.0.0"
 #require "JSONParser.class.nut:1.0.1"
 #require "JSONEncoder.class.nut:2.0.0"
 #require "Promise.lib.nut:4.0.0"
 #require "SPIFlashLogger.device.lib.nut:2.2.0"
+#require "SPIFlashFileSystem.device.lib.nut:3.0.1"
 #require "ConnectionManager.lib.nut:3.1.1"
 #require "Messenger.lib.nut:0.2.0"
 #require "ReplayMessenger.device.lib.nut:0.2.0"
 #require "utilities.lib.nut:2.0.0"
 #require "LIS3DH.device.lib.nut:3.0.0"
 #require "HTS221.device.lib.nut:2.0.2"
+#require "UBloxM8N.device.lib.nut:1.0.1"
+#require "UbxMsgParser.lib.nut:2.0.1"
+#require "UBloxAssistNow.device.lib.nut:0.1.0"
 
 //line 1 "../shared/Version.shared.nut"
 // Application Version
@@ -352,7 +356,7 @@ Logger <- {
 
 Logger.setLogLevelStr("INFO");
 
-//line 16 "/home/we/Develop/Squirrel/prog-x/src/device/Main.device.nut"
+//line 20 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
 
 //line 1 "../shared/Logger/stream/Logger.IOutputStream.shared.nut"
 /**
@@ -399,7 +403,7 @@ class UartOutputStream extends Logger.IOutputStream {
         return server.log(data);
     }
 }
-//line 20 "/home/we/Develop/Squirrel/prog-x/src/device/Main.device.nut"
+//line 24 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
 
 //line 2 "LedIndication.device.nut"
 
@@ -481,7 +485,7 @@ class LedIndication {
     }
 }
 
-//line 24 "/home/we/Develop/Squirrel/prog-x/src/device/Main.device.nut"
+//line 28 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
 
 //line 1 "Hardware.device.nut"
 // Temperature-humidity sensor's I2C bus
@@ -493,8 +497,12 @@ HW_ACCEL_I2C <- hardware.i2cLM;
 // Accelerometer's interrupt pin
 HW_ACCEL_INT_PIN <- hardware.pinW;
 
+// UART port used for the u-blox module
+// TODO: Choose another uart port
+HW_UBLOX_UART <- hardware.uartXEFGH;
+
 // UART port used for logging (if enabled)
-HW_LOGGING_UART <- hardware.uartXEFGH;
+HW_LOGGING_UART <- hardware.uartYABCD;
 
 // LED indication: RED pin
 HW_LED_RED_PIN <- hardware.pinR;
@@ -505,9 +513,13 @@ HW_LED_BLUE_PIN <- hardware.pinXB;
 
 // SPI Flash allocations
 
-// Allocation for the SPI Flash Logger used by ReplayMessenger
+// Allocation for the SPI Flash Logger used by Replay Messenger
 const HW_RM_SFL_START_ADDR = 0x000000;
 const HW_RM_SFL_END_ADDR = 0x100000;
+
+// Allocation for the SPI Flash File System used by Location Driver
+const HW_LD_SFFS_START_ADDR = 0x200000;
+const HW_LD_SFFS_END_ADDR = 0x240000;
 //line 2 "ProductionManager.device.nut"
 
 // ProductionManager's user config field
@@ -2333,300 +2345,6 @@ class BG96CellInfo {
     }
 }
 
-//line 2 "LocationDriver.device.nut"
-
-// GNSS options:
-// Accuracy threshold of positioning, in meters. Range: 1-1000.
-const LD_GNSS_ACCURACY = 10;
-// The maximum positioning time, in seconds. Range: 1-255
-const LD_LOC_TIMEOUT = 55;
-
-// Minimum time of BG96 assist data validity to skip updating of the assist data, in minutes
-const LD_ASSIST_DATA_MIN_VALID_TIME = 1440;
-
-// Location Driver class.
-// Determines the current position.
-class LocationDriver {
-    // Assist data validity time, in minutes
-    _assistDataValidityTime = 0;
-    // Promise that resolves or rejects when the assist data has been obtained.
-    // null if the assist data is not being obtained at the moment
-    _gettingAssistData = null;
-    // Ready-to-use assist data
-    _assistData = null;
-
-    /**
-     * Constructor for Location Driver
-     */
-    constructor() {
-        cm.onConnect(_onConnected.bindenv(this), "LocationDriver");
-        // Set a "finally" handler only to avoid "Unhandled promise rejection" message
-        _updateAssistData()
-        .finally(@(_) null);
-    }
-
-    /**
-     * Obtain and return the current location.
-     * - First, try to get GNSS fix
-     * - If no success, try to obtain location using cell towers info
-     *
-     * @return {Promise} that:
-     * - resolves with the current location if the operation succeeded
-     * - rejects if the operation failed
-     */
-    function getLocation() {
-        return _getLocationGNSS()
-        .fail(function(err) {
-            ::info("Couldn't get location using GNSS: " + err, "LocationDriver");
-            return _getLocationCellTowers();
-        }.bindenv(this))
-        .fail(function(err) {
-            ::info("Couldn't get location using cell towers: " + err, "LocationDriver");
-            return Promise.reject(null);
-        }.bindenv(this));
-    }
-
-    // -------------------- PRIVATE METHODS -------------------- //
-
-    /**
-     * Obtain the current location using GNSS.
-     *
-     * @return {Promise} that:
-     * - resolves with the current location if the operation succeeded
-     * - rejects with an error if the operation failed
-     */
-    function _getLocationGNSS() {
-        return _updateAssistData()
-        .finally(function(_) {
-            ::debug("Getting location using GNSS..", "LocationDriver");
-            return Promise(function(resolve, reject) {
-                BG96_GPS.enableGNSS({
-                    "onLocation": _onGnssLocationFunc(resolve, reject),
-                    "onEnabled": _onGnssEnabledFunc(reject),
-                    "maxPosTime": LD_LOC_TIMEOUT,
-                    "accuracy": LD_GNSS_ACCURACY,
-                    "useAssist": true,
-                    "assistData": _assistData
-                });
-
-                // We've just applied pending assist data (if any), so we clear it
-                _assistData = null;
-            }.bindenv(this));
-        }.bindenv(this));
-    }
-
-    /**
-     * Obtain the current location using cell towers info.
-     *
-     * @return {Promise} that:
-     * - resolves with the current location if the operation succeeded
-     * - rejects with an error if the operation failed
-     */
-    function _getLocationCellTowers() {
-        ::debug("Getting location using cell towers..", "LocationDriver");
-
-        cm.keepConnection("LocationDriver", true);
-
-        return cm.connect()
-        .fail(function(_) {
-            throw "Couldn't connect to the server";
-        }.bindenv(this))
-        .then(function(_) {
-            local scannedTowers = BG96CellInfo.scanCellTowers();
-
-            if (scannedTowers == null) {
-                throw "No towers scanned";
-            }
-
-            ::debug("Cell towers scanned. Sending results to the agent..", "LocationDriver");
-
-            return _requestToAgent(APP_RM_MSG_NAME.LOCATION_CELL, scannedTowers)
-            .fail(function(err) {
-                throw "Error sending a request to the agent: " + err;
-            }.bindenv(this));
-        }.bindenv(this))
-        .then(function(location) {
-            cm.keepConnection("LocationDriver", false);
-
-            if (location == null) {
-                throw "No location received from the agent";
-            }
-
-            ::info("Got location using cell towers", "LocationDriver");
-            ::debug(location, "LocationDriver");
-
-            return {
-                // Here we assume that if the device is connected, its time is synced
-                "timestamp": time(),
-                "type": "cell",
-                "accuracy": location.accuracy,
-                "longitude": location.lon,
-                "latitude": location.lat
-            };
-        }.bindenv(this), function(err) {
-            cm.keepConnection("LocationDriver", false);
-            throw err;
-        }.bindenv(this));
-    }
-
-    /**
-     * Create a handler called when GNSS is enabled or an error occurred
-     *
-     * @param {function} onError - Function to be called in case of an error during enabling of GNSS
-     *         onError(error), where
-     *         @param {string} error - Error occurred during enabling of GNSS
-     *
-     * @return {function} Handler called when GNSS is enabled or an error occurred
-     */
-    function _onGnssEnabledFunc(onError) {
-        return function(err) {
-            if (err == null) {
-                ::debug("GNSS enabled successfully", "LocationDriver");
-
-                // Update the validity info
-                local assistDataValidity = BG96_GPS.isAssistDataValid();
-                if (assistDataValidity.valid) {
-                    _assistDataValidityTime = assistDataValidity.time;
-                } else {
-                    _assistDataValidityTime = 0;
-                }
-
-                ::debug("Assist data validity time (min): " + _assistDataValidityTime, "LocationDriver");
-            } else {
-                onError("Error enabling GNSS: " + err);
-            }
-        }.bindenv(this);
-    }
-
-    /**
-     * Create a handler called when GNSS location data is ready or an error occurred
-     *
-     * @param {function} onFix - Function to be called in case of successful getting of a GNSS fix
-     *         onFix(fix), where
-     *         @param {table} fix - GNSS fix (location) data
-     * @param {function} onError - Function to be called in case of an error during GNSS locating
-     *         onError(error), where
-     *         @param {string} error - Error occurred during GNSS locating
-     *
-     * @return {function} Handler called when GNSS is enabled or an error occurred
-     */
-    function _onGnssLocationFunc(onFix, onError) {
-        // A valid timestamp will surely be greater than this value (01.01.2021)
-        const LD_VALID_TS = 1609459200;
-
-        return function(result) {
-            BG96_GPS.disableGNSS();
-
-            if (!("fix" in result)) {
-                if ("error" in result) {
-                    onError(result.error);
-                } else {
-                    onError("Unknown error");
-                }
-
-                return;
-            }
-
-            ::info("Got location using GNSS", "LocationDriver");
-            ::debug(result.fix, "LocationDriver");
-
-            local accuracy = ((4.0 * result.fix.hdop.tofloat()) + 0.5).tointeger();
-
-            onFix({
-                // If we don't have the valid time, we take it from the location data
-                "timestamp": time() > LD_VALID_TS ? time() : result.fix.time,
-                "type": "gnss",
-                "accuracy": accuracy,
-                "longitude": result.fix.lon.tofloat(),
-                "latitude": result.fix.lat.tofloat()
-            });
-        }.bindenv(this);
-    }
-
-    /**
-     * Handler called every time imp-device becomes connected
-     */
-    function _onConnected() {
-        // Set a "finally" handler only to avoid "Unhandled promise rejection" message
-        _updateAssistData()
-        .finally(@(_) null);
-    }
-
-    /**
-     * Update GNSS Assist data if needed
-     *
-     * @return {Promise} that:
-     * - resolves if assist data was obtained
-     * - rejects if there is no need to update assist data or an error occurred
-     */
-    function _updateAssistData() {
-        if (_gettingAssistData) {
-            ::debug("Already getting assist data", "LocationDriver");
-            return _gettingAssistData;
-        }
-
-        if (_assistData || _assistDataValidityTime >= LD_ASSIST_DATA_MIN_VALID_TIME || !cm.isConnected()) {
-            // If we already have ready-to-use assist data or assist data validity time is big enough,
-            // it doesn't matter if we resolve or reject the promise.
-            // Since the update was actually not done, let's just reject it
-            return Promise.reject(null);
-        }
-
-        ::debug("Requesting assist data...", "LocationDriver");
-
-        return _gettingAssistData = _requestToAgent(APP_RM_MSG_NAME.GNSS_ASSIST)
-        .then(function(data) {
-            _gettingAssistData = null;
-
-            if (data == null) {
-                ::info("No GNSS Assist data received", "LocationDriver");
-                return Promise.reject(null);
-            }
-
-            ::info("GNSS Assist data received", "LocationDriver");
-            _assistData = data;
-        }.bindenv(this), function(err) {
-            _gettingAssistData = null;
-            ::info("GNSS Assist data request failed: " + err, "LocationDriver");
-            return Promise.reject(null);
-        }.bindenv(this));
-    }
-
-    /**
-     * Send a request to imp-agent
-     *
-     * @param {enum} name - ReplayMessenger message name (APP_RM_MSG_NAME)
-     * @param {Any serializable type | null} [data] - data, optional
-     *
-     * @return {Promise} that:
-     * - resolves with the response (if any) if the operation succeeded
-     * - rejects with an error if the operation failed
-     */
-    function _requestToAgent(name, data = null) {
-        return Promise(function(resolve, reject) {
-            local onMsgAck = function(msg, resp) {
-                // Reset the callbacks because the request is finished
-                rm.onAck(null, name);
-                rm.onFail(null, name);
-                resolve(resp);
-            }.bindenv(this);
-
-            local onMsgFail = function(msg, error) {
-                // Reset the callbacks because the request is finished
-                rm.onAck(null, name);
-                rm.onFail(null, name);
-                reject(error);
-            }.bindenv(this);
-
-            // Set temporary callbacks for this request
-            rm.onAck(onMsgAck.bindenv(this), name);
-            rm.onFail(onMsgFail.bindenv(this), name);
-            // Send the request to the agent
-            rm.send(name, data);
-        }.bindenv(this));
-    }
-}
-
 //line 2 "AccelerometerDriver.device.nut"
 
 // Accelerometer Driver class:
@@ -4325,7 +4043,303 @@ class DataProcessor {
     }
 }
 
-//line 36 "/home/we/Develop/Squirrel/prog-x/src/device/Main.device.nut"
+//line 39 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
+
+//line 2 "LocationDriverBG96.device.nut"
+
+// GNSS options:
+// Accuracy threshold of positioning, in meters. Range: 1-1000.
+const LD_GNSS_ACCURACY = 10;
+// The maximum positioning time, in seconds. Range: 1-255
+const LD_LOC_TIMEOUT = 55;
+
+// Minimum time of BG96 assist data validity to skip updating of the assist data, in minutes
+const LD_ASSIST_DATA_MIN_VALID_TIME = 1440;
+
+// Location Driver class.
+// Determines the current position.
+class LocationDriver {
+    // Assist data validity time, in minutes
+    _assistDataValidityTime = 0;
+    // Promise that resolves or rejects when the assist data has been obtained.
+    // null if the assist data is not being obtained at the moment
+    _gettingAssistData = null;
+    // Ready-to-use assist data
+    _assistData = null;
+
+    /**
+     * Constructor for Location Driver
+     */
+    constructor() {
+        cm.onConnect(_onConnected.bindenv(this), "LocationDriver");
+        // Set a "finally" handler only to avoid "Unhandled promise rejection" message
+        _updateAssistData()
+        .finally(@(_) null);
+    }
+
+    /**
+     * Obtain and return the current location.
+     * - First, try to get GNSS fix
+     * - If no success, try to obtain location using cell towers info
+     *
+     * @return {Promise} that:
+     * - resolves with the current location if the operation succeeded
+     * - rejects if the operation failed
+     */
+    function getLocation() {
+        return _getLocationGNSS()
+        .fail(function(err) {
+            ::info("Couldn't get location using GNSS: " + err, "LocationDriver");
+            return _getLocationCellTowers();
+        }.bindenv(this))
+        .fail(function(err) {
+            ::info("Couldn't get location using cell towers: " + err, "LocationDriver");
+            return Promise.reject(null);
+        }.bindenv(this));
+    }
+
+    // -------------------- PRIVATE METHODS -------------------- //
+
+    /**
+     * Obtain the current location using GNSS.
+     *
+     * @return {Promise} that:
+     * - resolves with the current location if the operation succeeded
+     * - rejects with an error if the operation failed
+     */
+    function _getLocationGNSS() {
+        return _updateAssistData()
+        .finally(function(_) {
+            ::debug("Getting location using GNSS..", "LocationDriver");
+            return Promise(function(resolve, reject) {
+                BG96_GPS.enableGNSS({
+                    "onLocation": _onGnssLocationFunc(resolve, reject),
+                    "onEnabled": _onGnssEnabledFunc(reject),
+                    "maxPosTime": LD_LOC_TIMEOUT,
+                    "accuracy": LD_GNSS_ACCURACY,
+                    "useAssist": true,
+                    "assistData": _assistData
+                });
+
+                // We've just applied pending assist data (if any), so we clear it
+                _assistData = null;
+            }.bindenv(this));
+        }.bindenv(this));
+    }
+
+    /**
+     * Obtain the current location using cell towers info.
+     *
+     * @return {Promise} that:
+     * - resolves with the current location if the operation succeeded
+     * - rejects with an error if the operation failed
+     */
+    function _getLocationCellTowers() {
+        ::debug("Getting location using cell towers..", "LocationDriver");
+
+        cm.keepConnection("LocationDriver", true);
+
+        return cm.connect()
+        .fail(function(_) {
+            throw "Couldn't connect to the server";
+        }.bindenv(this))
+        .then(function(_) {
+            local scannedTowers = BG96CellInfo.scanCellTowers();
+
+            if (scannedTowers == null) {
+                throw "No towers scanned";
+            }
+
+            ::debug("Cell towers scanned. Sending results to the agent..", "LocationDriver");
+
+            return _requestToAgent(APP_RM_MSG_NAME.LOCATION_CELL, scannedTowers)
+            .fail(function(err) {
+                throw "Error sending a request to the agent: " + err;
+            }.bindenv(this));
+        }.bindenv(this))
+        .then(function(location) {
+            cm.keepConnection("LocationDriver", false);
+
+            if (location == null) {
+                throw "No location received from the agent";
+            }
+
+            ::info("Got location using cell towers", "LocationDriver");
+            ::debug(location, "LocationDriver");
+
+            return {
+                // Here we assume that if the device is connected, its time is synced
+                "timestamp": time(),
+                "type": "cell",
+                "accuracy": location.accuracy,
+                "longitude": location.lon,
+                "latitude": location.lat
+            };
+        }.bindenv(this), function(err) {
+            cm.keepConnection("LocationDriver", false);
+            throw err;
+        }.bindenv(this));
+    }
+
+    /**
+     * Create a handler called when GNSS is enabled or an error occurred
+     *
+     * @param {function} onError - Function to be called in case of an error during enabling of GNSS
+     *         onError(error), where
+     *         @param {string} error - Error occurred during enabling of GNSS
+     *
+     * @return {function} Handler called when GNSS is enabled or an error occurred
+     */
+    function _onGnssEnabledFunc(onError) {
+        return function(err) {
+            if (err == null) {
+                ::debug("GNSS enabled successfully", "LocationDriver");
+
+                // Update the validity info
+                local assistDataValidity = BG96_GPS.isAssistDataValid();
+                if (assistDataValidity.valid) {
+                    _assistDataValidityTime = assistDataValidity.time;
+                } else {
+                    _assistDataValidityTime = 0;
+                }
+
+                ::debug("Assist data validity time (min): " + _assistDataValidityTime, "LocationDriver");
+            } else {
+                onError("Error enabling GNSS: " + err);
+            }
+        }.bindenv(this);
+    }
+
+    /**
+     * Create a handler called when GNSS location data is ready or an error occurred
+     *
+     * @param {function} onFix - Function to be called in case of successful getting of a GNSS fix
+     *         onFix(fix), where
+     *         @param {table} fix - GNSS fix (location) data
+     * @param {function} onError - Function to be called in case of an error during GNSS locating
+     *         onError(error), where
+     *         @param {string} error - Error occurred during GNSS locating
+     *
+     * @return {function} Handler called when GNSS is enabled or an error occurred
+     */
+    function _onGnssLocationFunc(onFix, onError) {
+        // A valid timestamp will surely be greater than this value (01.01.2021)
+        const LD_VALID_TS = 1609459200;
+
+        return function(result) {
+            BG96_GPS.disableGNSS();
+
+            if (!("fix" in result)) {
+                if ("error" in result) {
+                    onError(result.error);
+                } else {
+                    onError("Unknown error");
+                }
+
+                return;
+            }
+
+            ::info("Got location using GNSS", "LocationDriver");
+            ::debug(result.fix, "LocationDriver");
+
+            local accuracy = ((4.0 * result.fix.hdop.tofloat()) + 0.5).tointeger();
+
+            onFix({
+                // If we don't have the valid time, we take it from the location data
+                "timestamp": time() > LD_VALID_TS ? time() : result.fix.time,
+                "type": "gnss",
+                "accuracy": accuracy,
+                "longitude": result.fix.lon.tofloat(),
+                "latitude": result.fix.lat.tofloat()
+            });
+        }.bindenv(this);
+    }
+
+    /**
+     * Handler called every time imp-device becomes connected
+     */
+    function _onConnected() {
+        // Set a "finally" handler only to avoid "Unhandled promise rejection" message
+        _updateAssistData()
+        .finally(@(_) null);
+    }
+
+    /**
+     * Update GNSS Assist data if needed
+     *
+     * @return {Promise} that:
+     * - resolves if assist data was obtained
+     * - rejects if there is no need to update assist data or an error occurred
+     */
+    function _updateAssistData() {
+        if (_gettingAssistData) {
+            ::debug("Already getting assist data", "LocationDriver");
+            return _gettingAssistData;
+        }
+
+        if (_assistData || _assistDataValidityTime >= LD_ASSIST_DATA_MIN_VALID_TIME || !cm.isConnected()) {
+            // If we already have ready-to-use assist data or assist data validity time is big enough,
+            // it doesn't matter if we resolve or reject the promise.
+            // Since the update was actually not done, let's just reject it
+            return Promise.reject(null);
+        }
+
+        ::debug("Requesting assist data...", "LocationDriver");
+
+        return _gettingAssistData = _requestToAgent(APP_RM_MSG_NAME.GNSS_ASSIST)
+        .then(function(data) {
+            _gettingAssistData = null;
+
+            if (data == null) {
+                ::info("No GNSS Assist data received", "LocationDriver");
+                return Promise.reject(null);
+            }
+
+            ::info("GNSS Assist data received", "LocationDriver");
+            _assistData = data;
+        }.bindenv(this), function(err) {
+            _gettingAssistData = null;
+            ::info("GNSS Assist data request failed: " + err, "LocationDriver");
+            return Promise.reject(null);
+        }.bindenv(this));
+    }
+
+    /**
+     * Send a request to imp-agent
+     *
+     * @param {enum} name - ReplayMessenger message name (APP_RM_MSG_NAME)
+     * @param {Any serializable type | null} [data] - data, optional
+     *
+     * @return {Promise} that:
+     * - resolves with the response (if any) if the operation succeeded
+     * - rejects with an error if the operation failed
+     */
+    function _requestToAgent(name, data = null) {
+        return Promise(function(resolve, reject) {
+            local onMsgAck = function(msg, resp) {
+                // Reset the callbacks because the request is finished
+                rm.onAck(null, name);
+                rm.onFail(null, name);
+                resolve(resp);
+            }.bindenv(this);
+
+            local onMsgFail = function(msg, error) {
+                // Reset the callbacks because the request is finished
+                rm.onAck(null, name);
+                rm.onFail(null, name);
+                reject(error);
+            }.bindenv(this);
+
+            // Set temporary callbacks for this request
+            rm.onAck(onMsgAck.bindenv(this), name);
+            rm.onFail(onMsgFail.bindenv(this), name);
+            // Send the request to the agent
+            rm.send(name, data);
+        }.bindenv(this));
+    }
+}
+
+//line 45 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
 
 // Main application on Imp-Device: does the main logic of the application
 
@@ -4395,6 +4409,8 @@ class Application {
         }.bindenv(this))
         .fail(function(err) {
             ::error("Error during initialization of business logic modules: " + err);
+
+            // TODO: Reboot after a delay? Or enter the emergency mode?
         }.bindenv(this));
     }
 

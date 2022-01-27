@@ -62,6 +62,7 @@ Variables:
 - `LOGGER_LEVEL` - Logging level ("ERROR", "INFO", "DEBUG") on Imp-Agent/Device after the Imp firmware is deployed. Optional. Default: **"INFO"**
 - `UART_LOGGING` - Enable/disable [UART logging](#uart-logging) on Imp-Device. Optional. Default: **enabled**
 - `LED_INDICATION` - Enable/disable [LED indication](#led-indication) of events. Optional. Default: **enabled**
+- `BG96_GNSS` - Use BG96 GNSS rather than u-blox. Optional. Default: **false**
 
 ### User-Defined Environment Variables ###
 
@@ -74,6 +75,7 @@ Variables:
 - `CLOUD_REST_API_USERNAME` - Username to access the cloud REST API. Mandatory. Has no default.
 - `CLOUD_REST_API_PASSWORD` - Password to access the cloud REST API. Mandatory. Has no default.
 - `GOOGLE_MAPS_API_KEY` - API Key for Google Maps Platform. Required by [Google Maps Geolocation API](https://developers.google.com/maps/documentation/geolocation/overview) to determine the location by cell towers info or by WiFi networks. See [here](https://developers.google.com/maps/documentation/geolocation/get-api-key) how to obtain the Key.
+- `UBLOX_ASSIST_NOW_TOKEN` - U-blox AssistNow token. Required for downloading of assist data for u-blox GNSS receiver.
 
 Example of JSON with environment variables (when Cloud REST API is [emulated on another Imp](#simple-cloud-emulation)):
 ```
@@ -88,7 +90,7 @@ Example of JSON with environment variables (when Cloud REST API is [emulated on 
 ## Build And Run ##
 
 - If no need to change the default values of [Configuration Constants](#hardcoded-configuration) and [Builder Variables](#builder-variables), take already preprocessed files from the [./build](./build) folder.
-- Otherwise: 
+- Otherwise:
   - Change [Configuration Constants](#hardcoded-configuration), if needed.
   - Specify [Builder Variables](#builder-variables), if needed.
   - Run [Builder](https://github.com/electricimp/Builder/) for [./src/agent/Main.agent.nut](./src/agent/Main.agent.nut) file to get Imp-Agent preprocessed file.
