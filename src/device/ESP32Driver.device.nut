@@ -90,6 +90,9 @@ class ESP32Driver {
     // ready flag (init success, device ready)
     _devReady = null;
 
+    // init flag
+    _isInit = null;
+
     /**
      * Constructor for ESP32 Driver Class.
      * (constructor wait the ready message from ESP, max. wait - ESP32_MAX_READY_WAIT_DELAY)
@@ -144,6 +147,7 @@ class ESP32Driver {
             throw "UART object is null.";
         }
 
+        _isInit = false;
         _resp = "";
         _msgWaitStart = time();
         _devReady = false;
@@ -175,6 +179,11 @@ class ESP32Driver {
 
         if (!_devReady) {
             return Promise.reject("ESP not ready");
+        }
+
+        if (_isInit) {
+            ::debug("Alredy init", "@{CLASS_NAME}");
+            return Promise.resolve("OK");
         }
 
         _serial.configure(_settings.baudRate, 
@@ -259,6 +268,7 @@ class ESP32Driver {
                                        ESP32_WIFI_SCAN_PRINT_MASK.SHOW_ECN);
                     _parseATResponceCb = function() {
                         if (_resp.find("OK")) {
+                            _isInit = true;
                             resolve("OK");
                         } else {
                             reject("Error set WiFi scan print mask info");
@@ -293,6 +303,11 @@ class ESP32Driver {
      * - rejects if the operation failed
      */
     function scanWiFiNetworks() {
+
+        if (!_isInit) {
+            return Promise.reject("ESP init");
+        }
+
         return Promise(function(resolve, reject) {
             local scanRes = [];
             _resp = "";

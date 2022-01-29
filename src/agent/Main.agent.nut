@@ -2,6 +2,7 @@
 #require "Messenger.lib.nut:0.2.0"
 #require "UBloxAssistNow.agent.lib.nut:1.0.0"
 
+@include once "github:electricimp/GoogleMaps/GoogleMaps.agent.lib.nut@develop"
 @include once "../shared/Version.shared.nut"
 @include once "../shared/Constants.shared.nut"
 @include once "../shared/Logger/Logger.shared.nut"
@@ -38,6 +39,7 @@ class Application {
         _msngr.on(APP_RM_MSG_NAME.DATA, _onData.bindenv(this));
         _msngr.on(APP_RM_MSG_NAME.GNSS_ASSIST, _onGnssAssist.bindenv(this));
         _msngr.on(APP_RM_MSG_NAME.LOCATION_CELL, _onLocationCell.bindenv(this));
+        _msngr.on(APP_RM_MSG_NAME.LOCATION_WIFI, _onLocationWiFi.bindenv(this));
     }
 
     /**
@@ -80,6 +82,23 @@ class Application {
         local ack = customAck();
 
         LocationAssistant.getLocationByCellInfo(msg.data)
+        .then(function(location) {
+            ::info("Location obtained using Google Geolocation API");
+            ack(location);
+        }.bindenv(this), function(err) {
+            ::error("Error during location obtaining using Google Geolocation API: " + err);
+            // Send `null` in reply to the request
+            ack(null);
+        }.bindenv(this));
+    }
+
+        /**
+     * Handler for Location By WiFi networks Info request received from Imp-Device
+     */
+    function _onLocationWiFi(msg, customAck) {
+        local ack = customAck();
+
+        LocationAssistant.getLocationByWiFiInfo(msg.data)
         .then(function(location) {
             ::info("Location obtained using Google Geolocation API");
             ack(location);

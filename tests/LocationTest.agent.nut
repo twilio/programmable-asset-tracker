@@ -1,8 +1,7 @@
 #require "Promise.lib.nut:4.0.0"
 #require "Messenger.lib.nut:0.2.0"
 
-// @include once "github:electricimp/GoogleMaps/GoogleMaps.agent.lib.nut@develop"
-@include once "./GoogleMaps.agent.lib.nut"
+@include once "github:electricimp/GoogleMaps/GoogleMaps.agent.lib.nut@develop"
 @include once "../src/shared/Constants.shared.nut"
 @include once "../src/shared/Logger/Logger.shared.nut"
 @include once "../src/agent/LocationAssistant.agent.nut"

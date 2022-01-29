@@ -43,9 +43,13 @@ class LocationDriver {
      * - rejects if the operation failed
      */
     function getLocation() {
-        return _getLocationGNSS()
-        .fail(function(err) {
+        return _gettingLocation = _getLocationGNSS()
+        fail(function(err) {
             ::info("Couldn't get location using GNSS: " + err, "@{CLASS_NAME}");
+            return _getLocationWiFi();
+        }.bindenv(this))
+        .fail(function(err) {
+            ::info("Couldn't get location using WiFi: " + err, "@{CLASS_NAME}");
             return _getLocationCellTowers();
         }.bindenv(this))
         .fail(function(err) {

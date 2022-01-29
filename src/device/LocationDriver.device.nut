@@ -94,16 +94,16 @@ class LocationDriver {
         }
 
         return _gettingLocation = _getLocationGNSS()
-        .fail(function(err) {
+        fail(function(err) {
             ::info("Couldn't get location using GNSS: " + err, "@{CLASS_NAME}");
+            return _getLocationWiFi();
+        }.bindenv(this))
+        .fail(function(err) {
+            ::info("Couldn't get location using WiFi: " + err, "@{CLASS_NAME}");
             return _getLocationCellTowers();
         }.bindenv(this))
-        .then(function(location) {
-            _gettingLocation = null;
-            return location;
-        }.bindenv(this), function(err) {
+        .fail(function(err) {
             ::info("Couldn't get location using cell towers: " + err, "@{CLASS_NAME}");
-            _gettingLocation = null;
             return Promise.reject(null);
         }.bindenv(this));
     }
@@ -212,7 +212,7 @@ class LocationDriver {
 
             return {
                 // Here we assume that if the device is connected, its time is synced
-                "timestamp": time(),
+                "timestamp": location.time,
                 "type": "cell",
                 "accuracy": location.accuracy,
                 "longitude": location.lon,
@@ -220,6 +220,57 @@ class LocationDriver {
             };
         }.bindenv(this), function(err) {
             cm.keepConnection("@{CLASS_NAME}", false);
+            throw err;
+        }.bindenv(this));
+    }
+
+    /**
+     * Obtain the current location using WiFi networks info.
+     *
+     * @return {Promise} that:
+     * - resolves with the current location if the operation succeeded
+     * - rejects with an error if the operation failed
+     */
+    function _getLocationWiFi() {
+        ::debug("Getting location using WiFi networks..", "@{CLASS_NAME}");
+
+        return _esp.init()
+        .fail(function(_) {
+            throw "Couldn't init ESP32";
+        }.bindenv(this))
+        .then(function(_) {
+
+            ::debug("Scan WiFi networks. Sending results to the agent..", "@{CLASS_NAME}");
+
+            return _esp.scanWiFiNetworks()
+            .fail(function(err) {
+                throw "Scan WiFi network error: " + error;
+            }.bindenv(this));
+        }.bindenv(this))
+        .then(function(wifiNetworks) {
+            return _requestToAgent(APP_RM_MSG_NAME.LOCATION_WIFI, wifiNetworks)
+            .fail(function(err) {
+                throw "Error sending a request to the agent: " + err;
+            }.bindenv(this));
+        }.bindenv(this))
+        .then(function(location) {
+
+            if (location == null) {
+                throw "No location received from the agent";
+            }
+
+            ::info("Got location using WiFi networks", "@{CLASS_NAME}");
+            ::debug(location, "@{CLASS_NAME}");
+
+            return {
+                // Here we assume that if the device is connected, its time is synced
+                "timestamp": location.time,
+                "type": "wifi",
+                "accuracy": location.accuracy,
+                "longitude": location.lon,
+                "latitude": location.lat
+            };
+        }.bindenv(this), function(err) {
             throw err;
         }.bindenv(this));
     }
