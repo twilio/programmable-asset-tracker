@@ -317,19 +317,21 @@ class ESP32Driver {
                                         scanResEl.open = paramEl.tointeger() == ESP32_ECN_METHOD.OPEN ? true : false;
                                         break;
                                     case ESP32_PARAM_ORDER.SSID:
-                                        scanResEl.ssid = paramEl;
+                                        local ssidLen = paramEl.len();
+                                        // remove "
+                                        scanResEl.ssid = _removeQuotMark(paramEl);
                                         break;
                                     case ESP32_PARAM_ORDER.RSSI:
                                         scanResEl.rssi = paramEl.tointeger();
                                         break;
                                     case ESP32_PARAM_ORDER.MAC:
-                                        // remove ":"
+                                        // remove : and "
                                         local macAddrArr = split(paramEl, ":");
                                         local resMac = "";
                                         foreach (el in macAddrArr) {
                                             resMac += el;
                                         }
-                                        scanResEl.bssid = resMac;
+                                        scanResEl.bssid = _removeQuotMark(resMac);
                                         break;
                                     case ESP32_PARAM_ORDER.CHANNEL:
                                         scanResEl.channel = paramEl.tointeger();
@@ -339,7 +341,9 @@ class ESP32Driver {
                                         break;
                                 }
                             }
-                            scanRes.push(scanResEl);
+                            if (scanResEl.bssid && scanResEl.channel && scanResEl.rssi) {
+                                scanRes.push(scanResEl);
+                            }
                         }
                     }
                     resolve(scanRes);
@@ -355,6 +359,21 @@ class ESP32Driver {
 
     // -------------------- PRIVATE METHODS -------------------- //
 
+    /**
+     * Remove "".
+     */
+    function _removeQuotMark(paramStr) {
+        local paramLen = paramStr.len();
+        if (paramLen > 2) {// "param str" -> param str
+            return paramStr.slice(1, paramLen - 1);
+        }
+
+        return "";
+    } 
+
+    /**
+     * Wait ready of ESP.
+     */
     function _waitReady() {
         local data = _serial.read();
         // read until FIFO not empty and accumulate to result string

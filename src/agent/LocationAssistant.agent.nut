@@ -108,6 +108,38 @@ class LocationAssistant {
             }.bindenv(this))
         }.bindenv(this));
     }
+
+    /**
+     * Obtains the location by WiFi networks info using Google Maps Geolocation API
+     *
+     * @param {Array} wifiInfo - Array of table with WiFi networks info
+     *
+     * @return {Promise} that:
+     * - resolves with the location info if the operation succeeded
+     * - rejects with an error if the operation failed
+     */
+    function getLocationByWiFiInfo(wifiInfo) {
+        ::debug("Requesting location from Google Geolocation API.", "@{CLASS_NAME}");
+        local apiKey = format("%s", __VARS.GOOGLE_MAPS_API_KEY);
+        local gmapsLib = GoogleMaps(apiKey);
+        return Promise(function(resolve, reject) {
+            local geolocationData = {
+                "wifiAccessPoints" : wifiInfo
+            };
+            gmapsLib && gmapsLib.getGeolocation(geolocationData, function(error, resp) {
+                if (error) {
+                    reject("Get location error: " + error);
+                } else {
+                    resolve({
+                        "accuracy" : resp.accuracy,
+                        "lat"      : resp.location.lat,
+                        "lon"      : resp.location.lng,
+                        "time"     : time()
+                    });
+                }
+            });
+        }.bindenv(this));
+    }
 }
 
 @set CLASS_NAME = null // Reset the variable

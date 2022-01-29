@@ -125,7 +125,7 @@ class LocationDriver {
 
             return {
                 // Here we assume that if the device is connected, its time is synced
-                "timestamp": time(),
+                "timestamp": location.time,
                 "type": "cell",
                 "accuracy": location.accuracy,
                 "longitude": location.lon,
@@ -177,7 +177,7 @@ class LocationDriver {
 
             return {
                 // Here we assume that if the device is connected, its time is synced
-                "timestamp": time(),
+                "timestamp": location.time,
                 "type": "wifi",
                 "accuracy": location.accuracy,
                 "longitude": location.lon,

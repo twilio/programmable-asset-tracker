@@ -1,6 +1,8 @@
 #require "Promise.lib.nut:4.0.0"
 #require "Messenger.lib.nut:0.2.0"
 
+// @include once "github:electricimp/GoogleMaps/GoogleMaps.agent.lib.nut@develop"
+@include once "./GoogleMaps.agent.lib.nut"
 @include once "../src/shared/Constants.shared.nut"
 @include once "../src/shared/Logger/Logger.shared.nut"
 @include once "../src/agent/LocationAssistant.agent.nut"
@@ -46,20 +48,16 @@
      */
     function _onLocationWiFi(msg, customAck) {
         local ack = customAck();
-        ::debug(msg.data);
-        ack({"timestamp": time(),
-                "type": "wifi",
-                "accuracy": 1,
-                "lon": 80.0,
-                "lat": 40.0});
-        // LocationAssistant.getLocationByWiFiInfo(msg.data)
-        // .then(function(location) {
-        //     ::info("Location obtained using Google Geolocation API");
-        //     ack(location);
-        // }.bindenv(this), function(err) {
-        //     ::error("Error during location obtaining using Google Geolocation API: " + err);
-        //     ack(null);
-        // }.bindenv(this));
+
+        LocationAssistant.getLocationByWiFiInfo(msg.data)
+        .then(function(location) {
+            ::info("Location obtained using Google Geolocation API");
+            ack(location);
+        }.bindenv(this), function(err) {
+            ::error("Error during location obtaining using Google Geolocation API: " + err);
+            // Send `null` in reply to the request
+            ack(null);
+        }.bindenv(this));
     }
 
 // ---------------------------- THE MAIN CODE ---------------------------- //
