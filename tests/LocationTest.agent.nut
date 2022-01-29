@@ -2,7 +2,7 @@
 #require "Messenger.lib.nut:0.2.0"
 
 @include once "../src/shared/Constants.shared.nut"
-@include once "../src/shared/Logger.shared.nut"
+@include once "../src/shared/Logger/Logger.shared.nut"
 @include once "../src/agent/LocationAssistant.agent.nut"
 
 // Test for Location determination.

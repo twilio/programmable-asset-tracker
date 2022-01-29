@@ -7,11 +7,19 @@
 #require "utilities.lib.nut:2.0.0"
 
 @include once "../src/shared/Constants.shared.nut"
-@include once "../src/shared/Logger.shared.nut"
+@include once "../src/shared/Logger/Logger.shared.nut"
+@include once "../src/device/Hardware.device.nut"
+@include once "../src/device/CustomConnectionManager.device.nut"
 @include once "../src/device/CustomReplayMessenger.device.nut"
 @include once "../src/device/bg96_gps.device.lib.nut"
 @include once "../src/device/BG96CellInfo.device.nut"
+
+@if BG96_GNSS
+@include once "../src/device/LocationDriverBG96.device.nut"
+@else
 @include once "../src/device/LocationDriver.device.nut"
+@endif
+
 
 // Test for Location determination.
 // Periodically tries to obtain the current location by different ways.
@@ -113,7 +121,7 @@ cmConfig <- {
         "errorPolicy"     : RETURN_ON_ERROR_NO_DISCONNECT,
         "connectTimeout"  : APP_CM_CONNECT_TIMEOUT
 };
-cm = ConnectionManager(cmConfig);
+cm = CustomConnectionManager(cmConfig);
 cm.connect();
 
 Logger.setLogLevel(LGR_LOG_LEVEL.DEBUG);
