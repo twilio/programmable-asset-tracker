@@ -332,7 +332,6 @@ class ESP32Driver {
                                         scanResEl.open = paramEl.tointeger() == ESP32_ECN_METHOD.OPEN ? true : false;
                                         break;
                                     case ESP32_PARAM_ORDER.SSID:
-                                        local ssidLen = paramEl.len();
                                         // remove "
                                         scanResEl.ssid = _removeQuotMark(paramEl);
                                         break;
