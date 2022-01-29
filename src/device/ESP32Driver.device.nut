@@ -153,6 +153,10 @@ class ESP32Driver {
         _devReady = false;
         // enable 3.3V to microBUS
         if (_enable3VPin) {
+            // power off
+            _enable3VPin.configure(DIGITAL_OUT, 0);
+            imp.sleep(0.1);
+            // power on
             _enable3VPin.configure(DIGITAL_OUT, 1);
         } else {
             throw "Hardware pin object is null.";
