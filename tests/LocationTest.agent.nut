@@ -41,6 +41,27 @@
         }.bindenv(this));
     }
 
+    /**
+     * Handler for Location By WiFi networks Info request received from Imp-Device
+     */
+    function _onLocationWiFi(msg, customAck) {
+        local ack = customAck();
+        ::debug(msg.data);
+        ack({"timestamp": time(),
+                "type": "wifi",
+                "accuracy": 1,
+                "lon": 80.0,
+                "lat": 40.0});
+        // LocationAssistant.getLocationByWiFiInfo(msg.data)
+        // .then(function(location) {
+        //     ::info("Location obtained using Google Geolocation API");
+        //     ack(location);
+        // }.bindenv(this), function(err) {
+        //     ::error("Error during location obtaining using Google Geolocation API: " + err);
+        //     ack(null);
+        // }.bindenv(this));
+    }
+
 // ---------------------------- THE MAIN CODE ---------------------------- //
 
 Logger.setLogLevel(LGR_LOG_LEVEL.DEBUG);
@@ -50,3 +71,4 @@ Logger.setLogLevel(LGR_LOG_LEVEL.DEBUG);
 msngr <- Messenger();
 msngr.on(APP_RM_MSG_NAME.GNSS_ASSIST, _onGnssAssist.bindenv(this));
 msngr.on(APP_RM_MSG_NAME.LOCATION_CELL, _onLocationCell.bindenv(this));
+msngr.on(APP_RM_MSG_NAME.LOCATION_WIFI, _onLocationWiFi.bindenv(this));

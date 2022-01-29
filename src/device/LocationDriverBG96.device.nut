@@ -19,12 +19,15 @@ class LocationDriver {
     _gettingAssistData = null;
     // Ready-to-use assist data
     _assistData = null;
+    // ESP32 object
+    _esp = null;
 
     /**
      * Constructor for Location Driver
      */
     constructor() {
         cm.onConnect(_onConnected.bindenv(this), "@{CLASS_NAME}");
+        _esp = ESP32Driver(HW_ESP_POWER_EN_PIN, HW_ESP_UART);
         // Set a "finally" handler only to avoid "Unhandled promise rejection" message
         _updateAssistData()
         .finally(@(_) null);
@@ -88,7 +91,7 @@ class LocationDriver {
      * - rejects with an error if the operation failed
      */
     function _getLocationCellTowers() {
-        ::debug("Getting location using cell towers..", "@{CLASS_NAME}");
+        ::debug("Getting location using cell towers...", "@{CLASS_NAME}");
 
         cm.keepConnection("@{CLASS_NAME}", true);
 
@@ -130,6 +133,57 @@ class LocationDriver {
             };
         }.bindenv(this), function(err) {
             cm.keepConnection("@{CLASS_NAME}", false);
+            throw err;
+        }.bindenv(this));
+    }
+
+    /**
+     * Obtain the current location using WiFi networks info.
+     *
+     * @return {Promise} that:
+     * - resolves with the current location if the operation succeeded
+     * - rejects with an error if the operation failed
+     */
+    function _getLocationWiFi() {
+        ::debug("Getting location using WiFi networks..", "@{CLASS_NAME}");
+
+        return _esp.init()
+        .fail(function(_) {
+            throw "Couldn't init ESP32";
+        }.bindenv(this))
+        .then(function(_) {
+
+            ::debug("Scan WiFi networks. Sending results to the agent..", "@{CLASS_NAME}");
+
+            return _esp.scanWiFiNetworks()
+            .fail(function(err) {
+                throw "Scan WiFi network error: " + error;
+            }.bindenv(this));
+        }.bindenv(this))
+        .then(function(wifiNetworks) {
+            return _requestToAgent(APP_RM_MSG_NAME.LOCATION_WIFI, wifiNetworks)
+            .fail(function(err) {
+                throw "Error sending a request to the agent: " + err;
+            }.bindenv(this));
+        }.bindenv(this))
+        .then(function(location) {
+
+            if (location == null) {
+                throw "No location received from the agent";
+            }
+
+            ::info("Got location using WiFi networks", "@{CLASS_NAME}");
+            ::debug(location, "@{CLASS_NAME}");
+
+            return {
+                // Here we assume that if the device is connected, its time is synced
+                "timestamp": time(),
+                "type": "wifi",
+                "accuracy": location.accuracy,
+                "longitude": location.lon,
+                "latitude": location.lat
+            };
+        }.bindenv(this), function(err) {
             throw err;
         }.bindenv(this));
     }

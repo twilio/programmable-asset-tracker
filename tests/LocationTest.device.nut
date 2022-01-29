@@ -13,6 +13,7 @@
 @include once "../src/device/CustomReplayMessenger.device.nut"
 @include once "../src/device/bg96_gps.device.lib.nut"
 @include once "../src/device/BG96CellInfo.device.nut"
+@include once "../src/device/ESP32Driver.device.nut"
 
 @if BG96_GNSS
 @include once "../src/device/LocationDriverBG96.device.nut"
@@ -93,7 +94,13 @@ function initReplayMessenger() {
         };
     });
 
-    // Obtain and log location by WiFi info - TBD
+    // Obtain and log location by WiFi info
+    ld._getLocationWiFi().then(function(loc){
+        ::info("Location WiFi:");
+        foreach (key, value in loc) {
+            ::info(key + ":" + value);
+        };
+    });
 
     // Obtain and log location by BLE beacons - TBD
 

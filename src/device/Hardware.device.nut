@@ -14,6 +14,12 @@ HW_UBLOX_UART <- hardware.uartXEFGH;
 // UART port used for logging (if enabled)
 HW_LOGGING_UART <- hardware.uartYABCD;
 
+// ESP32 UART port
+HW_ESP_UART <- hardware.uartXEFGH;
+
+// ESP32 power enable pin
+HW_ESP_POWER_EN_PIN <- hardware.pinXU;
+
 // LED indication: RED pin
 HW_LED_RED_PIN <- hardware.pinR;
 // LED indication: GREEN pin
