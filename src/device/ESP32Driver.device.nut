@@ -174,15 +174,22 @@ class ESP32Driver {
     /**
      * Init and configure ESP32.
      *  
+     * @param {bool} repeatInit - Clear last success init flag, and repeat init procedure.
+     *      Optional, default value is false.
+     *
      * @return {Promise} that:
      * - resolves with the init status of the click board
      * - rejects if the operation failed
      */
-    function init() {
+    function init(repeatInit = false) {
         local funcArr = array();
 
         if (!_devReady) {
             return Promise.reject("ESP not ready");
+        }
+
+        if (repeatInit) {
+            _isInit = false;
         }
 
         if (_isInit) {
@@ -359,6 +366,7 @@ class ESP32Driver {
                                         break;
                                 }
                             }
+                            // pusf if element not null
                             if (scanResEl.bssid && scanResEl.channel && scanResEl.rssi) {
                                 scanRes.push(scanResEl);
                             }

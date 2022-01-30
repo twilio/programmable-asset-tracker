@@ -77,35 +77,28 @@ class LocationAssistant {
     function getLocationByCellInfo(cellInfo) {
         ::debug("Requesting location from Google Geolocation API. Cell towers passed: " + cellInfo.cellTowers.len(), "@{CLASS_NAME}");
 
-        // Set up an HTTP request to get the location
-        local url = format("%s%s", LA_GOOGLE_MAPS_LOCATION_URL, __VARS.GOOGLE_MAPS_API_KEY);
-        local headers = { "Content-Type" : "application/json" };
-        local body = {
-            "considerIp" : "false",
-            "radioType"  : cellInfo.radioType,
-            "cellTowers" : cellInfo.cellTowers
-        };
-
-        local request = http.post(url, headers, http.jsonencode(body));
-
+        local apiKey = format("%s", __VARS.GOOGLE_MAPS_API_KEY);
+        local gmapsLib = GoogleMaps(apiKey);
         return Promise(function(resolve, reject) {
-            request.sendasync(function(resp) {
-                if (resp.statuscode == 200) {
-                    try {
-                        local parsed = http.jsondecode(resp.body);
-                        resolve({
-                            "accuracy" : parsed.accuracy,
-                            "lat"      : parsed.location.lat,
-                            "lon"      : parsed.location.lng,
-                            "time"     : time()
-                        });
-                    } catch(e) {
-                        reject("Response parsing error: " + e);
-                    }
+            local geolocationData = null;
+            if 
+            geolocationData = {
+                "considerIp" : "false",
+                "radioType"  : cellInfo.radioType,
+                "cellTowers" : cellInfo.cellTowers
+            };
+            gmapsLib && gmapsLib.getGeolocation(geolocationData, function(error, resp) {
+                if (error) {
+                    reject("Get location error: " + error);
                 } else {
-                    reject("Unexpected response status code: " + resp.statuscode);
+                    resolve({
+                        "accuracy" : resp.accuracy,
+                        "lat"      : resp.location.lat,
+                        "lon"      : resp.location.lng,
+                        "time"     : time()
+                    });
                 }
-            }.bindenv(this))
+            });
         }.bindenv(this));
     }
 
