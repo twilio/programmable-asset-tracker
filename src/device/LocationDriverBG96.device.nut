@@ -150,19 +150,11 @@ class LocationDriver {
      */
     function _getLocationWiFi() {
         ::debug("Getting location using WiFi networks..", "@{CLASS_NAME}");
+        ::debug("Scan WiFi networks. Sending results to the agent..", "@{CLASS_NAME}");
 
-        return _esp.init()
-        .fail(function(_) {
-            throw "Couldn't init ESP32";
-        }.bindenv(this))
-        .then(function(_) {
-
-            ::debug("Scan WiFi networks. Sending results to the agent..", "@{CLASS_NAME}");
-
-            return _esp.scanWiFiNetworks()
-            .fail(function(err) {
-                throw "Scan WiFi network error: " + error;
-            }.bindenv(this));
+        return _esp.scanWiFiNetworks()
+        .fail(function(err) {
+            throw "Scan WiFi network error: " + error;
         }.bindenv(this))
         .then(function(wifiNetworks) {
             return _requestToAgent(APP_RM_MSG_NAME.LOCATION_WIFI, wifiNetworks)

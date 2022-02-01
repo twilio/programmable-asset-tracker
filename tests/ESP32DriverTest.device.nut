@@ -55,10 +55,4 @@ server.log("ESP32 chip boot...");
 // esp chip boot delay
 server.log("init...");
 // init and start scan
-esp.init().then(function(initStatus) {
-    server.log("Init status: " + initStatus);
-    server.log("Scan WiFi network...");
-    scan();
-}).fail(function(error) {
-    server.log("Init status: " + error);
-});
+scan();

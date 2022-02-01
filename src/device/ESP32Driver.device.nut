@@ -176,7 +176,92 @@ class ESP32Driver {
             }
             imp.sleep(0.5);
         }
+    }    
+
+    /**
+     * Scan WiFi networks.
+     *  
+     * @return {Promise} that:
+     * - resolves with the table array of WiFi networks detectable by the click board
+     * The result array element table format:
+     *      "ssid"      : {string}  - SSID (network name).
+     *      "bssid"     : {string}  - BSSID (access point’s MAC address), in 0123456789ab format.
+     *      "channel"   : {integer} - Channel number: 1-13 (2.4GHz).
+     *      "rssi"      : {integer} - RSSI (signal strength).
+     *      "open"      : {bool}    - Whether the network is open (password-free).
+     * - rejects if the operation failed
+     */
+    function scanWiFiNetworks() {
+        ::debug("Scan WiFi networks", "@{CLASS_NAME}");
+        return _init()
+        .then(function(initStatus) {
+            ::debug("Init status: " + initStatus, "@{CLASS_NAME}");
+            return Promise(function(resolve, reject) {
+                local scanRes = [];
+                _resp = "";
+                _msgWaitStart = time();
+                local req = "AT+CWLAP\r\n";
+                _parseATResponceCb = function() {
+                    if (_resp.find("OK")) {
+                        local scanResRawArr = split(_resp, "\r\n");
+                        foreach (el in scanResRawArr) {
+                            local paramStartPos = el.find("(");
+                            local paramEndPos = el.find(")");
+                            local scanResEl = {"ssid"   : null,
+                                               "bssid"  : null,
+                                               "channel": null,
+                                               "rssi"   : null,
+                                               "open"   : null};
+                            if (paramStartPos && paramEndPos) {
+                                local networks = split(el.slice(paramStartPos + 1, paramEndPos), ",");
+                                foreach (ind, paramEl in networks) {
+                                    switch(ind) {
+                                        case ESP32_PARAM_ORDER.ECN:
+                                            scanResEl.open = paramEl.tointeger() == ESP32_ECN_METHOD.OPEN ? true : false;
+                                            break;
+                                        case ESP32_PARAM_ORDER.SSID:
+                                            // remove "
+                                            scanResEl.ssid = _removeQuotMark(paramEl);
+                                            break;
+                                        case ESP32_PARAM_ORDER.RSSI:
+                                            scanResEl.rssi = paramEl.tointeger();
+                                            break;
+                                        case ESP32_PARAM_ORDER.MAC:
+                                            // remove : and "
+                                            local macAddrArr = split(paramEl, ":");
+                                            local resMac = "";
+                                            foreach (el in macAddrArr) {
+                                                resMac += el;
+                                            }
+                                            scanResEl.bssid = _removeQuotMark(resMac);
+                                            break;
+                                        case ESP32_PARAM_ORDER.CHANNEL:
+                                            scanResEl.channel = paramEl.tointeger();
+                                            break;
+                                        default:
+                                            ::error("Unknown index", "@{CLASS_NAME}");
+                                            break;
+                                    }
+                                }
+                                // push if element not null
+                                if (scanResEl.bssid && scanResEl.channel && scanResEl.rssi) {
+                                    scanRes.push(scanResEl);
+                                }
+                            }
+                        }
+                        resolve(scanRes);
+                    } else {
+                        if ((time() - _msgWaitStart) > ESP32_MAX_MSG_WAIT_DELAY) {
+                            reject("Error scan WiFi");
+                        }
+                    }
+                }.bindenv(this);
+                _serial.write(req);
+            }.bindenv(this));
+        }.bindenv(this));
     }
+
+    // -------------------- PRIVATE METHODS -------------------- //
 
     /**
      * Init and configure ESP32.
@@ -188,7 +273,7 @@ class ESP32Driver {
      * - resolves with the init status of the click board
      * - rejects if the operation failed
      */
-    function init(repeatInit = false) {
+    function _init(repeatInit = false) {
         local funcArr = array();
 
         if (!_devReady) {
@@ -200,7 +285,7 @@ class ESP32Driver {
         }
 
         if (_isInit) {
-            ::debug("Alredy init", "@{CLASS_NAME}");
+            ::debug("Already init", "@{CLASS_NAME}");
             return Promise.resolve("OK");
         }
 
@@ -218,10 +303,10 @@ class ESP32Driver {
                                     ESP32_WIFI_SCAN_PRINT_MASK.SHOW_CHANNEL |
                                     ESP32_WIFI_SCAN_PRINT_MASK.SHOW_RSSI |
                                     ESP32_WIFI_SCAN_PRINT_MASK.SHOW_ECN);
-        local reqArr = [{"reqStr" : "AT+RESTORE\r\n", "rejStr" : "Error AT+RESTORE command"},
-                        {"reqStr" : "AT+GMR\r\n", "rejStr" : "Error check version"},
-                        {"reqStr" : reqCWMODE, "rejStr" : "Error set WiFi mode"},
-                        {"reqStr" : reqPRINTMASK, "rejStr" : "Error set WiFi scan print mask info"}];
+        local reqArr = [{"reqStr" : "AT+RESTORE\r\n",   "rejStr" : "Error AT+RESTORE command"},
+                        {"reqStr" : "AT+GMR\r\n",       "rejStr" : "Error check version"},
+                        {"reqStr" : reqCWMODE,          "rejStr" : "Error set WiFi mode"},
+                        {"reqStr" : reqPRINTMASK,       "rejStr" : "Error set WiFi scan print mask info"}];
 
         local atFuncReq = function(reqNum) {
             return function() {
@@ -237,6 +322,7 @@ class ESP32Driver {
                             resCheck = _resp.find("OK");
                         }
                         if (resCheck) {
+                            // print version info
                             if (reqNum == ESP32_INIT_STEP.GMR) {
                                 local respStrArr = split(_resp, "\r\n");
                                 ::info("ESP AT software:", "@{CLASS_NAME}");
@@ -246,6 +332,7 @@ class ESP32Driver {
                                     }
                                 }    
                             }
+                            // init flag -> true
                             if (reqNum == ESP32_INIT_STEP.CWLAPOPT) {
                                 _isInit = true;    
                             }
@@ -268,91 +355,6 @@ class ESP32Driver {
         local promises = Promise.serial(funcArr);
         return promises;
     }
-
-    /**
-     * Scan WiFi networks.
-     *  
-     * @return {Promise} that:
-     * - resolves with the table array of WiFi networks detectable by the click board
-     * The result array element table format:
-     *      "ssid"      : {string}  - SSID (network name).
-     *      "bssid"     : {string}  - BSSID (access point’s MAC address), in 0123456789ab format.
-     *      "channel"   : {integer} - Channel number: 1-13 (2.4GHz).
-     *      "rssi"      : {integer} - RSSI (signal strength).
-     *      "open"      : {bool}    - Whether the network is open (password-free).
-     * - rejects if the operation failed
-     */
-    function scanWiFiNetworks() {
-
-        if (!_isInit) {
-            return Promise.reject("ESP init");
-        }
-
-        return Promise(function(resolve, reject) {
-            local scanRes = [];
-            _resp = "";
-            _msgWaitStart = time();
-            local req = "AT+CWLAP\r\n";
-            _parseATResponceCb = function() {
-                if (_resp.find("OK")) {
-                    local scanResRawArr = split(_resp, "\r\n");
-                    foreach (el in scanResRawArr) {
-                        local paramStartPos = el.find("(");
-                        local paramEndPos = el.find(")");
-                        local scanResEl = {"ssid"   : null,
-                                           "bssid"  : null,
-                                           "channel": null,
-                                           "rssi"   : null,
-                                           "open"   : null};
-                        if (paramStartPos && paramEndPos) {
-                            local networks = split(el.slice(paramStartPos + 1, paramEndPos), ",");
-                            foreach (ind, paramEl in networks) {
-                                switch(ind) {
-                                    case ESP32_PARAM_ORDER.ECN:
-                                        scanResEl.open = paramEl.tointeger() == ESP32_ECN_METHOD.OPEN ? true : false;
-                                        break;
-                                    case ESP32_PARAM_ORDER.SSID:
-                                        // remove "
-                                        scanResEl.ssid = _removeQuotMark(paramEl);
-                                        break;
-                                    case ESP32_PARAM_ORDER.RSSI:
-                                        scanResEl.rssi = paramEl.tointeger();
-                                        break;
-                                    case ESP32_PARAM_ORDER.MAC:
-                                        // remove : and "
-                                        local macAddrArr = split(paramEl, ":");
-                                        local resMac = "";
-                                        foreach (el in macAddrArr) {
-                                            resMac += el;
-                                        }
-                                        scanResEl.bssid = _removeQuotMark(resMac);
-                                        break;
-                                    case ESP32_PARAM_ORDER.CHANNEL:
-                                        scanResEl.channel = paramEl.tointeger();
-                                        break;
-                                    default:
-                                        ::error("Unknown index", "@{CLASS_NAME}");
-                                        break;
-                                }
-                            }
-                            // push if element not null
-                            if (scanResEl.bssid && scanResEl.channel && scanResEl.rssi) {
-                                scanRes.push(scanResEl);
-                            }
-                        }
-                    }
-                    resolve(scanRes);
-                } else {
-                    if ((time() - _msgWaitStart) > ESP32_MAX_MSG_WAIT_DELAY) {
-                        reject("Error scan WiFi");
-                    }
-                }
-            }.bindenv(this);
-            _serial.write(req);
-        }.bindenv(this));
-    }
-
-    // -------------------- PRIVATE METHODS -------------------- //
 
     /**
      * Remove "".
