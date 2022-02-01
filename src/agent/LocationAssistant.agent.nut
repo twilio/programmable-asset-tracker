@@ -81,7 +81,6 @@ class LocationAssistant {
         local gmapsLib = GoogleMaps(apiKey);
         return Promise(function(resolve, reject) {
             local geolocationData = null;
-            if 
             geolocationData = {
                 "considerIp" : "false",
                 "radioType"  : cellInfo.radioType,

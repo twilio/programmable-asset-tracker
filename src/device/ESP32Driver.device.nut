@@ -44,6 +44,13 @@ enum ESP32_PARAM_ORDER {
     CHANNEL = 4
 };
 
+// Enum for init steps 
+enum ESP32_INIT_STEP {
+    RESTORE = 0,
+    GMR = 1,
+    CWMODE = 2,
+    CWLAPOPT = 3
+};
 
 // Internal constants:
 // -------------------
@@ -204,97 +211,59 @@ class ESP32Driver {
                           _settings.flags,
                           _rxCb.bindenv(this));
 
-        local atRestoreReq = function() {
+        local reqCWMODE = format("AT+CWMODE=%d\r\n", ESP32_WIFI_MODE.STATION);
+        local reqPRINTMASK = format("AT+CWLAPOPT=0,%d\r\n", 
+                                    ESP32_WIFI_SCAN_PRINT_MASK.SHOW_SSID |
+                                    ESP32_WIFI_SCAN_PRINT_MASK.SHOW_MAC |
+                                    ESP32_WIFI_SCAN_PRINT_MASK.SHOW_CHANNEL |
+                                    ESP32_WIFI_SCAN_PRINT_MASK.SHOW_RSSI |
+                                    ESP32_WIFI_SCAN_PRINT_MASK.SHOW_ECN);
+        local reqArr = [{"reqStr" : "AT+RESTORE\r\n", "rejStr" : "Error AT+RESTORE command"},
+                        {"reqStr" : "AT+GMR\r\n", "rejStr" : "Error check version"},
+                        {"reqStr" : reqCWMODE, "rejStr" : "Error set WiFi mode"},
+                        {"reqStr" : reqPRINTMASK, "rejStr" : "Error set WiFi scan print mask info"}];
+
+        local atFuncReq = function(reqNum) {
             return function() {
                 return Promise(function(resolve, reject) {
                     _resp = "";
                     _msgWaitStart = time();
-                    local req = "AT+RESTORE\r\n";
+                    local req = reqArr[reqNum].reqStr;
                     _parseATResponceCb = function() {
-                        if (_resp.find("OK")  && _resp.find("ready")) {
+                        local resCheck = null;
+                        if (reqNum == ESP32_INIT_STEP.RESTORE) {
+                            resCheck = (_resp.find("OK")  && _resp.find("ready"));
+                        } else {
+                            resCheck = _resp.find("OK");
+                        }
+                        if (resCheck) {
+                            if (reqNum == ESP32_INIT_STEP.GMR) {
+                                local respStrArr = split(_resp, "\r\n");
+                                ::info("ESP AT software:", "@{CLASS_NAME}");
+                                foreach (ind, el in respStrArr) {
+                                    if (ind != 0 && ind != (respStrArr.len() - 1)) {
+                                        ::info(el, "@{CLASS_NAME}");
+                                    }
+                                }    
+                            }
+                            if (reqNum == ESP32_INIT_STEP.CWLAPOPT) {
+                                _isInit = true;    
+                            }
                             resolve("OK");
                         } else {
                             if ((time() - _msgWaitStart) > ESP32_MAX_READY_WAIT_DELAY) {
-                                reject("Error AT+RESTORE command");
+                                reject(reqArr[reqNum].rejStr);
                             }
                         }
                     }.bindenv(this);
                     _serial.write(req);
-                }.bindenv(this));
+                }.bindenv(this));    
             }.bindenv(this);
         }
 
-        local atVersionReq = function() {
-            return function() {
-                return Promise(function(resolve, reject) {
-                    _resp = "";
-                    local req = "AT+GMR\r\n";
-                    _parseATResponceCb = function() {
-                        if (_resp.find("OK")) {
-                            local respStrArr = split(_resp, "\r\n");
-                            ::info("ESP AT software:", "@{CLASS_NAME}");
-                            foreach (ind, el in respStrArr) {
-                                if (ind != 0 && ind != (respStrArr.len() - 1)) {
-                                    ::info(el, "@{CLASS_NAME}");
-                                }
-                            }
-                            resolve("OK");
-                        } else {
-                            reject("Error check version");
-                        }
-                    }.bindenv(this);
-                    _serial.write(req);
-                    imp.sleep(3);
-                }.bindenv(this));
-            }.bindenv(this);
+        foreach (id, el in reqArr) {
+            funcArr.push(atFuncReq(id));
         }
-
-        local atSetModeReq = function() {
-            return function() {
-                return Promise(function(resolve, reject) {
-                    _resp = "";
-                    local req = format("AT+CWMODE=%d\r\n", ESP32_WIFI_MODE.STATION);
-                    _parseATResponceCb = function() {
-                        if (_resp.find("OK")) {
-                            resolve("OK");
-                        } else {
-                            reject("Error set WiFi mode");
-                        }
-                    }.bindenv(this);
-                    _serial.write(req);
-                    imp.sleep(3);
-                }.bindenv(this));
-            }.bindenv(this);
-        }
-
-        local atConfigureScanInfoReq = function() {
-            return function() {
-                return Promise(function(resolve, reject) {
-                    _resp = "";
-                    local req = format("AT+CWLAPOPT=0,%d\r\n", 
-                                       ESP32_WIFI_SCAN_PRINT_MASK.SHOW_SSID |
-                                       ESP32_WIFI_SCAN_PRINT_MASK.SHOW_MAC |
-                                       ESP32_WIFI_SCAN_PRINT_MASK.SHOW_CHANNEL |
-                                       ESP32_WIFI_SCAN_PRINT_MASK.SHOW_RSSI |
-                                       ESP32_WIFI_SCAN_PRINT_MASK.SHOW_ECN);
-                    _parseATResponceCb = function() {
-                        if (_resp.find("OK")) {
-                            _isInit = true;
-                            resolve("OK");
-                        } else {
-                            reject("Error set WiFi scan print mask info");
-                        }
-                    }.bindenv(this);
-                    _serial.write(req);
-                    imp.sleep(3);
-                }.bindenv(this));
-            }.bindenv(this);
-        }
-
-        funcArr.push(atRestoreReq());
-        funcArr.push(atVersionReq());
-        funcArr.push(atSetModeReq());
-        funcArr.push(atConfigureScanInfoReq());
 
         local promises = Promise.serial(funcArr);
         return promises;
@@ -366,7 +335,7 @@ class ESP32Driver {
                                         break;
                                 }
                             }
-                            // pusf if element not null
+                            // push if element not null
                             if (scanResEl.bssid && scanResEl.channel && scanResEl.rssi) {
                                 scanRes.push(scanResEl);
                             }
