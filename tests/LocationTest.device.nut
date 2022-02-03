@@ -78,28 +78,24 @@ function initReplayMessenger() {
  */
  function getLocation() {
 
-    // Obtain and log location by cell info
-    ld._getLocationCellTowers().then(function(loc){
-        ::info("Location cell tower:");
-        foreach (key, value in loc) {
-            ::info(key + ":" + value);
-        };
-    });
-
     // Obtain and log location by GNSS
-    ld._getLocationGNSS().then(function(loc){
-        ::info("Location GNSS:");
-        foreach (key, value in loc) {
-            ::info(key + ":" + value);
-        };
-    });
+    ld._getLocationGNSS()
+    .finally(function(res){
+        if(typeof res == "table") {
+            ::info("Location GNSS:");
+            foreach (key, value in loc) {
+                ::info(key + ":" + value);
+            }
+        }
 
-    // Obtain and log location by WiFi info
-    ld._getLocationWiFi().then(function(loc){
-        ::info("Location WiFi:");
-        foreach (key, value in loc) {
-            ::info(key + ":" + value);
-        };
+        // Obtain and log location by cell info and WiFi
+        ld._getLocationCellTowersAndWiFi()
+        .then(function(loc){
+            ::info("Location cell tower and wifi:");
+            foreach (key, value in loc) {
+                ::info(key + ":" + value);
+            }
+        });
     });
 
     // Obtain and log location by BLE beacons - TBD

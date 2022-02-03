@@ -4,8 +4,7 @@
 enum APP_RM_MSG_NAME {
     DATA = "data",
     GNSS_ASSIST = "gnssAssist",
-    LOCATION_CELL = "locationCell",
-    LOCATION_WIFI = "locationWiFi"
+    LOCATION_CELL_WIFI = "locationCellAndWiFi"
 }
 
 // Init latitude value (North Pole)

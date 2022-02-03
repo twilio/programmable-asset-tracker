@@ -52,6 +52,12 @@ enum ESP32_INIT_STEP {
     CWLAPOPT = 3
 };
 
+// Enum power state
+enum ESP32_POWER {
+    OFF = 0,
+    ON = 1
+};
+
 // Internal constants:
 // -------------------
 // Default baudrate
@@ -99,6 +105,9 @@ class ESP32Driver {
 
     // init flag
     _isInit = null;
+
+    // Reject timer
+    _rejTimer = null;
 
     /**
      * Constructor for ESP32 Driver Class.
@@ -160,11 +169,11 @@ class ESP32Driver {
         _devReady = false;
         // enable 3.3V to microBUS
         if (_enable3VPin) {
-            // power off
-            _enable3VPin.configure(DIGITAL_OUT, 0);
+            // configure (power off)
+            _enable3VPin.configure(DIGITAL_OUT, ESP32_POWER.OFF);
             imp.sleep(0.1);
             // power on
-            _enable3VPin.configure(DIGITAL_OUT, 1);
+            _enable3VPin.write(ESP32_POWER.ON);
         } else {
             throw "Hardware pin object is null.";
         }
@@ -201,6 +210,12 @@ class ESP32Driver {
                 _resp = "";
                 _msgWaitStart = time();
                 local req = "AT+CWLAP\r\n";
+                // create reject timer
+                if (_rejTimer == null) {
+                    _rejTimer = imp.wakeup(ESP32_MAX_MSG_WAIT_DELAY, function() {
+                        reject("Error scan WiFi");    
+                    }.bindenv(this));
+                }
                 _parseATResponceCb = function() {
                     if (_resp.find("OK")) {
                         local scanResRawArr = split(_resp, "\r\n");
@@ -249,11 +264,11 @@ class ESP32Driver {
                                 }
                             }
                         }
-                        resolve(scanRes);
-                    } else {
-                        if ((time() - _msgWaitStart) > ESP32_MAX_MSG_WAIT_DELAY) {
-                            reject("Error scan WiFi");
+                        if (_rejTimer) {
+                            imp.cancelwakeup(_rejTimer);
+                            _rejTimer = null;
                         }
+                        resolve(scanRes);
                     }
                 }.bindenv(this);
                 _serial.write(req);
@@ -275,11 +290,11 @@ class ESP32Driver {
      */
     function _init(repeatInit = false) {
         local funcArr = array();
-
+        // init only if device is ready
         if (!_devReady) {
             return Promise.reject("ESP not ready");
         }
-
+        // clear init flag on demand
         if (repeatInit) {
             _isInit = false;
         }
@@ -314,6 +329,11 @@ class ESP32Driver {
                     _resp = "";
                     _msgWaitStart = time();
                     local req = reqArr[reqNum].reqStr;
+                    if (_rejTimer == null) {
+                        _rejTimer = imp.wakeup(ESP32_MAX_MSG_WAIT_DELAY, function() {
+                            reject(reqArr[reqNum].rejStr);
+                        }.bindenv(this));
+                    }
                     _parseATResponceCb = function() {
                         local resCheck = null;
                         if (reqNum == ESP32_INIT_STEP.RESTORE) {
@@ -336,11 +356,11 @@ class ESP32Driver {
                             if (reqNum == ESP32_INIT_STEP.CWLAPOPT) {
                                 _isInit = true;    
                             }
-                            resolve("OK");
-                        } else {
-                            if ((time() - _msgWaitStart) > ESP32_MAX_READY_WAIT_DELAY) {
-                                reject(reqArr[reqNum].rejStr);
+                            if (_rejTimer) {
+                                imp.cancelwakeup(_rejTimer);
+                                _rejTimer = null;
                             }
+                            resolve("OK");
                         }
                     }.bindenv(this);
                     _serial.write(req);

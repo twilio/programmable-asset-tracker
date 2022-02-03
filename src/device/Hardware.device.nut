@@ -8,8 +8,7 @@ HW_ACCEL_I2C <- hardware.i2cLM;
 HW_ACCEL_INT_PIN <- hardware.pinW;
 
 // UART port used for the u-blox module
-// TODO: Choose another uart port
-HW_UBLOX_UART <- hardware.uartXEFGH;
+HW_UBLOX_UART <- hardware.uartPQRS;
 
 // UART port used for logging (if enabled)
 HW_LOGGING_UART <- hardware.uartYABCD;

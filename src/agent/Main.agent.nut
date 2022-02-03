@@ -38,8 +38,7 @@ class Application {
         _msngr = Messenger();
         _msngr.on(APP_RM_MSG_NAME.DATA, _onData.bindenv(this));
         _msngr.on(APP_RM_MSG_NAME.GNSS_ASSIST, _onGnssAssist.bindenv(this));
-        _msngr.on(APP_RM_MSG_NAME.LOCATION_CELL, _onLocationCell.bindenv(this));
-        _msngr.on(APP_RM_MSG_NAME.LOCATION_WIFI, _onLocationWiFi.bindenv(this));
+        _msngr.on(APP_RM_MSG_NAME.LOCATION_CELL_WIFI, _onLocationCellAndWiFi.bindenv(this));
     }
 
     /**
@@ -76,35 +75,17 @@ class Application {
     }
 
     /**
-     * Handler for Location By Cell Info request received from Imp-Device
+     * Handler for Location By Cell Info and WiFi request received from Imp-Device
      */
-    function _onLocationCell(msg, customAck) {
+    function _onLocationCellAndWiFi(msg, customAck) {
         local ack = customAck();
 
-        LocationAssistant.getLocationByCellInfo(msg.data)
+        LocationAssistant.getLocationByCellInfoAndWiFi(msg.data)
         .then(function(location) {
             ::info("Location obtained using Google Geolocation API");
             ack(location);
         }.bindenv(this), function(err) {
             ::error("Error during location obtaining using Google Geolocation API: " + err);
-            // Send `null` in reply to the request
-            ack(null);
-        }.bindenv(this));
-    }
-
-        /**
-     * Handler for Location By WiFi networks Info request received from Imp-Device
-     */
-    function _onLocationWiFi(msg, customAck) {
-        local ack = customAck();
-
-        LocationAssistant.getLocationByWiFiInfo(msg.data)
-        .then(function(location) {
-            ::info("Location obtained using Google Geolocation API");
-            ack(location);
-        }.bindenv(this), function(err) {
-            ::error("Error during location obtaining using Google Geolocation API: " + err);
-            // Send `null` in reply to the request
             ack(null);
         }.bindenv(this));
     }
