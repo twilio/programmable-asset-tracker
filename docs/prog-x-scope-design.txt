@@ -360,7 +360,7 @@ JSON format:
     "geofence": {                 // circle geofence (center, radius) TBD
       "enabled": true/false,        // true - geofence is enabled
                                     // lng, lat, radius - can be updated together only
-      "lng": <number>,              // center longitude, in degrees, [-90..90]
+      "lng": <number>,              // center longitude, in degrees, [-180..180]
       "lat": <number>,              // center latitude, in degrees, [-90..90]
       "radius": <number>            // radius, in meters, [EARTH_RADIUS..0]
     }
