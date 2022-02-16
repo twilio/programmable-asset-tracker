@@ -33,6 +33,7 @@
 @include once "CustomReplayMessenger.device.nut"
 @include once "bg96_gps.device.lib.nut"
 @include once "BG96CellInfo.device.nut"
+@include once "ESP32Driver.device.nut"
 @include once "AccelerometerDriver.device.nut"
 @include once "MotionMonitor.device.nut"
 @include once "DataProcessor.device.nut"
@@ -59,6 +60,9 @@ const APP_CM_MAX_CONNECTED_TIME = 300.0;
 const APP_RM_MSG_SENDING_MAX_RATE = 5;
 // The maximum number of messages to queue at any given time when replaying
 const APP_RM_MSG_RESEND_LIMIT = 5;
+
+// Send buffer size, in bytes
+const APP_SEND_BUFFER_SIZE = 20480;
 
 class Application {
     _locationDriver = null;
@@ -126,6 +130,8 @@ class Application {
      * Create and intialize Connection Manager
      */
     function _initConnectionManager() {
+        imp.setsendbuffersize(APP_SEND_BUFFER_SIZE);
+
         // Customized Connection Manager is used
         local cmConfig = {
 @if LED_INDICATION || !defined(LED_INDICATION)

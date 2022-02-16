@@ -95,6 +95,8 @@ class BG96CellInfo {
         data.radioType <- "gsm";
         data.cellTowers <- towers;
 
+        ::debug("Towers scanned: " + towers.len(), "@{CLASS_NAME}");
+
         return data;
     }
 

@@ -35,21 +35,13 @@ enum ESP32_ECN_METHOD {
     WPA2_WPA3_PSK = 7
 };
 
-// Enum for WiFi network parameter order 
+// Enum for WiFi network parameters order
 enum ESP32_PARAM_ORDER {
     ECN = 0,
     SSID = 1,
     RSSI = 2,
     MAC = 3,
     CHANNEL = 4
-};
-
-// Enum for init steps 
-enum ESP32_INIT_STEP {
-    RESTORE = 0,
-    GMR = 1,
-    CWMODE = 2,
-    CWLAPOPT = 3
 };
 
 // Enum power state
@@ -71,50 +63,36 @@ const ESP32_DEFAULT_STOP_BITS = 1;
 // Default control flags (NO_CTSRTS)
 const ESP32_DEFAULT_FLAGS = 4;
 // Default RX FIFO size
-const ESP32_DEFAULT_RX_FIFO_SZ = 800;
-// Max ready wait time, in seconds
-const ESP32_MAX_READY_WAIT_DELAY = 8;
-// Max message response wait time, in seconds
-const ESP32_MAX_MSG_WAIT_DELAY = 8;
+const ESP32_DEFAULT_RX_FIFO_SZ = 4096;
+// Maximum time allowed for waiting for data, in seconds
+const ESP32_WAIT_DATA_TIMEOUT = 8;
+// Maximum amount of data expected to be received, in bytes
+const ESP32_MAX_DATA_LEN = 4096;
+// Automatic switch off delay, in seconds
+const ESP32_SWITCH_OFF_DELAY = 10;
 
 
 // ESP32 Driver class.
-// Ability to work with WiFi networks and BLE.
+// Ability to work with WiFi networks and BLE
 class ESP32Driver {
-
-    // enable load switch pin
-    _enable3VPin = null;
-
-    // uart object
+    // Power switch pin
+    _switchPin = null;
+    // UART object
     _serial = null;
-
-    // all settings
+    // All settings
     _settings = null;
-
-    // parse AT command response callback
-    _parseATResponceCb = null;
-
-    // response string
-    _resp = null;
-
-    // time stamp on start
-    _msgWaitStart = null;
-
-    // ready flag (init success, device ready)
-    _devReady = null;
-
-    // init flag
-    _isInit = null;
-
-    // Reject timer
-    _rejTimer = null;
+    // True if the ESP32 board is switched ON, false otherwise
+    _switchedOn = false;
+    // True if the ESP32 board is initialized, false otherwise
+    _initialized = false;
+    // Timer for automatic switch-off of the ESP32 board when idle
+    _switchOffTimer = null;
 
     /**
-     * Constructor for ESP32 Driver Class.
-     * (constructor wait the ready message from ESP, max. wait - ESP32_MAX_READY_WAIT_DELAY)
+     * Constructor for ESP32 Driver Class
      *
-     * @param {object} enPin - Hardware pin object connected to load switch (1 - enable 3.3V to microBUS)
-     * @param {object} uart - UART object connected to click board on microBUS
+     * @param {object} switchPin - Hardware pin object connected to load switch
+     * @param {object} uart - UART object connected to a ESP32 board
      * @param {table} settings - Connection settings.
      *      Optional, all settings have defaults.
      *      If a setting is missed, it is reset to default.
@@ -133,66 +111,32 @@ class ESP32Driver {
      *                                          Default: ESP32_DEFAULT_RX_FIFO_SZ
      * An exception will be thrown in case of settings or UART configuration error.
      */
-    constructor(enPin, uart, settings = {}) {
-        _enable3VPin = enPin;
+    constructor(switchPin, uart, settings = {}) {
+        _switchPin = switchPin;
         _serial = uart;
 
-        // Set default settings
         _settings = {
-            "baudRate"  : ESP32_DEFAULT_BAUDRATE,
-            "wordSize"  : ESP32_DEFAULT_WORD_SIZE,
-            "parity"    : ESP32_DEFAULT_PARITY,
-            "stopBits"  : ESP32_DEFAULT_STOP_BITS,
-            "flags"     : ESP32_DEFAULT_FLAGS,
-            "rxFifoSize": ESP32_DEFAULT_RX_FIFO_SZ
+            "baudRate"  : ("baudRate" in settings)   ? settings.baudRate   : ESP32_DEFAULT_BAUDRATE,
+            "wordSize"  : ("wordSize" in settings)   ? settings.wordSize   : ESP32_DEFAULT_WORD_SIZE,
+            "parity"    : ("parity" in settings)     ? settings.parity     : ESP32_DEFAULT_PARITY,
+            "stopBits"  : ("stopBits" in settings)   ? settings.stopBits   : ESP32_DEFAULT_STOP_BITS,
+            "flags"     : ("flags" in settings)      ? settings.flags      : ESP32_DEFAULT_FLAGS,
+            "rxFifoSize": ("rxFifoSize" in settings) ? settings.rxFifoSize : ESP32_DEFAULT_RX_FIFO_SZ
         };
 
-        if (settings != null) {
-            _checkSettings(settings);
-        }
-
-        // configure UART
-        if (_serial) {
-            _serial.setrxfifosize(_settings.rxFifoSize);
-            _serial.configure(_settings.baudRate, 
-                              _settings.wordSize, 
-                              _settings.parity, 
-                              _settings.stopBits, 
-                              _settings.flags);
-        } else {
-            throw "UART object is null.";
-        }
-
-        _isInit = false;
-        _resp = "";
-        _msgWaitStart = time();
-        _devReady = false;
-        // enable 3.3V to microBUS
-        if (_enable3VPin) {
-            // configure (power off)
-            _enable3VPin.configure(DIGITAL_OUT, ESP32_POWER.OFF);
-            imp.sleep(0.1);
-            // power on
-            _enable3VPin.write(ESP32_POWER.ON);
-        } else {
-            throw "Hardware pin object is null.";
-        }
-        // wait ready
-        while((time() - _msgWaitStart < ESP32_MAX_READY_WAIT_DELAY)) {
-            if (_waitReady()) {
-                _devReady = true;
-                break;
-            }
-            imp.sleep(0.5);
-        }
-    }    
+        // Increase the RX FIFO size to make sure all data from ESP32 will fit into the buffer
+        _serial.setrxfifosize(_settings.rxFifoSize);
+        // Keep the ESP32 board switched off
+        _switchOff();
+    }
 
     /**
      * Scan WiFi networks.
-     *  
+     * NOTE: Parallel requests are not allowed
+     *
      * @return {Promise} that:
-     * - resolves with the table array of WiFi networks detectable by the click board
-     * The result array element table format:
+     * - resolves with an array of WiFi networks scanned if the operation succeeded
+     *   Each element of the array is a table with the following fields:
      *      "ssid"      : {string}  - SSID (network name).
      *      "bssid"     : {string}  - BSSID (access point’s MAC address), in 0123456789ab format.
      *      "channel"   : {integer} - Channel number: 1-13 (2.4GHz).
@@ -201,301 +145,311 @@ class ESP32Driver {
      * - rejects if the operation failed
      */
     function scanWiFiNetworks() {
-        ::debug("Scan WiFi networks", "@{CLASS_NAME}");
+        _switchOffTimer && imp.cancelwakeup(_switchOffTimer);
+
         return _init()
-        .then(function(initStatus) {
-            ::debug("Init status: " + initStatus, "@{CLASS_NAME}");
-            return Promise(function(resolve, reject) {
-                local scanRes = [];
-                _resp = "";
-                _msgWaitStart = time();
-                local req = "AT+CWLAP\r\n";
-                // create reject timer
-                if (_rejTimer == null) {
-                    _rejTimer = imp.wakeup(ESP32_MAX_MSG_WAIT_DELAY, function() {
-                        reject("Error scan WiFi");    
-                    }.bindenv(this));
-                }
-                _parseATResponceCb = function() {
-                    if (_resp.find("OK")) {
-                        local scanResRawArr = split(_resp, "\r\n");
-                        foreach (el in scanResRawArr) {
-                            local paramStartPos = el.find("(");
-                            local paramEndPos = el.find(")");
-                            local scanResEl = {"ssid"   : null,
-                                               "bssid"  : null,
-                                               "channel": null,
-                                               "rssi"   : null,
-                                               "open"   : null};
-                            if (paramStartPos && paramEndPos) {
-                                local networks = split(el.slice(paramStartPos + 1, paramEndPos), ",");
-                                foreach (ind, paramEl in networks) {
-                                    switch(ind) {
-                                        case ESP32_PARAM_ORDER.ECN:
-                                            scanResEl.open = paramEl.tointeger() == ESP32_ECN_METHOD.OPEN ? true : false;
-                                            break;
-                                        case ESP32_PARAM_ORDER.SSID:
-                                            // remove "
-                                            scanResEl.ssid = _removeQuotMark(paramEl);
-                                            break;
-                                        case ESP32_PARAM_ORDER.RSSI:
-                                            scanResEl.rssi = paramEl.tointeger();
-                                            break;
-                                        case ESP32_PARAM_ORDER.MAC:
-                                            // remove : and "
-                                            local macAddrArr = split(paramEl, ":");
-                                            local resMac = "";
-                                            foreach (el in macAddrArr) {
-                                                resMac += el;
-                                            }
-                                            scanResEl.bssid = _removeQuotMark(resMac);
-                                            break;
-                                        case ESP32_PARAM_ORDER.CHANNEL:
-                                            scanResEl.channel = paramEl.tointeger();
-                                            break;
-                                        default:
-                                            ::error("Unknown index", "@{CLASS_NAME}");
-                                            break;
-                                    }
-                                }
-                                // push if element not null
-                                if (scanResEl.bssid && scanResEl.channel && scanResEl.rssi) {
-                                    scanRes.push(scanResEl);
-                                }
-                            }
-                        }
-                        if (_rejTimer) {
-                            imp.cancelwakeup(_rejTimer);
-                            _rejTimer = null;
-                        }
-                        resolve(scanRes);
-                    }
-                }.bindenv(this);
-                _serial.write(req);
-            }.bindenv(this));
+        .then(function(_) {
+            ::debug("Scanning WiFi networks..", "@{CLASS_NAME}");
+
+            local okValidator = @(data) data.find("\r\nOK\r\n") != null;
+            // Send "List Available APs" cmd and parse the result
+            return _communicate("AT+CWLAP", okValidator, _parseWifiNetworks, false);
+        }.bindenv(this))
+        .then(function(wifis) {
+            ::debug("Scanning of WiFi networks finished successfully. Scanned networks: " + wifis.len(), "@{CLASS_NAME}");
+            _switchOffTimer = imp.wakeup(ESP32_SWITCH_OFF_DELAY, _switchOff.bindenv(this));
+            return wifis;
+        }.bindenv(this), function(err) {
+            _switchOffTimer = imp.wakeup(ESP32_SWITCH_OFF_DELAY, _switchOff.bindenv(this));
+            throw err;
         }.bindenv(this));
     }
 
-    // -------------------- PRIVATE METHODS -------------------- //
-
     /**
      * Init and configure ESP32.
-     *  
-     * @param {bool} repeatInit - Clear last success init flag, and repeat init procedure.
-     *      Optional, default value is false.
      *
      * @return {Promise} that:
-     * - resolves with the init status of the click board
+     * - resolves if the operation succeeded
      * - rejects if the operation failed
      */
-    function _init(repeatInit = false) {
-        local funcArr = array();
-        // init only if device is ready
-        if (!_devReady) {
-            return Promise.reject("ESP not ready");
-        }
-        // clear init flag on demand
-        if (repeatInit) {
-            _isInit = false;
+    function _init() {
+        // Delay between powering OFF and ON to restart the ESP32 board, in seconds
+        const ESP32_RESTART_DURATION = 1.0;
+
+        if (_initialized) {
+            return Promise.resolve(null);
         }
 
-        if (_isInit) {
-            ::debug("Already init", "@{CLASS_NAME}");
-            return Promise.resolve("OK");
+        ::debug("Starting initialization", "@{CLASS_NAME}");
+
+        // Just in case, check if it's already switched ON and switch OFF to start the initialization process from scratch
+        if (_switchedOn) {
+            _switchOff();
+            imp.sleep(ESP32_RESTART_DURATION);
         }
 
-        _serial.configure(_settings.baudRate, 
-                          _settings.wordSize, 
-                          _settings.parity, 
-                          _settings.stopBits, 
-                          _settings.flags,
-                          _rxCb.bindenv(this));
+        _switchOn();
 
-        local reqCWMODE = format("AT+CWMODE=%d\r\n", ESP32_WIFI_MODE.STATION);
-        local reqPRINTMASK = format("AT+CWLAPOPT=0,%d\r\n", 
-                                    ESP32_WIFI_SCAN_PRINT_MASK.SHOW_SSID |
-                                    ESP32_WIFI_SCAN_PRINT_MASK.SHOW_MAC |
-                                    ESP32_WIFI_SCAN_PRINT_MASK.SHOW_CHANNEL |
-                                    ESP32_WIFI_SCAN_PRINT_MASK.SHOW_RSSI |
-                                    ESP32_WIFI_SCAN_PRINT_MASK.SHOW_ECN);
-        local reqArr = [{"reqStr" : "AT+RESTORE\r\n",   "rejStr" : "Error AT+RESTORE command"},
-                        {"reqStr" : "AT+GMR\r\n",       "rejStr" : "Error check version"},
-                        {"reqStr" : reqCWMODE,          "rejStr" : "Error set WiFi mode"},
-                        {"reqStr" : reqPRINTMASK,       "rejStr" : "Error set WiFi scan print mask info"}];
+        local readyMsgValidator   = @(data) data.find("\r\nready\r\n") != null;
+        local restoreCmdValidator = @(data) data.find("\r\nOK\r\n\r\nready\r\n") != null;
+        local okValidator         = @(data) data.find("\r\nOK\r\n") != null;
 
-        local atFuncReq = function(reqNum) {
-            return function() {
-                return Promise(function(resolve, reject) {
-                    _resp = "";
-                    _msgWaitStart = time();
-                    local req = reqArr[reqNum].reqStr;
-                    if (_rejTimer == null) {
-                        _rejTimer = imp.wakeup(ESP32_MAX_MSG_WAIT_DELAY, function() {
-                            reject(reqArr[reqNum].rejStr);
-                        }.bindenv(this));
-                    }
-                    _parseATResponceCb = function() {
-                        local resCheck = null;
-                        if (reqNum == ESP32_INIT_STEP.RESTORE) {
-                            resCheck = (_resp.find("OK")  && _resp.find("ready"));
-                        } else {
-                            resCheck = _resp.find("OK");
-                        }
-                        if (resCheck) {
-                            // print version info
-                            if (reqNum == ESP32_INIT_STEP.GMR) {
-                                local respStrArr = split(_resp, "\r\n");
-                                ::info("ESP AT software:", "@{CLASS_NAME}");
-                                foreach (ind, el in respStrArr) {
-                                    if (ind != 0 && ind != (respStrArr.len() - 1)) {
-                                        ::info(el, "@{CLASS_NAME}");
-                                    }
-                                }    
-                            }
-                            // init flag -> true
-                            if (reqNum == ESP32_INIT_STEP.CWLAPOPT) {
-                                _isInit = true;    
-                            }
-                            if (_rejTimer) {
-                                imp.cancelwakeup(_rejTimer);
-                                _rejTimer = null;
-                            }
-                            resolve("OK");
-                        }
-                    }.bindenv(this);
-                    _serial.write(req);
-                }.bindenv(this));    
-            }.bindenv(this);
-        }
+        local cmdSetPrintMask = format("AT+CWLAPOPT=0,%d",
+                                       ESP32_WIFI_SCAN_PRINT_MASK.SHOW_SSID |
+                                       ESP32_WIFI_SCAN_PRINT_MASK.SHOW_MAC |
+                                       ESP32_WIFI_SCAN_PRINT_MASK.SHOW_CHANNEL |
+                                       ESP32_WIFI_SCAN_PRINT_MASK.SHOW_RSSI |
+                                       ESP32_WIFI_SCAN_PRINT_MASK.SHOW_ECN);
 
-        foreach (id, el in reqArr) {
-            funcArr.push(atFuncReq(id));
-        }
+        // Functions that return promises which will be executed serially
+        local promiseFuncs = [
+            // Wait for "ready" message
+            _communicate(null, readyMsgValidator),
+            // Restore Factory Default Settings
+            _communicate("AT+RESTORE", restoreCmdValidator),
+            // Check Version Information
+            _communicate("AT+GMR", okValidator, _logVersionInfo),
+            // Set the Wi-Fi Mode to "Station"
+            _communicate(format("AT+CWMODE=%d", ESP32_WIFI_MODE.STATION), okValidator),
+            // Set the Configuration for the Command AT+CWLAP
+            _communicate(cmdSetPrintMask, okValidator)
+        ];
 
-        local promises = Promise.serial(funcArr);
-        return promises;
+        return Promise.serial(promiseFuncs)
+        .then(function(_) {
+            ::debug("Initialization complete", "@{CLASS_NAME}");
+            _initialized = true;
+        }.bindenv(this), function(err) {
+            throw "Initialization failure: " + err;
+        }.bindenv(this));
     }
 
     /**
-     * Remove "".
-     */
-    function _removeQuotMark(paramStr) {
-        local paramLen = paramStr.len();
-        if (paramLen > 2) {// "param str" -> param str
-            return paramStr.slice(1, paramLen - 1);
-        }
-
-        return "";
-    } 
-
-    /**
-     * Wait ready of ESP.
-     */
-    function _waitReady() {
-        local data = _serial.read();
-        // read until FIFO not empty and accumulate to result string
-        while (data != -1) {
-            _resp += data.tochar();
-            data = _serial.read();
-        }
-
-        return _resp.find("ready");
-    }
-
-    /**
-     * Callback function on data received.
-     */
-    function _rxCb() {
-        local data = _serial.read();
-        // read until FIFO not empty and accumulate to result string
-        while (data != -1) {
-            _resp += data.tochar();
-            data = _serial.read();
-        }
-
-        if (_isFunction(_parseATResponceCb)) {
-            _parseATResponceCb();
-        }
-    }
-
-    /**
-     * Check object for callback function set method.
-     * @param {function} f - Callback function.
-     * @return {boolean} true if argument is function and not null.
-     */
-    function _isFunction(f) {
-        return f && typeof f == "function";
-    }
-
-    /**
-     * Check settings element.
-     * Returns the specified value if the check fails.
+     * Communicate with the ESP32 board: send a command (if passed) and wait for a reply
      *
-     * @param {integer} val - Value of settings element.
-     * @param {integer} defVal - Default value of settings element.
+     * @param {string | null} cmd - String with a command to send or null
+     * @param {function} validator - Function that checks if a reply has been fully received
+     * @param {function} [replyHandler=null] - Handler that is called to process the reply
+     * @param {boolean} [wrapInAFunc=true] - True to wrap the Promise to be returned in an additional function with no params.
+     *                                       This optionis useful for, e.g., serial execution of a list of promises (Promise.serial)
      *
-     * @return {integer} If success - value, else - default value.
+     * @return {Promise | function}: Promise or a function with no params that returns this promise. The promise:
+     * - resolves with the reply (pre-processed if a reply handler specified) if the operation succeeded
+     * - rejects with an error if the operation failed
      */
-    function _checkVal(val, defVal) {
-        if (typeof val == "integer") {
-                return val;
-        } else {
-            ::error("Incorrect type of settings parameter", "@{CLASS_NAME}");
+    function _communicate(cmd, validator, replyHandler = null, wrapInAFunc = true) {
+        if (wrapInAFunc) {
+            return (@() _communicate(cmd, validator, replyHandler, false)).bindenv(this);
         }
 
-        return defVal;
+        if (cmd) {
+            ::debug(format("Sending %s cmd..", cmd), "@{CLASS_NAME}");
+            _serial.write(cmd + "\r\n");
+        }
+
+        return _waitForData(validator)
+        .then(function(reply) {
+            cmd && ::debug(format("Reply for %s cmd received", cmd), "@{CLASS_NAME}");
+            return replyHandler ? replyHandler(reply) : reply;
+        }.bindenv(this));
     }
 
     /**
-     *  Check and set settings.
-     *  Sets default values for incorrect settings.
-     *
-     *   @param {table} settings - Table with the settings.
-     *        Optional, all settings have defaults.
-     *        The settings:
-     *              "baudRate"  : {integer} - UART baudrate, in baud per second.
-     *                                          Default: ESP32_DEFAULT_BAUDRATE
-     *              "wordSize"  : {integer} - Word size, in bits.
-     *                                          Default: ESP32_DEFAULT_WORD_SIZE
-     *              "parity"    : {integer} - Parity.
-     *                                          Default: ESP32_DEFAULT_PARITY
-     *              "stopBits"  : {integer} - Count of stop bits.
-     *                                          Default: ESP32_DEFAULT_STOP_BITS
-     *              "flags"     : {integer} - Control flags.
-     *                                          Default: ESP32_DEFAULT_FLAGS
-     *              "rxFifoSize": {integer} - The new size of the receive FIFO, in bytes.
-     *                                          Default: ESP32_DEFAULT_RX_FIFO_SZ
+     * Switch ON the ESP32 board and configure the UART port
      */
-    function _checkSettings(settings) {
-        foreach (key, value in settings) {
-            if (typeof key == "string") {
-                switch(key) {
-                    case "baudRate":
-                        _settings.baudRate = _checkVal(value, ESP32_DEFAULT_BAUDRATE);
-                        break;
-                    case "wordSize":
-                        _settings.wordSize = _checkVal(value, ESP32_DEFAULT_WORD_SIZE);
-                        break;
-                    case "parity":
-                        _settings.parity = _checkVal(value, ESP32_DEFAULT_PARITY);
-                        break;
-                    case "stopBits":
-                        _settings.stopBits = _checkVal(value, ESP32_DEFAULT_STOP_BITS);
-                        break;
-                    case "flags":
-                        _settings.flags = _checkVal(value, ESP32_DEFAULT_FLAGS);
-                        break;
-                    case "rxFifoSize":
-                        _settings.rxFifoSize = _checkVal(value, ESP32_DEFAULT_RX_FIFO_SZ);
-                        break;
-                    default:
-                        ::error("Incorrect key name", "@{CLASS_NAME}");
-                        break;
+    function _switchOn() {
+        _serial.configure(_settings.baudRate,
+                          _settings.wordSize,
+                          _settings.parity,
+                          _settings.stopBits,
+                          _settings.flags);
+        _switchPin.configure(DIGITAL_OUT, ESP32_POWER.ON);
+        _switchedOn = true;
+
+        ::debug("ESP32 board has been switched ON", "@{CLASS_NAME}");
+    }
+
+    /**
+     * Switch OFF the ESP32 board and disable the UART port
+     */
+    function _switchOff() {
+        _switchPin.disable();
+        _serial.disable();
+        _switchedOn = false;
+        _initialized = false;
+
+        ::debug("ESP32 board has been switched OFF", "@{CLASS_NAME}");
+    }
+
+    /**
+     * Parse the data returned by the AT+CWLAP (List Available APs) command
+     *
+     * @param {string} data - String with a reply to the AT+GMR command
+     *
+     * @return {array} of parsed WiFi networks
+     *  Each element of the array is a table with the following fields:
+     *     "ssid"      : {string}  - SSID (network name).
+     *     "bssid"     : {string}  - BSSID (access point’s MAC address), in 0123456789ab format.
+     *     "channel"   : {integer} - Channel number: 1-13 (2.4GHz).
+     *     "rssi"      : {integer} - RSSI (signal strength).
+     *     "open"      : {bool}    - Whether the network is open (password-free).
+     * An exception may be thrown in case of an error.
+     */
+    function _parseWifiNetworks(data) {
+        // The data should look like the following:
+        // AT+CWLAP
+        // +CWLAP:(3,"Ger",-64,"f1:b2:d4:88:16:32",8)
+        // +CWLAP:(3,"TP-Link_256",-80,"bb:ae:76:8d:2c:de",10)
+        //
+        // OK
+
+        // Sub-expressions of the regular expression for parsing AT+CWLAP response
+        const ESP32_CWLAP_PREFIX = @"\+CWLAP:";
+        const ESP32_CWLAP_ECN = @"\d";
+        const ESP32_CWLAP_SSID = @".{0,32}";
+        const ESP32_CWLAP_RSSI = @"-?\d{1,3}";
+        const ESP32_CWLAP_MAC = @"(?:\x\x:){5}\x\x";
+        // Only WiFi 2.4GHz (5GHz channels can be 100+)
+        const ESP32_CWLAP_CHANNEL = @"\d{1,2}";
+
+        // NOTE: Due to the known issues of regexp (see the electric imp docs), WiFi networks with SSID that contains quotation mark(s) (")
+        // will not be recognized by the regular expression and, therefore, will not be in the result list of scanned networks
+        local regex = regexp(format(@"^%s\((%s),""(%s)"",(%s),""(%s)"",(%s)\)$",
+                                    ESP32_CWLAP_PREFIX,
+                                    ESP32_CWLAP_ECN,
+                                    ESP32_CWLAP_SSID,
+                                    ESP32_CWLAP_RSSI,
+                                    ESP32_CWLAP_MAC,
+                                    ESP32_CWLAP_CHANNEL));
+
+        ::debug("Parsing the WiFi scan response..", "@{CLASS_NAME}");
+
+        try {
+            local wifis = [];
+            local dataRows = split(data, "\r\n");
+
+            foreach (row in dataRows) {
+                local regexCapture = regex.capture(row);
+
+                if (regexCapture == null) {
+                    continue;
                 }
-            } else {
-                ::error("Incorrect key type", "@{CLASS_NAME}");
+
+                // The first capture is the full row. Let's remove it as we only need the parsed pieces of the row
+                regexCapture.remove(0);
+                // Convert the array of begin/end indexes to an array of substrings parsed out from the row
+                foreach (i, val in regexCapture) {
+                    regexCapture[i] = row.slice(val.begin, val.end);
+                }
+
+                local scannedWifi = {
+                    "ssid"   : regexCapture[ESP32_PARAM_ORDER.SSID],
+                    "bssid"  : _removeColon(regexCapture[ESP32_PARAM_ORDER.MAC]),
+                    "channel": regexCapture[ESP32_PARAM_ORDER.CHANNEL].tointeger(),
+                    "rssi"   : regexCapture[ESP32_PARAM_ORDER.RSSI].tointeger(),
+                    "open"   : regexCapture[ESP32_PARAM_ORDER.ECN].tointeger() == ESP32_ECN_METHOD.OPEN
+                };
+
+                wifis.push(scannedWifi);
             }
+
+            return wifis;
+        } catch (err) {
+            throw "WiFi networks parsing error: " + err;
         }
+    }
+
+    /**
+     * Log the data returned by the AT+GMR (Check Version Information) command
+     *
+     * @param {string} data - String with a reply to the AT+GMR command
+     * An exception may be thrown in case of an error.
+     */
+    function _logVersionInfo(data) {
+        // The data should look like the following:
+        // AT version:2.2.0.0(c6fa6bf - ESP32 - Jul  2 2021 06:44:05)
+        // SDK version:v4.2.2-76-gefa6eca
+        // compile time(3a696ba):Jul  2 2021 11:54:43
+        // Bin version:2.2.0(WROOM-32)
+        //
+        // OK
+
+        ::debug("ESP AT software:", "@{CLASS_NAME}");
+
+        try {
+            local rows = split(data, "\r\n");
+            for (local i = 1; i < rows.len() - 1; i++) {
+                ::debug(rows[i], "@{CLASS_NAME}");
+            }
+        } catch (err) {
+            throw "AT+GMR cmd response parsing error: " + err;
+        }
+    }
+
+    /**
+     * Wait for certain data to be received from the ESP32 board
+     *
+     * @param {function} validator - Function that checks if the expected data has been fully received
+     *
+     * @return {Promise} that:
+     * - resolves with the data received if the operation succeeded
+     * - rejects if the operation failed
+     */
+    function _waitForData(validator) {
+        // Data check/read period, in seconds
+        const ESP32_DATA_CHECK_PERIOD = 0.5;
+        // Maximum data length expected to be received from ESP32, in bytes
+        const ESP32_DATA_READ_CHUNK_LEN = 1024;
+
+        local start = hardware.millis();
+        local data = "";
+
+        return Promise(function(resolve, reject) {
+            local check;
+            check = function() {
+                local chunk = _serial.readblob(ESP32_DATA_READ_CHUNK_LEN);
+
+                // Read until FIFO is empty and accumulate to the result string
+                while (chunk.len() > 0 && data.len() < ESP32_MAX_DATA_LEN) {
+                    data += chunk.tostring();
+                    chunk = _serial.readblob(ESP32_DATA_READ_CHUNK_LEN);
+                }
+
+                if (data.len() > 0 && validator(data)) {
+                    return resolve(data);
+                }
+
+                local timeElapsed = (hardware.millis() - start) / 1000.0;
+                if (timeElapsed >= ESP32_WAIT_DATA_TIMEOUT) {
+                    return reject("Timeout waiting for the expected data or an acknowledge");
+                }
+
+                if (data.len() >= ESP32_MAX_DATA_LEN) {
+                    return reject("Too much data received but still no expected data");
+                }
+
+                imp.wakeup(ESP32_DATA_CHECK_PERIOD, check);
+            }.bindenv(this);
+
+            imp.wakeup(ESP32_DATA_CHECK_PERIOD, check);
+        }.bindenv(this));
+    }
+
+    /**
+     * Remove all colon (:) chars from a string
+     *
+     * @param {string} str - A string
+     *
+     * @return {string} String with all colon chars removed
+     */
+    function _removeColon(str) {
+        local subStrings = split(str, ":");
+        local res = "";
+        foreach (subStr in subStrings) {
+            res += subStr;
+        }
+
+        return res;
     }
 }
 

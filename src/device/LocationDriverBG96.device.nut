@@ -10,7 +10,7 @@ const LD_LOC_TIMEOUT = 55;
 const LD_ASSIST_DATA_MIN_VALID_TIME = 1440;
 
 // Location Driver class.
-// Determines the current position.
+// Determines the current position
 class LocationDriver {
     // Assist data validity time, in minutes
     _assistDataValidityTime = 0;
@@ -19,22 +19,19 @@ class LocationDriver {
     _gettingAssistData = null;
     // Ready-to-use assist data
     _assistData = null;
-    // ESP32 object
-    _esp = null;
 
     /**
      * Constructor for Location Driver
      */
     constructor() {
         cm.onConnect(_onConnected.bindenv(this), "@{CLASS_NAME}");
-        _esp = ESP32Driver(HW_ESP_POWER_EN_PIN, HW_ESP_UART);
         // Set a "finally" handler only to avoid "Unhandled promise rejection" message
         _updateAssistData()
         .finally(@(_) null);
     }
 
     /**
-     * Obtain and return the current location.
+     * Obtain and return the current location:
      * - First, try to get GNSS fix
      * - If no success, try to obtain location using cell towers info
      *
@@ -43,13 +40,13 @@ class LocationDriver {
      * - rejects if the operation failed
      */
     function getLocation() {
-        return _gettingLocation = _getLocationGNSS()
-        fail(function(err) {
+        return _getLocationGNSS()
+        .fail(function(err) {
             ::info("Couldn't get location using GNSS: " + err, "@{CLASS_NAME}");
-            return _getLocationCellTowersAndWiFi();
+            return _getLocationCellTowers();
         }.bindenv(this))
         .fail(function(err) {
-            ::info("Couldn't get location using WiFi and cell towers: " + err, "@{CLASS_NAME}");
+            ::info("Couldn't get location using cell towers: " + err, "@{CLASS_NAME}");
             return Promise.reject(null);
         }.bindenv(this));
     }
@@ -57,7 +54,7 @@ class LocationDriver {
     // -------------------- PRIVATE METHODS -------------------- //
 
     /**
-     * Obtain the current location using GNSS.
+     * Obtain the current location using GNSS
      *
      * @return {Promise} that:
      * - resolves with the current location if the operation succeeded
@@ -84,58 +81,31 @@ class LocationDriver {
     }
 
     /**
-     * Obtain the current location using cell towers info and WiFi.
+     * Obtain the current location using cell towers info
      *
      * @return {Promise} that:
      * - resolves with the current location if the operation succeeded
      * - rejects with an error if the operation failed
      */
-    function _getLocationCellTowersAndWiFi() {
-        ::debug("Getting location using cell towers and WiFi...", "@{CLASS_NAME}");
+    function _getLocationCellTowers() {
+        ::debug("Getting location using cell towers..", "@{CLASS_NAME}");
 
         cm.keepConnection("@{CLASS_NAME}", true);
 
-        local locType = null;
-        local scanWiFiInfo = null;
-        local connectSuccess = false;
-        return Promise.all([_esp.scanWiFiNetworks()
-                            .then(function(wifiInfo) {
-                                scanWiFiInfo = wifiInfo;
-                            }),
-                            cm.connect()
-                            .then(function(_) {
-                                connectSuccess = true;
-                            })])
-        .finally(function(_) {
+        return cm.connect()
+        .fail(function(_) {
+            throw "Couldn't connect to the server";
+        }.bindenv(this))
+        .then(function(_) {
+            local scannedTowers = BG96CellInfo.scanCellTowers();
 
-            local cellAndwifiInfo = [];
-            local scannedTowers = null;
-
-            if (connectSuccess) {
-                scannedTowers = BG96CellInfo.scanCellTowers();
+            if (scannedTowers == null) {
+                throw "No towers scanned";
             }
 
-            if (scannedTowers == null && scanWiFiInfo == null) {
-                throw "No towers and WiFi scanned";
-            }
+            ::debug("Cell towers scanned. Sending results to the agent..", "@{CLASS_NAME}");
 
-            if (scannedTowers) {
-                cellAndwifiInfo.push(scannedTowers);
-                locType = "cell";
-            }
-
-            if (scanWiFiInfo) {
-                cellAndwifiInfo.push(scanWiFiInfo);
-                locType = "wifi";
-            }
-
-            if (scanWiFiInfo && scannedTowers) {
-                locType = "wifi+cell";
-            }
-
-            ::debug("Sending results to the agent..", "@{CLASS_NAME}");
-
-            return _requestToAgent(APP_RM_MSG_NAME.LOCATION_CELL_WIFI, cellAndwifiInfo)
+            return _requestToAgent(APP_RM_MSG_NAME.LOCATION_CELL_WIFI, [scannedTowers])
             .fail(function(err) {
                 throw "Error sending a request to the agent: " + err;
             }.bindenv(this));
@@ -152,8 +122,8 @@ class LocationDriver {
 
             return {
                 // Here we assume that if the device is connected, its time is synced
-                "timestamp": location.time,
-                "type": locType,
+                "timestamp": time(),
+                "type": "cell",
                 "accuracy": location.accuracy,
                 "longitude": location.lon,
                 "latitude": location.lat

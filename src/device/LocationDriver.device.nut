@@ -82,7 +82,7 @@ class LocationDriver {
     }
 
     /**
-     * Obtain and return the current location.
+     * Obtain and return the current location
      * - First, try to get GNSS fix
      * - If no success, try to obtain location using cell towers info
      *
@@ -97,12 +97,16 @@ class LocationDriver {
         }
 
         return _gettingLocation = _getLocationGNSS()
-        fail(function(err) {
+        .fail(function(err) {
             ::info("Couldn't get location using GNSS: " + err, "@{CLASS_NAME}");
             return _getLocationCellTowersAndWiFi();
         }.bindenv(this))
-        .fail(function(err) {
-            ::info("Couldn't get location using WiFi and cell towers: " + err, "@{CLASS_NAME}");
+        .then(function(location) {
+            _gettingLocation = null;
+            return location;
+        }.bindenv(this), function(err) {
+            ::info("Couldn't get location using WiFi networks and cell towers: " + err, "@{CLASS_NAME}");
+            _gettingLocation = null;
             return Promise.reject(null);
         }.bindenv(this));
     }
@@ -126,7 +130,8 @@ class LocationDriver {
             // TODO: Power on the module?
             ::debug("Writing the UTC time to u-blox..", "@{CLASS_NAME}");
             _ubxAssist.writeUtcTimeAssist();
-            return _writeAssistDataToUBlox();
+            // TODO: Disabled due to issues
+            // return _writeAssistDataToUBlox();
         }.bindenv(this))
         .finally(function(_) {
             ::debug("Getting location using GNSS (u-blox)..", "@{CLASS_NAME}");
@@ -155,6 +160,9 @@ class LocationDriver {
                 local timeoutTimer = imp.wakeup(LD_GNSS_LOC_TIMEOUT, onTimeout);
 
                 local onFix = function(location) {
+                    ::info("Got location using GNSS", "@{CLASS_NAME}");
+                    ::debug(location, "@{CLASS_NAME}");
+
                     // Successful location!
                     // Zero the fails counter, cancel the timeout timer, disable the u-blox, and resolve the promise
                     _gnssFailsCounter = 0;
@@ -170,79 +178,80 @@ class LocationDriver {
     }
 
     /**
-     * Obtain the current location using cell towers info and WiFi.
+     * Obtain the current location using cell towers info and WiFi
      *
      * @return {Promise} that:
      * - resolves with the current location if the operation succeeded
      * - rejects with an error if the operation failed
      */
     function _getLocationCellTowersAndWiFi() {
-        ::debug("Getting location using cell towers..", "@{CLASS_NAME}");
+        ::debug("Getting location using cell towers and WiFi..", "@{CLASS_NAME}");
 
         cm.keepConnection("@{CLASS_NAME}", true);
 
+        local scannedWifis = null;
+        local scannedTowers = null;
         local locType = null;
-        local scanWiFiInfo = null;
-        local connectSuccess = false;
-        return Promise.all([_esp.scanWiFiNetworks()
-                            .then(function(wifiInfo) {
-                                scanWiFiInfo = wifiInfo;
-                            }),
-                            cm.connect()
-                            .then(function(_) {
-                                connectSuccess = true;
-                            })])
-        .finally(function(_) {
 
-            local cellAndwifiInfo = [];
-            local scannedTowers = null;
+        // Run WiFi scanning in the background
+        local scanWifiPromise = _esp.scanWiFiNetworks()
+        .then(function(wifis) {
+            scannedWifis = wifis;
+        }.bindenv(this), function(err) {
+            ::error("Couldn't scan WiFi networks: " + err, "@{CLASS_NAME}");
+        }.bindenv(this));
 
-            if (connectSuccess) {
-                scannedTowers = BG96CellInfo.scanCellTowers();
-            }
+        return cm.connect()
+        .then(function(_) {
+            scannedTowers = BG96CellInfo.scanCellTowers();
+            // Wait until the WiFi scanning is finished (if not yet)
+            return scanWifiPromise;
+        }.bindenv(this), function(_) {
+            throw "Couldn't connect to the server";
+        }.bindenv(this))
+        .then(function(_) {
+            local locationData = {};
 
-            if (scannedTowers == null && scanWiFiInfo == null) {
-                throw "No towers and WiFi scanned";
-            }
-
-            if (scannedTowers) {
-                cellAndwifiInfo.push(scannedTowers);
-                locType = "cell";
-            }
-
-            if (scanWiFiInfo) {
-                cellAndwifiInfo.push(scanWiFiInfo);
-                locType = "wifi";
-            }
-
-            if (scanWiFiInfo && scannedTowers) {
+            if (scannedWifis && scannedTowers) {
+                locationData.wifiAccessPoints <- scannedWifis;
+                locationData.radioType <- scannedTowers.radioType;
+                locationData.cellTowers <- scannedTowers.cellTowers;
                 locType = "wifi+cell";
+            } else if (scannedWifis) {
+                locationData.wifiAccessPoints <- scannedWifis;
+                locType = "wifi";
+            } else if (scannedTowers) {
+                locationData.radioType <- scannedTowers.radioType;
+                locationData.cellTowers <- scannedTowers.cellTowers;
+                locType = "cell";
+            } else {
+                throw "No towers and WiFi scanned";
             }
 
             ::debug("Sending results to the agent..", "@{CLASS_NAME}");
 
-            return _requestToAgent(APP_RM_MSG_NAME.LOCATION_CELL_WIFI, cellAndwifiInfo)
+            return _requestToAgent(APP_RM_MSG_NAME.LOCATION_CELL_WIFI, locationData)
             .fail(function(err) {
                 throw "Error sending a request to the agent: " + err;
             }.bindenv(this));
         }.bindenv(this))
-        .then(function(location) {
+        .then(function(resp) {
             cm.keepConnection("@{CLASS_NAME}", false);
 
-            if (location == null) {
+            if (resp == null) {
                 throw "No location received from the agent";
             }
 
-            ::info("Got location using cell towers and WiFi", "@{CLASS_NAME}");
-            ::debug(location, "@{CLASS_NAME}");
+            ::info("Got location using cell towers and/or WiFi", "@{CLASS_NAME}");
+            ::debug(resp, "@{CLASS_NAME}");
 
             return {
                 // Here we assume that if the device is connected, its time is synced
-                "timestamp": location.time,
+                "timestamp": time(),
                 "type": locType,
-                "accuracy": location.accuracy,
-                "longitude": location.lon,
-                "latitude": location.lat
+                "accuracy": resp.accuracy,
+                "longitude": resp.location.lng,
+                "latitude": resp.location.lat
             };
         }.bindenv(this), function(err) {
             cm.keepConnection("@{CLASS_NAME}", false);
@@ -412,6 +421,8 @@ class LocationDriver {
             }
 
             local onDone = function(errors) {
+                ::debug("Assist data has been written to u-blox successfully", "@{CLASS_NAME}");
+
                 if (!errors) {
                     return resolve(null);
                 }
@@ -447,11 +458,11 @@ class LocationDriver {
             local yesterdayFileName = UBloxAssistNow.getDateString(date(time() - LD_DAY_SEC));
 
             if (_assistDataStorage.fileExists(todayFileName)) {
-                chosenFile = data[todayFileName];
+                chosenFile = todayFileName;
             } else if (_assistDataStorage.fileExists(tomorrowFileName)) {
-                chosenFile = data[tomorrowFileName];
+                chosenFile = tomorrowFileName;
             } else if (_assistDataStorage.fileExists(yesterdayFileName)) {
-                chosenFile = data[yesterdayFileName];
+                chosenFile = yesterdayFileName;
             }
 
             if (chosenFile == null) {
@@ -468,7 +479,7 @@ class LocationDriver {
 
             return data;
         } catch (err) {
-            ::error("Couldn't erase stale u-blox assist data: " + err, "@{CLASS_NAME}");
+            ::error("Couldn't read u-blox assist data: " + err, "@{CLASS_NAME}");
         }
 
         return null;
@@ -485,11 +496,11 @@ class LocationDriver {
         try {
             foreach (date, assistMsgs in data) {
                 // Erase the existing file if any
-                if (_sffs.fileExists(date)) {
-                    _sffs.eraseFile(date);
+                if (_assistDataStorage.fileExists(date)) {
+                    _assistDataStorage.eraseFile(date);
                 }
 
-                local file = _sffs.open(date, "w");
+                local file = _assistDataStorage.open(date, "w");
                 file.write(assistMsgs);
                 file.close();
             }
@@ -509,7 +520,7 @@ class LocationDriver {
             // Since the date has the following format YYYYMMDD, we can compare dates as integer numbers
             local yesterday = UBloxAssistNow.getDateString(date(time() - LD_DAY_SEC)).tointeger();
 
-            foreach(file in files) {
+            foreach (file in files) {
                 local name = file.fname;
                 local erase = true;
 

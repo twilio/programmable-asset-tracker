@@ -51,7 +51,7 @@ class LocationAssistant {
                     return reject(error);
                 }
 
-                local assistData = _ubxAssist.getOfflineMsgByDate(resp);
+                local assistData = ubxAssist.getOfflineMsgByDate(resp);
 
                 if (assistData.len() == 0) {
                     return reject("No u-blox offline assist data received");
@@ -66,45 +66,21 @@ class LocationAssistant {
     }
 
     /**
-     * Obtains the location by cell towers and WiFi info using Google Maps Geolocation API
+     * Obtains the location by cell towers and WiFi networks using Google Maps Geolocation API
      *
-     * @param {Array} cellInfoAndWiFi - array of table with cell towers and WiFi info 
+     * @param {table} locationData - Scanned cell towers and WiFi networks
      *
      * @return {Promise} that:
      * - resolves with the location info if the operation succeeded
      * - rejects with an error if the operation failed
      */
-    function getLocationByCellInfoAndWiFi(cellInfoAndWiFi) {
-        ::debug("Requesting location from Google Geolocation API.", "@{CLASS_NAME}");
+    function getLocationByCellInfoAndWiFi(locationData) {
+        ::debug("Requesting location from Google Geolocation API..", "@{CLASS_NAME}");
+
+        ::debug(http.jsonencode(locationData));
 
         local apiKey = format("%s", __VARS.GOOGLE_MAPS_API_KEY);
-        local gmapsLib = GoogleMaps(apiKey);
-        return Promise(function(resolve, reject) {
-            local geolocationData = null;
-            foreach (id, el in cellInfoAndWiFi) {
-                if ("radioType" in el) {
-                    geolocationData = {
-                        "considerIp" : "false",
-                        "radioType"  : el.radioType,
-                        "cellTowers" : el.cellTowers
-                    };
-                } else {
-                    geolocationData.wifiAccessPoints <- el;
-                }
-            }
-            gmapsLib && gmapsLib.getGeolocation(geolocationData, function(error, resp) {
-                if (error) {
-                    reject("Get location error: " + error);
-                } else {
-                    resolve({
-                        "accuracy" : resp.accuracy,
-                        "lat"      : resp.location.lat,
-                        "lon"      : resp.location.lng,
-                        "time"     : time()
-                    });
-                }
-            });
-        }.bindenv(this));
+        return GoogleMaps(apiKey).getGeolocation(locationData);
     }
 }
 
