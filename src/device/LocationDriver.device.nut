@@ -130,8 +130,7 @@ class LocationDriver {
             // TODO: Power on the module?
             ::debug("Writing the UTC time to u-blox..", "@{CLASS_NAME}");
             _ubxAssist.writeUtcTimeAssist();
-            // TODO: Disabled due to issues
-            // return _writeAssistDataToUBlox();
+            return _writeAssistDataToUBlox();
         }.bindenv(this))
         .finally(function(_) {
             ::debug("Getting location using GNSS (u-blox)..", "@{CLASS_NAME}");
@@ -415,15 +414,17 @@ class LocationDriver {
     function _writeAssistDataToUBlox() {
         return Promise(function(resolve, reject) {
             local assistData = _readUBloxAssistData();
-
             if (assistData == null) {
                 return reject(null);
             }
 
             local onDone = function(errors) {
-                ::debug("Assist data has been written to u-blox successfully", "@{CLASS_NAME}");
+                // TODO: Temporarily print this log message as we have never seen this
+                // callback called and want to be aware if it is suddenly called one day
+                ::info("ATTENTION!!! U-BLOX WRITE-ASSIST-DATA CALLBACK HAS BEEN CALLED!");
 
                 if (!errors) {
+                    ::debug("Assist data has been written to u-blox successfully", "@{CLASS_NAME}");
                     return resolve(null);
                 }
 
@@ -438,6 +439,10 @@ class LocationDriver {
 
             ::debug("Writing assist data to u-blox..", "@{CLASS_NAME}");
             _ubxAssist.writeAssistNow(assistData, onDone);
+
+            // TODO: Temporarily resolve this Promise immediately because for some reason,
+            // the callback is not called by the writeAssistNow() method
+            resolve(null);
         }.bindenv(this));
     }
 
