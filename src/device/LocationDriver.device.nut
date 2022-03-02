@@ -96,7 +96,11 @@ class LocationDriver {
             return _gettingLocation;
         }
 
-        return _gettingLocation = _getLocationGNSS()
+        return _gettingLocation = _getLocationBLEBeacons()
+        .fail(function(err) {
+            ::info("Couldn't get location BLE beacons: " + err, "@{CLASS_NAME}");
+            return _getLocationGNSS();
+        }.bindenv(this))
         .fail(function(err) {
             ::info("Couldn't get location using GNSS: " + err, "@{CLASS_NAME}");
             return _getLocationCellTowersAndWiFi();
@@ -255,6 +259,25 @@ class LocationDriver {
         }.bindenv(this), function(err) {
             cm.keepConnection("@{CLASS_NAME}", false);
             throw err;
+        }.bindenv(this));
+    }
+
+    /**
+     * Obtain the current location using BLE beacons
+     *
+     * @return {Promise} that:
+     * - resolves with the current location if the operation succeeded
+     * - rejects with an error if the operation failed
+     */
+    function _getLocationBLEBeacons() {
+        ::debug("Getting location using BLE beacons..", "@{CLASS_NAME}");
+
+        return = _esp.scanBLEBeacons()
+        .then(function(beacons) {
+
+        }.bindenv(this))
+        .fail(function(err) {
+            throw "Error scan BLE beacons: " + err;
         }.bindenv(this));
     }
 
