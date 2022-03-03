@@ -73,32 +73,39 @@ function initReplayMessenger() {
     }.bindenv(this));
 }
 
+function printResult(loc) {
+    foreach (key, value in loc) {
+        ::info(key + ":" + value);
+    }
+}
+
 /**
  * Obtains location
  */
  function getLocation() {
 
-    // Obtain and log location by GNSS
-    ld._getLocationGNSS()
-    .finally(function(res){
-        if(typeof res == "table") {
-            ::info("Location GNSS:");
-            foreach (key, value in loc) {
-                ::info(key + ":" + value);
-            }
-        }
-
-        // Obtain and log location by cell info and WiFi
-        ld._getLocationCellTowersAndWiFi()
+     // Obtain and log location by BLE beacons
+    ld._getLocationBLEBeacons()
+    .then(function(loc){
+        ::info("Location BLE beacons:");
+        printResult(loc);
+    })
+    .finally(function(_) {
+        // Obtain and log location by GNSS
+        ld._getLocationGNSS()
         .then(function(loc){
-            ::info("Location cell tower and wifi:");
-            foreach (key, value in loc) {
-                ::info(key + ":" + value);
-            }
+            ::info("Location GNSS:");
+            printResult(loc);
+        })
+        .finally(function(_) {
+            // Obtain and log location by cell info and WiFi
+            ld._getLocationCellTowersAndWiFi()
+            .then(function(loc){
+                ::info("Location cell tower and wifi:");
+                printResult(loc);
+            });
         });
-    });
-
-    // Obtain and log location by BLE beacons - TBD
+    })
 
     // Periodically repeat
     imp.wakeup(TEST_GET_LOCATION_PERIOD, getLocation);
