@@ -105,7 +105,7 @@ function printResult(loc) {
                 printResult(loc);
             });
         });
-    })
+    });
 
     // Periodically repeat
     imp.wakeup(TEST_GET_LOCATION_PERIOD, getLocation);
