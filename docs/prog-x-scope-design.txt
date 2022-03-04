@@ -350,7 +350,7 @@ JSON format:
       "beacons": {                  // new set of beacons - fully replaces the previous set of beacons
         <id>: {                     // beacon unique identifier (MAC address)
                                       // location - lng, lat - can be specified together only
-          "lng": <number>,            // longitude, in degrees, [-90..90]
+          "lng": <number>,            // longitude, in degrees, [-180..180]
           "lat": <number>             // latitude, in degrees, [-90..90]
         },
         ...

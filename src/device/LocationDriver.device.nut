@@ -48,6 +48,8 @@ class LocationDriver {
     _gnssFailsCounter = 0;
     // ESP32 object
     _esp = null;
+    // BLE beacons array
+    _beaconsWithKnownLocation = null;
 
     /**
      * Constructor for Location Driver
@@ -96,7 +98,11 @@ class LocationDriver {
             return _gettingLocation;
         }
 
-        return _gettingLocation = _getLocationGNSS()
+        return _gettingLocation = _getLocationBLEBeacons()
+        .fail(function(err) {
+            ::info("Couldn't get location BLE beacons: " + err, "@{CLASS_NAME}");
+            return _getLocationGNSS();
+        }.bindenv(this))
         .fail(function(err) {
             ::info("Couldn't get location using GNSS: " + err, "@{CLASS_NAME}");
             return _getLocationCellTowersAndWiFi();
@@ -255,6 +261,66 @@ class LocationDriver {
         }.bindenv(this), function(err) {
             cm.keepConnection("@{CLASS_NAME}", false);
             throw err;
+        }.bindenv(this));
+    }
+    
+    /**
+     * Obtain the current location using BLE beacons
+     *
+     * @return {Promise} that:
+     * - resolves with the current location if the operation succeeded
+     * - rejects with an error if the operation failed
+     */
+    function _getLocationBLEBeacons() {
+        ::debug("Getting location using BLE beacons..", "@{CLASS_NAME}");
+        // Default accuracy
+        const LD_BLE_BEACON_DEFAULT_ACCURACY = 10;
+
+        local resBeacons = [];
+        local resBeaconsRssi = [];
+        local resBeaconsAddr = [];
+
+        return _esp.scanBLEBeacons()
+        .then(function(beacons) {
+            // check known location beacons
+            if (_beaconsWithKnownLocation != null) {
+                foreach (discoveredBeacon in beacons) {
+                    foreach (knownBeacon in _beaconsWithKnownLocation) {
+                        if (discoveredBeacon.addr in knownBeacon) {
+                            resBeacons.push(knownBeacon);
+                            resBeaconsRssi.push(discoveredBeacon.rssi);
+                            resBeaconsAddr.push(discoveredBeacon.addr);
+                        }
+                    }
+                }
+                local closestBeaconRssi = null;
+                local closestBeaconInd = null;
+                switch(resBeacons.len()) {
+                    case 0:
+                        return Promise.reject("No beacons available with known location");
+                        break;
+                    default:
+                        foreach (ind, beaconRssi in resBeaconsRssi) {
+                            if (closestBeaconRssi == null || beaconRssi > closestBeaconRssi) {
+                                closestBeaconRssi = beaconRssi;
+                                closestBeaconInd = ind;
+                            }
+                        }
+                        return {
+                            "timestamp": time(),
+                            "type": "ble",
+                            "accuracy": LD_BLE_BEACON_DEFAULT_ACCURACY,
+                            "longitude": resBeacons[closestBeaconInd][resBeaconsAddr[closestBeaconInd]].lng,
+                            "latitude": resBeacons[closestBeaconInd][resBeaconsAddr[closestBeaconInd]].lat
+                        };
+                        break;
+                }
+            } else {
+                return Promise.reject("No beacons available with known location");
+            }
+        }.bindenv(this))
+        .fail(function(err) {
+            throw "Error scan BLE beacons: " + err;
         }.bindenv(this));
     }
 

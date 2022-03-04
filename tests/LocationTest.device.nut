@@ -73,35 +73,64 @@ function initReplayMessenger() {
     }.bindenv(this));
 }
 
+function printResult(loc) {
+    foreach (key, value in loc) {
+        ::info(key + ":" + value);
+    }
+}
+
 /**
- * Obtains location
+ * Obtains location Cell Towers and WiFi
  */
- function getLocation() {
+ function testGetLocationCellTowersAndWiFi() {
 
-    // Obtain and log location by GNSS
-    ld._getLocationGNSS()
-    .finally(function(res){
-        if(typeof res == "table") {
-            ::info("Location GNSS:");
-            foreach (key, value in loc) {
-                ::info(key + ":" + value);
-            }
-        }
-
-        // Obtain and log location by cell info and WiFi
-        ld._getLocationCellTowersAndWiFi()
-        .then(function(loc){
-            ::info("Location cell tower and wifi:");
-            foreach (key, value in loc) {
-                ::info(key + ":" + value);
-            }
-        });
+     // Obtain and log location by cell info and WiFi
+    ld._getLocationCellTowersAndWiFi()
+    .then(function(loc){
+        ::info("Location cell tower and wifi:");
+        printResult(loc);
+        imp.wakeup(TEST_GET_LOCATION_PERIOD, testGetLocationBLE);
+    })
+    .fail(function(err){
+        ::info("Location cell tower and wifi error: " + err);
+        imp.wakeup(TEST_GET_LOCATION_PERIOD, testGetLocationBLE);
     });
+}
 
-    // Obtain and log location by BLE beacons - TBD
+/**
+ * Obtains location GNSS
+ */
+ function testGetLocationGNSS() {
 
-    // Periodically repeat
-    imp.wakeup(TEST_GET_LOCATION_PERIOD, getLocation);
+     // Obtain and log location by GNSS
+    ld._getLocationGNSS()
+    .then(function(loc){
+        ::info("Location GNSS:");
+        printResult(loc);
+        imp.wakeup(0, testGetLocationCellTowersAndWiFi);
+    })
+    .fail(function(err){
+        ::info("Location GNSS error: " + err);
+        imp.wakeup(0, testGetLocationCellTowersAndWiFi);
+    });
+}
+
+/**
+ * Obtains location BLE beacons
+ */
+ function testGetLocationBLE() {
+
+     // Obtain and log location by BLE beacons
+    ld._getLocationBLEBeacons()
+    .then(function(loc){
+        ::info("Location BLE beacons:");
+        printResult(loc);
+        imp.wakeup(0, testGetLocationGNSS);
+    })
+    .fail(function(err){
+        ::info("Location BLE beacons error: " + err);
+        imp.wakeup(0, testGetLocationGNSS);
+    });
 }
 
 // ---------------------------- THE MAIN CODE ---------------------------- //
@@ -137,7 +166,7 @@ initReplayMessenger()
     ld = LocationDriver();
 
     // Start periodic obtaining of the current location
-    getLocation();
+    testGetLocationBLE();
 
 }.bindenv(this), function(err) {
     ::error("Replay Messenger initialization error: " + err);

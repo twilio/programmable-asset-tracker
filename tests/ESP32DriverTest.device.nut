@@ -18,7 +18,7 @@ const ESP_DRV_TEST_SCAN_WIFI_PERIOD = 60;
 
 server.log("ESP AT test");
 
-function scan() {
+function scanWiFi() {
     esp.scanWiFiNetworks().then(function(wifiNetworks) {
         server.log("Find "  + wifiNetworks.len() + " WiFi network:");
         foreach (ind, network in wifiNetworks) {
@@ -33,7 +33,20 @@ function scan() {
     }).fail(function(error) {
         server.log("Scan WiFi network error: " + error);
     }).finally(function(_) {
-        imp.wakeup(ESP_DRV_TEST_SCAN_WIFI_PERIOD, scan);
+        imp.wakeup(ESP_DRV_TEST_SCAN_WIFI_PERIOD, scanBeacons);
+    });
+}
+
+function scanBeacons() {
+    esp.scanBLEBeacons().then(function(beacons) {
+        server.log(" Beacons:");
+        foreach (ind, beacon in beacons) {
+            server.log("Beacon address: " + beacon["addr"]);
+        }
+    }).fail(function(error) {
+        server.log("Scan BLE beacons error: " + error);
+    }).finally(function(_) {
+        imp.wakeup(0, scanWiFi);
     });
 }
 
@@ -55,4 +68,4 @@ server.log("ESP32 chip boot...");
 // esp chip boot delay
 server.log("init...");
 // init and start scan
-scan();
+scanBeacons();

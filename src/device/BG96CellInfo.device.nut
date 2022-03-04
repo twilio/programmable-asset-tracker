@@ -2,11 +2,10 @@
 
 // Required BG96 AT Commands
 enum AT_COMMAND {
-    SET_CGREG = "AT+CGREG=2",  // Enable network registration and location information unsolicited result code
-    GET_CGREG = "AT+CGREG?",   // Query the network registration status
-    SET_COPS  = "AT+COPS=3,2", // Force an attempt to select and register the GSM/UMTS network operator
-    GET_COPS  = "AT+COPS?",    // Query the current mode and selected operator
-    GET_QENG  = "AT+QENG=\"neighbourcell\"" // Query the information of neighbour cells (Detailed information of base station)
+    // Query the information of neighbour cells (Detailed information of base station)
+    GET_QENG  = "AT+QENG=\"neighbourcell\"",
+    // Query the information of serving cell (Detailed information of base station)
+    GET_QENG_SERV_CELL  = "AT+QENG=\"servingcell\""
 }
 
 // Class to obtain cell towers info from BG96 modem.
@@ -25,7 +24,7 @@ class BG96CellInfo {
     *
     * @return {Table} The network registration information, or null on error.
     * Table fields include:
-    * "radioType"                   - Always "gsm" string
+    * "radioType"                   - The mobile radio type: "gsm" or "lte"
     * "cellTowers"                  - Array of tables
     *     cellTowers[0]             - Table with information about the connected tower
     *         "locationAreaCode"    - Integer of the location area code  [0, 65535]
@@ -41,61 +40,62 @@ class BG96CellInfo {
     *         "signalStrength"      - Signal strength string
     */
     function scanCellTowers() {
-        local resp = null;
-        local parsed = null;
-        local tmp = null;
-        local towers = [];
+        local data = {
+            "radioType": null,
+            "cellTowers": []
+        };
 
         try {
-            local connectedTower = {};
-
-            // connected tower
-            resp = _writeAndParseAT(AT_COMMAND.SET_CGREG);
-            resp = _writeAndParseAT(AT_COMMAND.GET_CGREG);
-
-            if ("error" in resp) {
-                ::error("AT+CGREG command returned error: " + resp.error, "@{CLASS_NAME}");
-                return null;
+            local qengCmdResp = _writeAndParseAT(AT_COMMAND.GET_QENG_SERV_CELL);
+            if ("error" in qengCmdResp) {
+                throw "AT+QENG serving cell command returned error: " + qengCmdResp.error;
             }
 
-            if (!_cgregExtractTowerInfo(resp.data, connectedTower)) {
-                ::info("No connected tower detected (by GCREG cmd)", "@{CLASS_NAME}");
-                return null;
-            }
+            local srvCellRadioType = _qengExtractRadioType(qengCmdResp.data);
 
-            resp = _writeAndParseAT(AT_COMMAND.SET_COPS);
-            resp = _writeAndParseAT(AT_COMMAND.GET_COPS);
-
-            if ("error" in resp) {
-                ::error("AT+COPS command returned error: " + resp.error, "@{CLASS_NAME}");
-                return null;
-            }
-
-            if (!_copsExtractTowerInfo(resp.data, connectedTower)) {
-                ::info("No connected tower detected (by COPS cmd)", "@{CLASS_NAME}");
-                return null;
-            }
-
-            towers.append(connectedTower);
-
-            // neighbor towers
-            resp = _writeAndParseATMultiline(AT_COMMAND.GET_QENG);
-
-            if ("error" in resp) {
-                ::error("AT+QENG command returned error: " + resp.error, "@{CLASS_NAME}");
-            } else {
-                towers.extend(_qengExtractTowersInfo(resp.data));
+            switch (srvCellRadioType) {
+                case "GSM":
+                    data.radioType = "gsm";
+                    // +QENG:
+                    // "servingscell",<state>,"GSM",<mcc>,
+                    // <mnc>,<lac>,<cellid>,<bsic>,<arfcn>,<band>,<rxlev>,<txp>,
+                    // <rla>,<drx>,<c1>,<c2>,<gprs>,<tch>,<ts>,<ta>,<maio>,<hsn>,<rxlevsub>,
+                    // <rxlevfull>,<rxqualsub>,<rxqualfull>,<voicecodec>
+                    data.cellTowers.append(_qengExtractServingCellGSM(qengCmdResp.data));
+                    // Neighbor towers
+                    // +QENG:
+                    // "neighbourcell","GSM",<mcc>,<mnc>,<lac>,<cellid>,<bsic>,<arfcn>,
+                    // <rxlev>,<c1>,<c2>,<c31>,<c32>
+                    qengCmdResp = _writeAndParseATMultiline(AT_COMMAND.GET_QENG);
+                    if ("error" in qengCmdResp) {
+                        ::error("AT+QENG command returned error: " + qengCmdResp.error, "@{CLASS_NAME}");
+                    } else {
+                        data.cellTowers.extend(_qengExtractTowersInfo(qengCmdResp.data, srvCellRadioType));
+                    }
+                    break;
+                case "CAT-M":
+                case "CAT-NB":
+                case "LTE":
+                    data.radioType = "lte";
+                    data.cellTowers.append(_qengExtractServingCellLTE(qengCmdResp.data));
+                    // Neighbor towers parameters not correspond google API
+                    // +QENG:
+                    // "servingcell",<state>,"LTE",<is_tdd>,<mcc>,<mnc>,<cellid>,
+                    // <pcid>,<earfcn>,<freq_band_ind>,
+                    // <ul_bandwidth>,<d_bandwidth>,<tac>,<rsrp>,<rsrq>,<rssi>,<sinr>,<srxlev>
+                    // +QENG: "neighbourcell intra”,"LTE",<earfcn>,<pcid>,<rsrq>,<rsrp>,<rssi>,<sinr>
+                    // ,<srxlev>,<cell_resel_priority>,<s_non_intra_search>,<thresh_serving_low>,
+                    // <s_intra_search>
+                    // https://developers.google.com/maps/documentation/geolocation/overview#wifi_access_point_object
+                    // location is determined by one tower
+                    break;
+                default:
+                    throw "Unknown radio type: " + srvCellRadioType;
             }
         } catch (err) {
             ::error("Scanning cell towers error: " + err, "@{CLASS_NAME}");
             return null;
         }
-
-        local data = {};
-        data.radioType <- "gsm";
-        data.cellTowers <- towers;
-
-        ::debug("Towers scanned: " + towers.len(), "@{CLASS_NAME}");
 
         return data;
     }
@@ -174,11 +174,9 @@ class BG96CellInfo {
 
         try {
             parsed.success <- (resp.find("OK") != null);
-
             lines = split(resp, "\n");
 
             foreach (line in lines) {
-
                 if (line == "OK") {
                     continue;
                 }
@@ -204,69 +202,11 @@ class BG96CellInfo {
     }
 
     /**
-     * Extract location area code and cell ID from dataStr parameter
-     * and put it in dstTbl parameter.
-     * Return true if the needed info found, false - otherwise.
-     */
-    function _cgregExtractTowerInfo(dataStr, dstTbl) {
-        try {
-            local splitted = split(dataStr, ",");
-
-            if (splitted.len() >= 4) {
-                local lac = splitted[2];
-                lac = split(lac, "\"")[0];
-                lac = utilities.hexStringToInteger(lac);
-
-                local ci = splitted[3];
-                ci = split(ci, "\"")[0];
-                ci = utilities.hexStringToInteger(ci);
-
-                dstTbl.locationAreaCode <- lac;
-                dstTbl.cellId <- ci;
-
-                return true;
-            } else {
-                return false;
-            }
-        } catch (err) {
-            throw "Couldn't parse registration status (GET_CGREG cmd): " + err;
-        }
-    }
-
-    /**
-     * Extract mobile country and network codes from dataStr parameter
-     * and put it in dstTbl parameter.
-     * Return true if the needed info found, false - otherwise.
-     */
-    function _copsExtractTowerInfo(dataStr, dstTbl) {
-        try {
-            local splitted = split(dataStr, ",");
-
-            if (splitted.len() >= 3) {
-                local lai = splitted[2];
-                lai = split(lai, "\"")[0];
-
-                local mcc = lai.slice(0, 3);
-                local mnc = lai.slice(3);
-
-                dstTbl.mobileCountryCode <- mcc;
-                dstTbl.mobileNetworkCode <- mnc;
-
-                return true;
-            } else {
-                return false;
-            }
-        } catch (err) {
-            throw "Couldn't parse operator selection (GET_COPS cmd): " + err;
-        }
-    }
-
-    /**
      * Extract mobile country and network codes, location area code,
      * cell ID, signal strength from dataLines parameter.
      * Return the info in array.
      */
-    function _qengExtractTowersInfo(dataLines) {
+    function _qengExtractTowersInfo(dataLines, checkRadioType) {
         try {
             local towers = [];
 
@@ -274,6 +214,13 @@ class BG96CellInfo {
                 local splitted = split(line, ",");
 
                 if (splitted.len() < 9) {
+                    continue;
+                }
+
+                local radioType = splitted[1];
+                radioType = split(radioType, "\"")[0];
+
+                if (radioType != checkRadioType) {
                     continue;
                 }
 
@@ -298,6 +245,84 @@ class BG96CellInfo {
             return towers;
         } catch (err) {
             throw "Couldn't parse neighbour cells (GET_QENG cmd): " + err;
+        }
+    }
+
+    /**
+     * Extract radio type from the data parameter.
+     * Return the info in a sring.
+     */
+    function _qengExtractRadioType(data) {
+        // +QENG: "servingcell","NOCONN","GSM",250,99,DC51,B919,26,50,-,-73,255,255,0,38,38,1,-,-,-,-,-,-,-,-,-,"-"
+        // +QENG: "servingcell","CONNECT","CAT-M","FDD",262,03,2FAA03,187,6200,20,3,3,2AFB,-105,-11,-76,10,-
+        try {
+            local splitted = split(data, ",");
+            local radioType = splitted[2];
+            radioType = split(radioType, "\"")[0];
+
+            return radioType;
+        } catch (err) {
+            throw "Couldn't parse radio type (GET_QENG cmd): " + err;
+        }
+    }
+
+     /**
+     * Extract mobile country and network codes, location area code,
+     * cell ID, signal strength from the data parameter. (GSM networks)
+     * Return the info in a table.
+     */
+    function _qengExtractServingCellGSM(data) {
+        // +QENG: "servingcell","NOCONN","GSM",250,99,DC51,B919,26,50,-,-73,255,255,0,38,38,1,-,-,-,-,-,-,-,-,-,"-"
+        try {
+            local splitted = split(data, ",");
+
+            local mcc = splitted[3];
+            local mnc = splitted[4];
+            local lac = splitted[5];
+            local ci = splitted[6];
+            local ss = splitted[10];
+            lac = utilities.hexStringToInteger(lac);
+            ci = utilities.hexStringToInteger(ci);
+
+            return {
+                "mobileCountryCode" : mcc,
+                "mobileNetworkCode" : mnc,
+                "locationAreaCode" : lac,
+                "cellId" : ci,
+                "signalStrength" : ss
+            };
+        } catch (err) {
+            throw "Couldn't parse serving cell (GET_QENG_SERV_CELL cmd): " + err;
+        }
+    }
+
+    /**
+     * Extract mobile country and network codes, location area code,
+     * cell ID, signal strength from the data parameter. (LTE networks)
+     * Return the info in a table.
+     */
+    function _qengExtractServingCellLTE(data) {
+        // +QENG: "servingcell","CONNECT","CAT-M","FDD",262,03,2FAA03,187,6200,20,3,3,2AFB,-105,-11,-76,10,-
+        try {
+            local splitted = split(data, ",");
+
+            local mcc = splitted[4];
+            local mnc = splitted[5];
+            local lac = splitted[12];
+            local ci = splitted[6];
+            local ss = splitted[15];
+            lac = utilities.hexStringToInteger(lac);
+            ci = utilities.hexStringToInteger(ci);
+
+            return {
+                "mobileCountryCode" : mcc,
+                "mobileNetworkCode" : mnc,
+                "locationAreaCode" : lac,
+                "cellId" : ci,
+                "signalStrength" : ss
+            };
+        } catch (err) {
+            throw "Couldn't parse serving cell (GET_QENG_SERV_CELL cmd): " + err;
         }
     }
 }
