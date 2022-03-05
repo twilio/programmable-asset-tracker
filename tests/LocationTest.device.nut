@@ -1,10 +1,14 @@
 #require "Promise.lib.nut:4.0.0"
 #require "Serializer.class.nut:1.0.0"
 #require "SPIFlashLogger.device.lib.nut:2.2.0"
+#require "SPIFlashFileSystem.device.lib.nut:3.0.1"
 #require "ConnectionManager.lib.nut:3.1.1"
 #require "Messenger.lib.nut:0.2.0"
 #require "ReplayMessenger.device.lib.nut:0.2.0"
 #require "utilities.lib.nut:2.0.0"
+#require "UBloxM8N.device.lib.nut:1.0.1"
+#require "UbxMsgParser.lib.nut:2.0.1"
+#require "UBloxAssistNow.device.lib.nut:0.1.0"
 
 @include once "../src/shared/Constants.shared.nut"
 @include once "../src/shared/Logger/Logger.shared.nut"
@@ -14,6 +18,7 @@
 @include once "../src/device/bg96_gps.device.lib.nut"
 @include once "../src/device/BG96CellInfo.device.nut"
 @include once "../src/device/ESP32Driver.device.nut"
+
 
 @if BG96_GNSS
 @include once "../src/device/LocationDriverBG96.device.nut"
