@@ -1,4 +1,4 @@
-ver 2022-01-13
+ver 2022-03-10
 
 Prog-X: scope
 ------------------
@@ -269,12 +269,18 @@ Definitions:
 - Default cfg - hardcoded configuration. Always a full cfg. Always exists. Can be different for different builds (different production flavors, different in development builds).
 - Saved cfg - configuration saved in the flash. Always a full cfg.
 - Reported cfg - known actual configuration of the tracker. Always a full cfg.
-- Reported cfg contains two parts - description (always exists) and configuration itself (does not exist if actual configuration is not known.
+- Reported cfg contains three parts:
+  -- description (always exists),
+  -- configuration itself (does not exist if actual configuration is not known),
+  -- debug features - standalone part of configuration related to debug, eg. log level (may exist partially, eg. for Imp-Agent part only).
 - Cfg update - configuration update from the cloud. Can be full or partial cfg. Note, some of the fields can be updated/specified together only.
 - Pending cfg update - cfg update which is not applied yet, waiting for the tracker becomes online.
 - There can be not more than one pending cfg update at a time. A new cfg update from the cloud overwrites the current pending cfg update (if any).
 - Every cfg update has a unique Id specified by the cloud (default cfg has predefined Id).
 - Reported cfg includes Id of the latest applied cfg update.
+- Debug features can be processed separately from the configuration. For example:
+  -- Log level on Imp-Agent is updated immediately, even if the configuration is pending.
+  -- Log level on Imp-Device can be updated even if the configuration is rejected.
 
 Imp-Agent implements REST API:
 
@@ -288,6 +294,7 @@ Imp-Agent implements REST API:
     - Imp-Agent checks the correctness of the configuration (type of field values, supported range of field values, all fields which can be updated together only are specified). If something is wrong, the request is failed and an error is responded.
     - If Imp-Device is online, then cfg update is immediately sent to Imp-Device. 
     - Otherwise, the request becomes pending cfg update, till Imp-Device becomes online. If there was another pending cfg, it is overwritten by the new one.
+    - Debug features related to Imp-Agent are applied immediately.
 
 JSON format:
 - all keys and values are case sensitive
@@ -400,12 +407,12 @@ JSON format:
     "tamperingDetected": {        // TBD
       "enabled": true/false        // true - alert is enabled
     }
-  },
-
-  "impLogging": {               // imp logging level ("ERROR", "INFO", "DEBUG")
-    "agentLevel": "DEBUG",        // on Imp-Agent
-    "deviceLevel": "INFO"         // on Imp-Device
   }
+},
+
+"debug": {                 // debug features
+  "agentLogLevel": "DEBUG",  // logging level on Imp-Agent ("ERROR", "INFO", "DEBUG")
+  "deviceLogLevel": "INFO"   // logging level on Imp-Device ("ERROR", "INFO", "DEBUG")
 }
 }
 
