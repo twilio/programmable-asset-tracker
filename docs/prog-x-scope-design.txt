@@ -1,4 +1,4 @@
-ver 2022-03-10
+ver 2022-03-13
 
 Prog-X: scope
 ------------------
@@ -352,13 +352,27 @@ JSON format:
       "after": <string>             // UNIX timestamp after which location obtaining is activated, >SOME_RESONABLE_TIMESTAMP
     },
 
-    "bleBeacons": {               // BLE beacons for location obtaining
-      "enabled": true/false,        // true - location obtaining using BLE beacons is enabled
-      "beacons": {                  // new set of beacons - fully replaces the previous set of beacons
-        <id>: {                     // beacon unique identifier (MAC address)
+    "ble": {                      // Bluetooth Low Enegry (BLE) for location obtaining
+      "enabled": true/false,        // true - location obtaining using BLE is enabled
+      "generic": {                  // new set of generic devices - fully replaces the previous set of generic devices
+        <mac>: {                     // device identifier (MAC address). Example: "db9786256c43"
                                       // location - lng, lat - can be specified together only
           "lng": <number>,            // longitude, in degrees, [-180..180]
           "lat": <number>             // latitude, in degrees, [-90..90]
+        },
+        ...
+      },
+      "iBeacon": {                  // new set of iBeacon devices - fully replaces the previous set of iBeacon devices
+        <uuid>: {                     // group UUID (16 bytes). Example: "74d2515660e6444ca177a96e67ecfc5f"
+          <major>: {                    // sub-group identifier, number from 0 to 65535
+            <minor>: {                    // device identifier, number from 0 to 65535
+                                            // location - lng, lat - can be specified together only
+              "lng": <number>,              // longitude, in degrees, [-180..180]
+              "lat": <number>               // latitude, in degrees, [-90..90]
+            },
+            ...
+          },
+          ...
         },
         ...
       }
