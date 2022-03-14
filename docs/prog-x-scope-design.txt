@@ -352,8 +352,8 @@ JSON format:
       "after": <string>             // UNIX timestamp after which location obtaining is activated, >SOME_RESONABLE_TIMESTAMP
     },
 
-    "ble": {                      // Bluetooth Low Enegry (BLE) for location obtaining
-      "enabled": true/false,        // true - location obtaining using BLE is enabled
+    "bleDevices": {               // Bluetooth Low Enegry (BLE) devices for location obtaining
+      "enabled": true/false,        // true - location obtaining using BLE devices is enabled
       "generic": {                  // new set of generic devices - fully replaces the previous set of generic devices
         <mac>: {                     // device identifier (MAC address). Example: "db9786256c43"
                                       // location - lng, lat - can be specified together only
