@@ -48,13 +48,15 @@ class LocationDriver {
     _gnssFailsCounter = 0;
     // ESP32 object
     _esp = null;
-    // BLE beacons array
-    _beaconsWithKnownLocation = null;
+    // Known BLE devices
+    _knownBLEDevices = null;
 
     /**
      * Constructor for Location Driver
      */
     constructor() {
+        _knownBLEDevices = DEFAULT_BLE_DEVICES;
+
         _ubxDriver = UBloxM8N(HW_UBLOX_UART);
         local ubxSettings = {
             "baudRate"     : LD_UBLOX_UART_BAUDRATE,
@@ -98,9 +100,9 @@ class LocationDriver {
             return _gettingLocation;
         }
 
-        return _gettingLocation = _getLocationBLEBeacons()
+        return _gettingLocation = _getLocationBLEDevices()
         .fail(function(err) {
-            ::info("Couldn't get location BLE beacons: " + err, "@{CLASS_NAME}");
+            ::info("Couldn't get location using BLE devices: " + err, "@{CLASS_NAME}");
             return _getLocationGNSS();
         }.bindenv(this))
         .fail(function(err) {
@@ -263,64 +265,69 @@ class LocationDriver {
             throw err;
         }.bindenv(this));
     }
-    
+
     /**
-     * Obtain the current location using BLE beacons
+     * Obtain the current location using BLE devices
      *
      * @return {Promise} that:
      * - resolves with the current location if the operation succeeded
      * - rejects with an error if the operation failed
      */
-    function _getLocationBLEBeacons() {
-        ::debug("Getting location using BLE beacons..", "@{CLASS_NAME}");
+    function _getLocationBLEDevices() {
+        ::debug("Getting location using BLE devices..", "@{CLASS_NAME}");
         // Default accuracy
         const LD_BLE_BEACON_DEFAULT_ACCURACY = 10;
 
-        local resBeacons = [];
-        local resBeaconsRssi = [];
-        local resBeaconsAddr = [];
+        return _esp.scanBLEAdverts()
+        .then(function(adverts) {
+            local knownGeneric = _knownBLEDevices.generic;
+            local knownIBeacons = _knownBLEDevices.iBeacon;
+            // Table of "recognized" advertisements (for which the location is known) and their locations
+            local recognized = {};
 
-        return _esp.scanBLEBeacons()
-        .then(function(beacons) {
-            // check known location beacons
-            if (_beaconsWithKnownLocation != null) {
-                foreach (discoveredBeacon in beacons) {
-                    foreach (knownBeacon in _beaconsWithKnownLocation) {
-                        if (discoveredBeacon.addr in knownBeacon) {
-                            resBeacons.push(knownBeacon);
-                            resBeaconsRssi.push(discoveredBeacon.rssi);
-                            resBeaconsAddr.push(discoveredBeacon.addr);
-                        }
-                    }
+            foreach (advert in adverts) {
+                if (advert.address in knownGeneric) {
+                    ::debug("A generic BLE device with known location found: " + advert.address, "@{CLASS_NAME}");
+
+                    recognized[advert] <- knownGeneric[advert.address];
+                    continue;
                 }
-                local closestBeaconRssi = null;
-                local closestBeaconInd = null;
-                switch(resBeacons.len()) {
-                    case 0:
-                        return Promise.reject("No beacons available with known location");
-                        break;
-                    default:
-                        foreach (ind, beaconRssi in resBeaconsRssi) {
-                            if (closestBeaconRssi == null || beaconRssi > closestBeaconRssi) {
-                                closestBeaconRssi = beaconRssi;
-                                closestBeaconInd = ind;
-                            }
-                        }
-                        return {
-                            "timestamp": time(),
-                            "type": "ble",
-                            "accuracy": LD_BLE_BEACON_DEFAULT_ACCURACY,
-                            "longitude": resBeacons[closestBeaconInd][resBeaconsAddr[closestBeaconInd]].lng,
-                            "latitude": resBeacons[closestBeaconInd][resBeaconsAddr[closestBeaconInd]].lat
-                        };
-                        break;
+
+                local parsed = _parseIBeaconPacket(advert.advData);
+
+                if (parsed && parsed.uuid  in knownIBeacons
+                           && parsed.major in knownIBeacons[parsed.uuid]
+                           && parsed.minor in knownIBeacons[parsed.uuid][parsed.major]) {
+                    local iBeaconInfo = format("UUID %s, Major %d, Minor %d", _formatUUID(parsed.uuid), parsed.major, parsed.minor);
+                    ::debug(format("An iBeacon device with known location found: %s, %s", advert.address, iBeaconInfo), "@{CLASS_NAME}");
+
+                    recognized[advert] <- knownIBeacons[parsed.uuid][parsed.major][parsed.minor];
                 }
-            } else {
-                return Promise.reject("No beacons available with known location");
             }
-        }.bindenv(this))
-        .fail(function(err) {
-            throw "Error scan BLE beacons: " + err;
+
+            if (recognized.len() == 0) {
+                return Promise.reject("No known devices available");
+            }
+
+            local closestDevice = null;
+            foreach (advert, _ in recognized) {
+                if (closestDevice == null || closestDevice.rssi < advert.rssi) {
+                    closestDevice = advert;
+                }
+            }
+
+            ::info("Got location using BLE devices", "@{CLASS_NAME}");
+            ::debug("The closest BLE device with known location: " + closestDevice.address, "@{CLASS_NAME}");
+
+            return {
+                "timestamp": time(),
+                "type": "ble",
+                "accuracy": LD_BLE_BEACON_DEFAULT_ACCURACY,
+                "longitude": recognized[closestDevice].lng,
+                "latitude": recognized[closestDevice].lat
+            };
+        }.bindenv(this), function(err) {
+            throw "Couldn't scan BLE devices: " + err;
         }.bindenv(this));
     }
 
@@ -403,6 +410,58 @@ class LocationDriver {
             // Send the request to the agent
             rm.send(name, data);
         }.bindenv(this));
+    }
+
+    /**
+     * Parse the iBeacon packet (if any) from BLE advertisement data
+     *
+     * @param {blob} data - BLE advertisement data
+     *
+     * @return {table | null} Parsed iBeacon packet or null if no iBeacon packet found
+     *  The keys and values of the table:
+     *     "uuid"  : {string}  - UUID (16 bytes).
+     *     "major" : {integer} - Major (from 0 to 65535).
+     *     "minor" : {integer} - Minor (from 0 to 65535).
+     */
+    function _parseIBeaconPacket(data) {
+        // Packet length: 0x1A = 26 bytes
+        // Packet type: 0xFF = Custom Manufacturer Packet
+        // Manufacturer ID: 0x4C00 (little-endian) = Apple’s Bluetooth Sig ID
+        // Sub-packet type: 0x02 = iBeacon
+        // Sub-packet length: 0x15 = 21 bytes
+        const LD_IBEACON_PREFIX = "\x1A\xFF\x4C\x00\x02\x15";
+        const LD_IBEACON_DATA_LEN = 27;
+
+        local dataStr = data.tostring();
+
+        if (dataStr.len() < LD_IBEACON_DATA_LEN || dataStr.find(LD_IBEACON_PREFIX) == null) {
+            return null;
+        }
+
+        local checkPrefix = function(startIdx) {
+            return dataStr.slice(startIdx, startIdx + LD_IBEACON_PREFIX.len()) == LD_IBEACON_PREFIX;
+        };
+
+        // Advertisement data may consist of several sub-packets. Every packet contains its length in the first byte.
+        // We are jumping across these packets and checking if some of them contains the prefix we are looking for
+        local packetStartIdx = 0;
+        while (!checkPrefix(packetStartIdx)) {
+            // Add up the sub-packet's length to jump to the next one
+            packetStartIdx += data[packetStartIdx] + 1;
+
+            // If we see that there will surely be no iBeacon packet in further bytes, we stop
+            if (packetStartIdx + LD_IBEACON_DATA_LEN > data.len()) {
+                return null;
+            }
+        }
+
+        data.seek(packetStartIdx + LD_IBEACON_PREFIX.len());
+
+        return {
+            "uuid": data.readblob(16).tostring(),
+            "major": (data.readn('b') << 8) | data.readn('b'),
+            "minor": (data.readn('b') << 8) | data.readn('b'),
+        }
     }
 
     // -------------------- UBLOX-SPECIFIC METHODS -------------------- //
@@ -727,6 +786,29 @@ class LocationDriver {
             ::error("Invalid date object passed: " + err, "@{CLASS_NAME}");
             return 0;
         }
+    }
+
+    /**
+     * Format a UUID string to make it printable and human-readable
+     *
+     * @param {string} str - UUID string (16 bytes)
+     *
+     * @return {string} Printable and human-readable UUID string
+     *  The format is: 00112233-4455-6677-8899-aabbccddeeff
+     */
+    function _formatUUID(str) {
+        // The indexes where the dash character ("-") must be placed in the UUID representation
+        local uuidDashes = [3, 5, 7, 9];
+        local res = "";
+
+        for (local i = 0; i < str.len(); i++) {
+            res += format("%02x", str[i]);
+            if (uuidDashes.find(i) != null) {
+                res += "-";
+            }
+        }
+
+        return res;
     }
 }
 

@@ -44,3 +44,22 @@ const DEFAULT_MOTION_VELOCITY = 0.5;
 // Minimal movement distance to determine motion detection condition, in meters.
 // If 0, distance is not calculated (not used for motion detection)
 const DEFAULT_MOTION_DISTANCE = 5.0;
+
+// BLE devices and their locations
+DEFAULT_BLE_DEVICES <- {
+    // This key may contain an empty table but it must be present
+    "generic": {
+        "656684e1b306": {
+            "lat": 1,
+            "lng": 2
+        }
+    },
+    // This key may contain an empty table but it must be present
+    "iBeacon": {
+        "\x01\x12\x23\x34\x45\x56\x67\x78\x89\x9a\xab\xbc\xcd\xde\xef\xf0": {
+            [1800] = {
+                [1286] = { "lat": 10, "lng": 20 }
+            }
+        }
+    }
+};

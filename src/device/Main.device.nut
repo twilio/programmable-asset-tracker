@@ -7,7 +7,7 @@
 #require "ConnectionManager.lib.nut:3.1.1"
 #require "Messenger.lib.nut:0.2.0"
 #require "ReplayMessenger.device.lib.nut:0.2.0"
-#require "utilities.lib.nut:2.0.0"
+#require "utilities.lib.nut:3.0.1"
 #require "LIS3DH.device.lib.nut:3.0.0"
 #require "HTS221.device.lib.nut:2.0.2"
 #require "UBloxM8N.device.lib.nut:1.0.1"
@@ -62,8 +62,9 @@ const APP_RM_MSG_SENDING_MAX_RATE = 5;
 const APP_RM_MSG_RESEND_LIMIT = 5;
 
 // Send buffer size, in bytes
-const APP_SEND_BUFFER_SIZE = 20480;
+const APP_SEND_BUFFER_SIZE = 10240;
 
+// TODO: Check the RAM consumption!
 class Application {
     _locationDriver = null;
     _accelDriver = null;

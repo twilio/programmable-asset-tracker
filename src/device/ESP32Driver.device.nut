@@ -25,7 +25,7 @@ enum ESP32_BLE_FILTER_POLICY {
     ALLOW_ALL = 0,
     ALLOW_ONLY_WLST = 1,
     ALLOW_UND_RPA_DIR = 2,
-    ALLOW_WLIST_PRA_DIR = 3
+    ALLOW_WLIST_RPA_DIR = 3
 };
 
 // Enum for BLE roles
@@ -111,22 +111,24 @@ const ESP32_DEFAULT_RX_FIFO_SZ = 4096;
 // Maximum time allowed for waiting for data, in seconds
 const ESP32_WAIT_DATA_TIMEOUT = 8;
 // Maximum amount of data expected to be received, in bytes
-const ESP32_MAX_DATA_LEN = 4096;
+const ESP32_MAX_DATA_LEN = 12288;
 // Automatic switch off delay, in seconds
 const ESP32_SWITCH_OFF_DELAY = 10;
 
-// Scan interval. It should be more than or equal to the value of <scan_window>. 
-// The range of this parameter is [0x0004,0x4000]. 
-// The scan interval equals this parameter multiplied by 0.625 ms, 
+// TODO: Tune the following 3 constants. Sometimes it can scan not all devices
+//       But we also should avoid OOM (please, see the TODO above _waitForData())
+// Scan interval. It should be more than or equal to the value of <scan_window>.
+// The range of this parameter is [0x0004,0x4000].
+// The scan interval equals this parameter multiplied by 0.625 ms,
 // so the range for the actual scan interval is [2.5,10240] ms.
-const ESP32_BLE_SCAN_INTERVAL = 4;
-// Scan window. It should be less than or equal to the value of <scan_interval>. 
-// The range of this parameter is [0x0004,0x4000]. 
-// The scan window equals this parameter multiplied by 0.625 ms, 
+const ESP32_BLE_SCAN_INTERVAL = 8;
+// Scan window. It should be less than or equal to the value of <scan_interval>.
+// The range of this parameter is [0x0004,0x4000].
+// The scan window equals this parameter multiplied by 0.625 ms,
 // so the range for the actual scan window is [2.5,10240] ms.
-const ESP32_BLE_SCAN_WINDOW = 4;
-// BLE beacons scan period, in seconds
-const ESP32_BLE_SCAN_PERIOD = 5;
+const ESP32_BLE_SCAN_WINDOW = 8;
+// BLE advertisements scan period, in seconds
+const ESP32_BLE_SCAN_PERIOD = 6;
 
 // ESP32 Driver class.
 // Ability to work with WiFi networks and BLE
@@ -143,8 +145,6 @@ class ESP32Driver {
     _initialized = false;
     // Timer for automatic switch-off of the ESP32 board when idle
     _switchOffTimer = null;
-    // Elapsed time after last request 
-    _timeElapsed = null;
 
     /**
      * Constructor for ESP32 Driver Class
@@ -190,7 +190,7 @@ class ESP32Driver {
 
     /**
      * Scan WiFi networks.
-     * NOTE: Parallel requests are not allowed
+     * NOTE: Parallel requests (2xWiFi or WiFi+BLE scanning) are not allowed
      *
      * @return {Promise} that:
      * - resolves with an array of WiFi networks scanned if the operation succeeded
@@ -209,12 +209,12 @@ class ESP32Driver {
         .then(function(_) {
             ::debug("Scanning WiFi networks..", "@{CLASS_NAME}");
 
-            local okValidator = @(data) data.find("\r\nOK\r\n") != null;
+            local okValidator = @(data, _) data.find("\r\nOK\r\n") != null;
             // Send "List Available APs" cmd and parse the result
             return _communicate("AT+CWLAP", okValidator, _parseWifiNetworks, false);
         }.bindenv(this))
         .then(function(wifis) {
-            ::debug("Scanning of WiFi networks finished successfully. Scanned networks: " + wifis.len(), "@{CLASS_NAME}");
+            ::debug("Scanning of WiFi networks finished successfully. Scanned items: " + wifis.len(), "@{CLASS_NAME}");
             _switchOffTimer = imp.wakeup(ESP32_SWITCH_OFF_DELAY, _switchOff.bindenv(this));
             return wifis;
         }.bindenv(this), function(err) {
@@ -224,37 +224,35 @@ class ESP32Driver {
     }
 
     /**
-     * Scan BLE beacons.
-     * NOTE: Parallel requests are not allowed
+     * Scan BLE advertisements.
+     * NOTE: Parallel requests (2xBLE or BLE+WiFi scanning) are not allowed
      *
      * @return {Promise} that:
-     * - resolves with an array of BLE beacons scanned if the operation succeeded
+     * - resolves with an array of scanned BLE advertisements if the operation succeeded
      *   Each element of the array is a table with the following fields:
-     *     "addr"      : {string}  - beacon address.
-     *     "rssi"      : {integer} - RSSI (signal strength).
+     *     "address"  : {string}  - BLE address.
+     *     "rssi"     : {integer} - RSSI (signal strength).
+     *     "advData"  : {blob} - Advertising data.
+     *     "addrType" : {integer} - Address type: 0 - public, 1 - random.
      * - rejects if the operation failed
      */
-    function scanBLEBeacons() {
+    function scanBLEAdverts() {
         _switchOffTimer && imp.cancelwakeup(_switchOffTimer);
 
         return _init()
         .then(function(_) {
-            ::debug("Scanning BLE beacons..", "@{CLASS_NAME}");
+            ::debug("Scanning BLE advertisements..", "@{CLASS_NAME}");
 
-            local okValidator = @(data) ((data.find("\r\nOK\r\n") != null) && 
-                                         (_timeElapsed >= ESP32_BLE_SCAN_PERIOD));
-            // Send "List Available APs" cmd and parse the result
-            return _communicate(format("AT+BLESCAN=%d,%d",
-                                       ESP32_BLE_SCAN.ENABLE,
-                                       ESP32_BLE_SCAN_PERIOD), 
-                                okValidator, 
-                                _parseBLEBeacons, 
-                                false);
+            local bleScanCmd = format("AT+BLESCAN=%d,%d", ESP32_BLE_SCAN.ENABLE, ESP32_BLE_SCAN_PERIOD);
+            local validator = @(data, timeElapsed) (data.find("\r\nOK\r\n") != null &&
+                                                    timeElapsed >= ESP32_BLE_SCAN_PERIOD);
+            // Send "Enable Bluetooth LE Scanning" cmd and parse the result
+            return _communicate(bleScanCmd, validator, _parseBLEAdverts, false);
         }.bindenv(this))
-        .then(function(beacons) {
-            ::debug("Scanning of BLE beacons finished.", "@{CLASS_NAME}");
+        .then(function(adverts) {
+            ::debug("Scanning of BLE advertisements finished successfully. Scanned items: " + adverts.len(), "@{CLASS_NAME}");
             _switchOffTimer = imp.wakeup(ESP32_SWITCH_OFF_DELAY, _switchOff.bindenv(this));
-            return beacons;
+            return adverts;
         }.bindenv(this), function(err) {
             _switchOffTimer = imp.wakeup(ESP32_SWITCH_OFF_DELAY, _switchOff.bindenv(this));
             throw err;
@@ -276,9 +274,9 @@ class ESP32Driver {
             return Promise.resolve(null);
         }
 
-        // compare BLE scan period and wait data timeout
+        // Compare BLE scan period and wait data timeout
         if (ESP32_BLE_SCAN_PERIOD > ESP32_WAIT_DATA_TIMEOUT) {
-            ::info("BLE scan period more then wait data period!", "@{CLASS_NAME}");
+            ::info("BLE scan period is greater than wait data period!", "@{CLASS_NAME}");
         }
 
         ::debug("Starting initialization", "@{CLASS_NAME}");
@@ -291,9 +289,9 @@ class ESP32Driver {
 
         _switchOn();
 
-        local readyMsgValidator   = @(data) data.find("\r\nready\r\n") != null;
-        local restoreCmdValidator = @(data) data.find("\r\nOK\r\n\r\nready\r\n") != null;
-        local okValidator         = @(data) data.find("\r\nOK\r\n") != null;
+        local readyMsgValidator   = @(data, _) data.find("\r\nready\r\n") != null;
+        local restoreCmdValidator = @(data, _) data.find("\r\nOK\r\n\r\nready\r\n") != null;
+        local okValidator         = @(data, _) data.find("\r\nOK\r\n") != null;
 
         local cmdSetPrintMask = format("AT+CWLAPOPT=0,%d",
                                        ESP32_WIFI_SCAN_PRINT_MASK.SHOW_SSID |
@@ -301,8 +299,6 @@ class ESP32Driver {
                                        ESP32_WIFI_SCAN_PRINT_MASK.SHOW_CHANNEL |
                                        ESP32_WIFI_SCAN_PRINT_MASK.SHOW_RSSI |
                                        ESP32_WIFI_SCAN_PRINT_MASK.SHOW_ECN);
-        local cmdSetBLERole = format("AT+BLEINIT=%d",
-                                     ESP32_BLE_ROLE.CLIENT);
         local cmdSetBLEScanParam = format("AT+BLESCANPARAM=%d,%d,%d,%d,%d",
                                           ESP32_BLE_SCAN_TYPE.PASSIVE,
                                           ESP32_BLE_OWN_ADDR_TYPE.PUBLIC,
@@ -320,10 +316,10 @@ class ESP32Driver {
             _communicate("AT+GMR", okValidator, _logVersionInfo),
             // Set the Wi-Fi Mode to "Station"
             _communicate(format("AT+CWMODE=%d", ESP32_WIFI_MODE.STATION), okValidator),
-            // Set the Configuration for the Command AT+CWLAP
+            // Set the Configuration for the Command AT+CWLAP (Wi-Fi scanning)
             _communicate(cmdSetPrintMask, okValidator),
             // Initialize the role of BLE
-            _communicate(cmdSetBLERole, okValidator),
+            _communicate(format("AT+BLEINIT=%d", ESP32_BLE_ROLE.CLIENT), okValidator),
             // Set the parameters of Bluetooth LE scanning
             _communicate(cmdSetBLEScanParam, okValidator)
         ];
@@ -417,11 +413,11 @@ class ESP32Driver {
         // OK
 
         // Sub-expressions of the regular expression for parsing AT+CWLAP response
-        const ESP32_CWLAP_PREFIX = @"\+CWLAP:";
-        const ESP32_CWLAP_ECN = @"\d";
-        const ESP32_CWLAP_SSID = @".{0,32}";
-        const ESP32_CWLAP_RSSI = @"-?\d{1,3}";
-        const ESP32_CWLAP_MAC = @"(?:\x\x:){5}\x\x";
+        const ESP32_CWLAP_PREFIX  = @"\+CWLAP:";
+        const ESP32_CWLAP_ECN     = @"\d";
+        const ESP32_CWLAP_SSID    = @".{0,32}";
+        const ESP32_CWLAP_RSSI    = @"-?\d{1,3}";
+        const ESP32_CWLAP_MAC     = @"(?:\x\x:){5}\x\x";
         // Only WiFi 2.4GHz (5GHz channels can be 100+)
         const ESP32_CWLAP_CHANNEL = @"\d{1,2}";
 
@@ -508,9 +504,11 @@ class ESP32Driver {
      * - resolves with the data received if the operation succeeded
      * - rejects if the operation failed
      */
+    // TODO: On-the-fly data processing may be required. And memory consumption optimization.
+    //       If we wait for all data to be received before processing, we can face OOM due to the need of keeping all raw recevied data
     function _waitForData(validator) {
         // Data check/read period, in seconds
-        const ESP32_DATA_CHECK_PERIOD = 0.5;
+        const ESP32_DATA_CHECK_PERIOD = 0.1;
         // Maximum data length expected to be received from ESP32, in bytes
         const ESP32_DATA_READ_CHUNK_LEN = 1024;
 
@@ -528,12 +526,13 @@ class ESP32Driver {
                     chunk = _serial.readblob(ESP32_DATA_READ_CHUNK_LEN);
                 }
 
-                if (data.len() > 0 && validator(data)) {
+                local timeElapsed = (hardware.millis() - start) / 1000.0;
+
+                if (validator(data, timeElapsed)) {
                     return resolve(data);
                 }
 
-                _timeElapsed = (hardware.millis() - start) / 1000.0;
-                if (_timeElapsed >= ESP32_WAIT_DATA_TIMEOUT) {
+                if (timeElapsed >= ESP32_WAIT_DATA_TIMEOUT) {
                     return reject("Timeout waiting for the expected data or an acknowledge");
                 }
 
@@ -570,39 +569,49 @@ class ESP32Driver {
      *
      * @param {string} data - String with a reply to the AT+BLESCAN command
      *
-     * @return {array} of BLE beacons
+     * @return {array} of scanned BLE advertisements
      *  Each element of the array is a table with the following fields:
-     *     "addr"      : {string}  - beacon address.
-     *     "rssi"      : {integer} - RSSI (signal strength).
+     *     "address"  : {string}  - BLE address.
+     *     "rssi"     : {integer} - RSSI (signal strength).
+     *     "advData"  : {blob} - Advertising data.
+     *     "addrType" : {integer} - Address type: 0 - public, 1 - random.
      * An exception may be thrown in case of an error.
      */
-    function _parseBLEBeacons(data) {
+    function _parseBLEAdverts(data) {
         // The data should look like the following:
         // AT+BLESCAN=1,5
         // OK
-        // iBeacon   - +BLESCAN:6f:92:8a:04:e1:79,-89,1aff4c000215646be3e46e4e4e25ad0177a28f3df4bd00000000bf,,1
-        // altbeacon - +BLESCAN:76:72:c3:3e:29:e4,-79,1bffffffbeac726addafa7044528b00b12f8f57e7d8200000000bb00,,1
-        // eddistone - +BLESCAN:78:51:69:0a:fe:a0,-81,0303aafe1516aafe00bf39f67645ff7d7a14b58f000000000000,,1
+        // +BLESCAN:6f:92:8a:04:e1:79,-89,1aff4c000215646be3e46e4e4e25ad0177a28f3df4bd00000000bf,,1
+        // +BLESCAN:76:72:c3:3e:29:e4,-79,1bffffffbeac726addafa7044528b00b12f8f57e7d8200000000bb00,,1
 
         // Sub-expressions of the regular expression for parsing AT+BLESCAN response
-        const ESP32_BLESCAN_PREFIX = @"\+BLESCAN:";
-        const ESP32_BLESCAN_ADDR = @"(?:\x\x:){5}\x\x";
-        const ESP32_BLESCAN_RSSI = @"-?\d{1,3}";
-        const ESP32_BLESCAN_ADV = @".{0,30}";
-        // NOTE: Due to the known issues of regexp (see the electric imp docs)
-        local regex = regexp(format(@"^%s(%s),(%s),(%s)",
+        const ESP32_BLESCAN_PREFIX        = @"\+BLESCAN:";
+        const ESP32_BLESCAN_ADDR          = @"(?:\x\x:){5}\x\x";
+        const ESP32_BLESCAN_RSSI          = @"-?\d{1,3}";
+        const ESP32_BLESCAN_ADV_DATA      = @"(?:\x\x){0,31}";
+        const ESP32_BLESCAN_SCAN_RSP_DATA = @"(?:\x\x){0,31}";
+        const ESP32_BLESCAN_ADDR_TYPE     = @"\d";
+
+        local regex = regexp(format(@"^%s""(%s)"",(%s),(%s),(%s),(%s)$",
                                     ESP32_BLESCAN_PREFIX,
                                     ESP32_BLESCAN_ADDR,
                                     ESP32_BLESCAN_RSSI,
-                                    ESP32_BLESCAN_ADV));
-        ::debug("Parsing the BLE beacons scan response..", "@{CLASS_NAME}");
+                                    ESP32_BLESCAN_ADV_DATA,
+                                    ESP32_BLESCAN_SCAN_RSP_DATA,
+                                    ESP32_BLESCAN_ADDR_TYPE));
+        ::debug("Parsing the BLE devices scan response..", "@{CLASS_NAME}");
 
         try {
-            local beacons = [];
+            // Result array of scanned advertisements
+            local result = [];
+            // Array of strings to be compared to check the uniqueness of an advertisement
+            local uniqueAdverts = [];
             local dataRows = split(data, "\r\n");
 
+            // In order to process fresher advertisements first (to get the latest RSSI for duplicated adverts), reverse this array
+            dataRows.reverse();
+
             foreach (row in dataRows) {
-                ::debug(row, "@{CLASS_NAME}");
                 local regexCapture = regex.capture(row);
 
                 if (regexCapture == null) {
@@ -616,26 +625,33 @@ class ESP32Driver {
                     regexCapture[i] = row.slice(val.begin, val.end);
                 }
 
-                local scannedBeacon = {
-                    "addr"   : _removeColon(regexCapture[ESP32_BLE_PARAM_ORDER.ADDR]),
-                    "rssi"   : regexCapture[ESP32_BLE_PARAM_ORDER.RSSI].tointeger()
+                local address = _removeColon(regexCapture[ESP32_BLE_PARAM_ORDER.ADDR]);
+                local advData = regexCapture[ESP32_BLE_PARAM_ORDER.ADV_DATA];
+                local addrType = regexCapture[ESP32_BLE_PARAM_ORDER.ADDR_TYPE].tointeger();
+
+                // Make a string that helps to compare adverts.
+                // Advertisement uniqueness is determined by equality of address, advData and addrType
+                local stringAdvert = address + advData + addrType;
+
+                if (uniqueAdverts.find(stringAdvert) != null) {
+                    continue;
+                }
+
+                uniqueAdverts.push(stringAdvert);
+
+                local resultAdvert = {
+                    "address" : address,
+                    "rssi"    : regexCapture[ESP32_BLE_PARAM_ORDER.RSSI].tointeger(),
+                    "advData" : advData.len() >= 2 ? utilities.hexStringToBlob(advData) : blob(),
+                    "addrType": addrType
                 };
 
-                local alreadyExist = false;
-                foreach (el in beacons) {
-                    if(el.addr.find(scannedBeacon.addr) != null) {
-                        alreadyExist = true;
-                        break;
-                    }
-                }
-                if (!alreadyExist) {
-                    beacons.push(scannedBeacon);
-                }
+                result.push(resultAdvert);
             }
 
-            return beacons;
+            return result;
         } catch (err) {
-            throw "BLE beacons parsing error: " + err;
+            throw "BLE advertisements parsing error: " + err;
         }
     }
 }
