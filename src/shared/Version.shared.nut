@@ -1,2 +1,2 @@
 // Application Version
-const APP_VERSION = "1.2.1";
+const APP_VERSION = "1.3.0";
