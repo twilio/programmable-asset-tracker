@@ -5,7 +5,7 @@
 #require "ConnectionManager.lib.nut:3.1.1"
 #require "Messenger.lib.nut:0.2.0"
 #require "ReplayMessenger.device.lib.nut:0.2.0"
-#require "utilities.lib.nut:2.0.0"
+#require "utilities.lib.nut:3.0.1"
 #require "UBloxM8N.device.lib.nut:1.0.1"
 #require "UbxMsgParser.lib.nut:2.0.1"
 #require "UBloxAssistNow.device.lib.nut:0.1.0"
@@ -18,6 +18,7 @@
 @include once "../src/device/bg96_gps.device.lib.nut"
 @include once "../src/device/BG96CellInfo.device.nut"
 @include once "../src/device/ESP32Driver.device.nut"
+@include once "../src/device/Configuration.device.nut"
 
 
 @if BG96_GNSS
@@ -125,15 +126,15 @@ function printResult(loc) {
  */
  function testGetLocationBLE() {
 
-     // Obtain and log location by BLE beacons
-    ld._getLocationBLEBeacons()
+     // Obtain and log location by BLE device
+    ld._getLocationBLEDevices()
     .then(function(loc){
-        ::info("Location BLE beacons:");
+        ::info("Location BLE device:");
         printResult(loc);
         imp.wakeup(0, testGetLocationGNSS);
     })
     .fail(function(err){
-        ::info("Location BLE beacons error: " + err);
+        ::info("Location BLE device error: " + err);
         imp.wakeup(0, testGetLocationGNSS);
     });
 }
@@ -154,9 +155,9 @@ ld <- null;
 // in order to run the application without a connection to the Internet
 // (it sets the appropriate send timeout policy)
 cmConfig <- {
-        "stayConnected"   : true,
-        "errorPolicy"     : RETURN_ON_ERROR_NO_DISCONNECT,
-        "connectTimeout"  : APP_CM_CONNECT_TIMEOUT
+    "stayConnected"   : true,
+    "errorPolicy"     : RETURN_ON_ERROR_NO_DISCONNECT,
+    "connectTimeout"  : APP_CM_CONNECT_TIMEOUT
 };
 cm = CustomConnectionManager(cmConfig);
 cm.connect();
