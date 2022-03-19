@@ -592,7 +592,7 @@ class ESP32Driver {
         const ESP32_BLESCAN_SCAN_RSP_DATA = @"(?:\x\x){0,31}";
         const ESP32_BLESCAN_ADDR_TYPE     = @"\d";
 
-        local regex = regexp(format(@"^%s(%s),(%s),(%s),(%s),(%s)$",
+        local regex = regexp(format(@"^%s""(%s)"",(%s),(%s),(%s),(%s)$",
                                     ESP32_BLESCAN_PREFIX,
                                     ESP32_BLESCAN_ADDR,
                                     ESP32_BLESCAN_RSSI,
