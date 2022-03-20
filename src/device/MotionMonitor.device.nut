@@ -98,7 +98,7 @@ class MotionMonitor {
         _ld = locDriver;
 
         _geofenceIsEnable = false;
-        _geofenceRadius = 0.0;
+        _geofenceRadius = DEFAULT_GEOFENCE_RADIUS;
         _motionStopAssumption = false;
         _inMotion = false;
         _curLocFresh = false;
@@ -113,8 +113,8 @@ class MotionMonitor {
                     "accuracy": MM_EARTH_RAD,
                     "longitude": INIT_LONGITUDE,
                     "latitude": INIT_LATITUDE};
-        _geofenceCenter = {"longitude": INIT_LONGITUDE,
-                            "latitude": INIT_LATITUDE};
+        _geofenceCenter = {"longitude": DEFAULT_GEOFENCE_CENTER_LNG,
+                            "latitude": DEFAULT_GEOFENCE_CENTER_LAT};
         _locReadingPeriod = DEFAULT_LOCATION_READING_PERIOD;
         _movementMax = DEFAULT_MOVEMENT_ACCELERATION_MAX;
         _movementMin = DEFAULT_MOVEMENT_ACCELERATION_MIN;
@@ -249,7 +249,7 @@ class MotionMonitor {
                     _geofenceIsEnable = settings.enabled;
                 }
             }
-            _geofenceRadius = 0.0;
+            _geofenceRadius = DEFAULT_GEOFENCE_RADIUS;
             if ("radius" in settings) {
                 if (typeof settings.radius == "float" && 
                     settings.radius >= 0) {
@@ -257,8 +257,8 @@ class MotionMonitor {
                     _geofenceRadius = settings.radius > MM_EARTH_RAD ? MM_EARTH_RAD : settings.radius;
                 }
             }
-            _geofenceCenter = {"longitude": INIT_LONGITUDE,
-                               "latitude" : INIT_LATITUDE};
+            _geofenceCenter = {"longitude": DEFAULT_GEOFENCE_CENTER_LNG,
+                               "latitude" : DEFAULT_GEOFENCE_CENTER_LAT};
             if ("lng" in settings && "lat" in settings) {
                 if (typeof settings.lat == "float") {
                     ::info("Geofence latitude: " + settings.lat, "@{CLASS_NAME}");
@@ -503,16 +503,27 @@ class MotionMonitor {
      *          "latitude" : {float}    - Latitude, in degrees.  
      */
     function _procGeofence(curLocation) {
+        //              _____GeofenceZone
+        //             /      \
+        //            /__     R\    dist           __Location
+        //           |/\ \  .---|-----------------/- \
+        //           |\__/      |                 \_\/accuracy (radius)
+        //            \ Location/
+        //             \______ /
+        //            in zone                     not in zone
+        // (location with accuracy radius      (location with accuracy radius
+        //  entirely in geofence zone)          entirely not in geofence zone)
+        // TODO: location after reboot/reconfigure - not in geofence zone
         if (_geofenceIsEnable) {
-            local dist = _greatCircleDistance(_geofenceCenter, curLocation);               //       _____GeofenceZone
-            ::debug("Geofence distance: " + dist, "@{CLASS_NAME}");                        //      /      \
-            if (dist > _geofenceRadius) {                                                  //     / __    R\    dist    __Location
-                local distWithoutAccurace = dist - curLocation.accuracy;                   //    | /\ \ .---|----------/- \
-                if (distWithoutAccurace > 0 && distWithoutAccurace > _geofenceRadius) {    //    | \__/     |          \_\/acc.
-                    if (_inGeofenceZone == null || _inGeofenceZone == true) {              //     \ Location/
-                        _geofencingEventCb && _geofencingEventCb(false);                   //      \______ /
-                        _inGeofenceZone = false;                                           //       
-                    }                                                                      //
+            local dist = _greatCircleDistance(_geofenceCenter, curLocation);
+            ::debug("Geofence distance: " + dist, "@{CLASS_NAME}");
+            if (dist > _geofenceRadius) {
+                local distWithoutAccurace = dist - curLocation.accuracy;
+                if (distWithoutAccurace > 0 && distWithoutAccurace > _geofenceRadius) {
+                    if (_inGeofenceZone == null || _inGeofenceZone == true) {
+                        _geofencingEventCb && _geofencingEventCb(false);
+                        _inGeofenceZone = false;
+                    }
                 }
             } else {
                 local distWithAccurace = dist + curLocation.accuracy;
