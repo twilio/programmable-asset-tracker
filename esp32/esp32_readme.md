@@ -1,12 +1,12 @@
 # ESP32 Firmware #
 
-Firmware for the [WiFi BLE click](https://www.mikroe.com/wifi-ble-click) board with ESP32-WROOM-32 module.
+Firmware for the [WiFi BLE click](https://www.mikroe.com/wifi-ble-click) board with the ESP32-WROOM-32 module (ESP32 Series).
 
 ## Compile Firmware ##
 
 How to prepare (compile) a firmware is described [here](https://docs.espressif.com/projects/esp-at/en/latest/Compile_and_Develop/).
 
-The latest official firmware version is [2.2.0.0](https://github.com/espressif/esp-at/releases/tag/v2.2.0.0_esp32).
+The latest official firmware version is [v2.2.0.0_esp32](https://github.com/espressif/esp-at/releases/tag/v2.2.0.0_esp32).
 
 It is already compiled and available [here](https://github.com/espressif/esp-at/files/6767464/ESP32-WROOM_AT_V2.2.0.0.zip).
 

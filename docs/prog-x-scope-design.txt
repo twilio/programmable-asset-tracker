@@ -1,4 +1,4 @@
-ver 2022-03-13
+ver 2022-03-20
 
 Prog-X: scope
 ------------------
@@ -245,7 +245,7 @@ Data Message JSON
    "location": {
      "fresh": true, // false - if the latest location has not beed determined, the provided data is the previous location
      "timestamp": 1617900070, // Unix time, timestamp when this location was determined
-     "type": "gnss", // Possible values: "gnss", "cell", "wifi", "ble"
+     "type": "gnss", // Possible values: "ble", "gnss", "wifi+cell", "wifi", "cell"
      "accuracy": 3, // in meters
      "lng": 30.571465,
      "lat": 59.749069
@@ -383,7 +383,7 @@ JSON format:
                                     // lng, lat, radius - can be updated together only
       "lng": <number>,              // center longitude, in degrees, [-180..180]
       "lat": <number>,              // center latitude, in degrees, [-90..90]
-      "radius": <number>            // radius, in meters, [EARTH_RADIUS..0]
+      "radius": <number>            // radius, in meters, [0..EARTH_RADIUS]
     }
   },
 

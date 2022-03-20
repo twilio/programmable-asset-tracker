@@ -45,7 +45,18 @@ const DEFAULT_MOTION_VELOCITY = 0.5;
 // If 0, distance is not calculated (not used for motion detection)
 const DEFAULT_MOTION_DISTANCE = 5.0;
 
+// Geofence zone:
+// NOTE: The current settings are fake/example only.
+
+// Geofence zone center latitude, in degrees, [-90..90]
+const DEFAULT_GEOFENCE_CENTER_LAT = 1.0;
+// Geofence zone center longitude, in degrees, [-180..180]
+const DEFAULT_GEOFENCE_CENTER_LNG = 2.0;
+// Geofence zone radius, in meters, [0..EARTH_RADIUS]
+const DEFAULT_GEOFENCE_RADIUS = 1.0;
+
 // BLE devices and their locations
+// NOTE: The current settings are fake/example only.
 DEFAULT_BLE_DEVICES <- {
     // This key may contain an empty table but it must be present
     "generic": {

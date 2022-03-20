@@ -1,13 +1,16 @@
 # Prog-X Asset Tracker #
 
-**Version of the Application: 1.2.1 (POC)**
+**Version of the Application: 1.3.0 (POC)**
 
 An application in Squirrel language for [Electric Imp platform](https://www.electricimp.com/platform) that implements asset tracking functionality.
 
 The requirements: [./docs/Requirements - Prog-X Asset Tracker - external-GPx.pdf](./docs/Requirements%20-%20Prog-X%20Asset%20Tracker%20-%20external-GPx.pdf)
 
 This version (Proof-Of-Concept) supports:
-- Target board: [imp006 Breakout Board](https://developer.electricimp.com/hardware/resources/reference-designs/imp006breakout)
+- Target hardware:
+  - [imp006 Breakout Board](https://developer.electricimp.com/hardware/resources/reference-designs/imp006breakout)
+  - [u-blox NEO-M8N GNSS module](https://www.u-blox.com/en/product/neo-m8-series). Tested with [Readytosky Ublox NEO M8N Kit](http://www.readytosky.com/)
+  - [Espressif ESP32 Series WiFi and Bluetooth chipset](https://www.espressif.com/en/products/socs/esp32) with [ESP-AT](https://docs.espressif.com/projects/esp-at/en/latest/esp32/) version [v2.2.0.0_esp32](https://github.com/espressif/esp-at/releases/tag/v2.2.0.0_esp32). Tested with [Mikroe WiFi BLE Click board](https://www.mikroe.com/wifi-ble-click) (ESP32-WROOM-32 module). See [esp32_readme](./esp32/esp32_readme.md)
 - Communication with the Internet (between Imp-Device and Imp-Agent) via cellular network.
 - Application configuration is hardcoded in the source file.
 - Motion start detection using Accelerometer.
@@ -15,8 +18,12 @@ This version (Proof-Of-Concept) supports:
 - Motion stop detection using Location tracking (+ Accelerometer for confirmation).
 - Default configuration settings intended for manual testing of motion ("walking pattern").
 - Location tracking by:
-  - GNSS fix (BG96 GNSS) (+ BG96 Assist data)
-  - Cellular towers information (+ Google Maps Geolocation API)
+  - Nearby BLE devices (+ BLE devices location specified in the configuration). BLE devices with [iBeacon Technology](https://developer.apple.com/ibeacon/) are supported.
+  - GNSS fix (u-blox NEO-M8N GNSS) (+ U-blox AssistNow data)
+  - Nearby WiFi networks information (+ Google Maps Geolocation API)
+  - Nearby cellular towers information (+ Google Maps Geolocation API)
+- Geofencing:
+  - One circle geofence zone configured by the center location and the radius
 - Periodic reading and reporting of:
   - Temperature
 - Alerts determination and immediate reporting for:
@@ -25,10 +32,12 @@ This version (Proof-Of-Concept) supports:
   - Shock Detected
   - Motion Started
   - Motion Stopped
+  - Geofence Entered
+  - Geofence Exited
 - Staying offline most of time. Connect to the Internet (from Imp-device to Imp-Agent) when required only. Internet connection is used for:
   - Data/alerts sending
   - GNSS Assist data obtaining
-  - Location obtaining by cellular towers information
+  - Location obtaining by cellular towers and WiFi networks information
 - If no/bad cellular network, saving messages in the flash and re-sending them later.
 - Sending data/alerts from Imp-Agent to a cloud with the predefined REST API.
 - Emergency (recovery) mode.
@@ -59,10 +68,10 @@ Should be passed to [Builder](https://github.com/electricimp/Builder/):
 - or using `--use-directives <path_to_json_file>` option, where the json file contains the variables with the values.
 
 Variables:
-- `LOGGER_LEVEL` - Logging level ("ERROR", "INFO", "DEBUG") on Imp-Agent/Device after the Imp firmware is deployed. Optional. Default: **"INFO"**
-- `UART_LOGGING` - Enable/disable [UART logging](#uart-logging) on Imp-Device. Optional. Default: **enabled**
-- `LED_INDICATION` - Enable/disable [LED indication](#led-indication) of events. Optional. Default: **enabled**
-- `BG96_GNSS` - Use BG96 GNSS rather than u-blox. Optional. Default: **false**
+- `LOGGER_LEVEL` - Set logging level ("ERROR", "INFO", "DEBUG") on Imp-Agent/Device after the Imp firmware is deployed. Optional. Default: **"INFO"**
+- `UART_LOGGING` - Enable (define the variable) / disable (undefine the variable) [UART logging](#uart-logging) on Imp-Device. Optional. Default: **enabled**
+- `LED_INDICATION` - Enable (define the variable) / disable (undefine the variable) [LED indication](#led-indication) of events. Optional. Default: **enabled**
+- `BG96_GNSS` - Enable (define the variable) / disable (undefine the variable) usage of BG96 GNSS rather than U-blox GNSS. Optional. Default: **disabled**
 
 ### User-Defined Environment Variables ###
 
@@ -75,7 +84,7 @@ Variables:
 - `CLOUD_REST_API_USERNAME` - Username to access the cloud REST API. Mandatory. Has no default.
 - `CLOUD_REST_API_PASSWORD` - Password to access the cloud REST API. Mandatory. Has no default.
 - `GOOGLE_MAPS_API_KEY` - API Key for Google Maps Platform. Required by [Google Maps Geolocation API](https://developers.google.com/maps/documentation/geolocation/overview) to determine the location by cell towers info or by WiFi networks. See [here](https://developers.google.com/maps/documentation/geolocation/get-api-key) how to obtain the Key.
-- `UBLOX_ASSIST_NOW_TOKEN` - U-blox AssistNow token. Required for downloading of assist data for u-blox GNSS receiver.
+- `UBLOX_ASSIST_NOW_TOKEN` - [U-blox AssistNow token](https://www.u-blox.com/en/product/assistnow). Required for downloading of assist data for u-blox GNSS receiver. See [here](https://www.u-blox.com/en/assistnow-service-evaluation-token-request-form) how to obtain the Token.
 
 Example of JSON with environment variables (when Cloud REST API is [emulated on another Imp](#simple-cloud-emulation)):
 ```
@@ -83,7 +92,8 @@ Example of JSON with environment variables (when Cloud REST API is [emulated on 
   "CLOUD_REST_API_URL": "https://agent.electricimp.com/7jiDVu1t_w-1", // not a real url
   "CLOUD_REST_API_USERNAME": "test",
   "CLOUD_REST_API_PASSWORD": "test",
-  "GOOGLE_MAPS_API_KEY": "AIzaSyDJQV2m_qNMjdw5snP6qPjdtoMRau-ger8" // not a real key
+  "GOOGLE_MAPS_API_KEY": "AIzaSyDJQV2m_qNMjdw5snP6qPjdtoMRau-ger8", // not a real key
+  "UBLOX_ASSIST_NOW_TOKEN": "CW2lcwNtSE2pHmXYP_LbKP" // not a real token
 }
 ```
 
@@ -123,7 +133,7 @@ All fields are mandatory, if not specified otherwise.
    },
    "location": {             // Last known location
      "timestamp": <number>,  // Timestamp when this location was determined (Unix time - secs since the Epoch)
-     "type": <string>,       // Type of location determination: "gnss", "cell", "wifi", "ble"
+     "type": <string>,       // Type of location determination: "ble", "gnss", "wifi+cell", "wifi", "cell"
      "accuracy": 3,          // Location accuracy, in meters
      "lng": <number>,        // Longitude
      "lat": <number>         // Latitude
@@ -132,7 +142,9 @@ All fields are mandatory, if not specified otherwise.
      "temperature": <number> // Current temperature, in Celsius
    },
    "alerts": [ <array_of_strings> ]    // Alerts. Optional. Can be missed or empty if no alerts.
-   // Possible values: "temperatureHigh", "temperatureLow", "shockDetected", "motionStarted", "motionStopped"
+   // Possible values:
+   //    "temperatureHigh", "temperatureLow", "shockDetected",
+   //    "motionStarted", "motionStopped", "geofenceEntered", "geofenceExited"
 }
 ```
 
