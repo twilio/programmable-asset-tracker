@@ -1,6 +1,4 @@
-//line 5 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/not_for_uploading/my_main.device.nut"
-
-//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
+//line 1 "/home/we/Develop/Squirrel/prog-x/src/device/Main.device.nut"
 #require "Serializer.class.nut:1.0.0"
 #require "JSONParser.class.nut:1.0.1"
 #require "JSONEncoder.class.nut:2.0.0"
@@ -17,10 +15,10 @@
 #require "UbxMsgParser.lib.nut:2.0.1"
 #require "UBloxAssistNow.device.lib.nut:0.1.0"
 
-//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/shared/Version.shared.nut"
+//line 1 "../shared/Version.shared.nut"
 // Application Version
 const APP_VERSION = "1.3.0";
-//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/shared/Constants.shared.nut"
+//line 1 "../shared/Constants.shared.nut"
 // Constants common for the imp-agent and the imp-device
 
 // ReplayMessenger message names
@@ -35,7 +33,7 @@ const INIT_LATITUDE = 90.0;
 
 // Init longitude value (Greenwich)
 const INIT_LONGITUDE = 0.0;
-//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/shared/Logger/Logger.shared.nut"
+//line 1 "../shared/Logger/Logger.shared.nut"
 // Logger for "DEBUG", "INFO" and "ERROR" information.
 // Prints out information to the standard impcentral log ("server.log").
 // The supported data types: string, table. Other types may be printed out incorrectly.
@@ -358,9 +356,9 @@ Logger <- {
 
 Logger.setLogLevelStr("INFO");
 
-//line 20 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
+//line 20 "/home/we/Develop/Squirrel/prog-x/src/device/Main.device.nut"
 
-//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/shared/Logger/stream/Logger.IOutputStream.shared.nut"
+//line 1 "../shared/Logger/stream/Logger.IOutputStream.shared.nut"
 /**
  * Logger output stream interface
  */
@@ -371,7 +369,7 @@ Logger.IOutputStream <- class {
     function close() { throw "The Close method must be implemented in an inherited class" }
 };
 
-//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/shared/Logger/stream/UartOutputStream.device.nut"
+//line 2 "../shared/Logger/stream/UartOutputStream.device.nut"
 
 /**
  * UART Output Stream.
@@ -405,9 +403,9 @@ class UartOutputStream extends Logger.IOutputStream {
         return server.log(data);
     }
 }
-//line 24 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
+//line 24 "/home/we/Develop/Squirrel/prog-x/src/device/Main.device.nut"
 
-//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/LedIndication.device.nut"
+//line 2 "LedIndication.device.nut"
 
 // Duration of a signal, in seconds
 const LI_SIGNAL_DURATION = 1.0;
@@ -487,9 +485,9 @@ class LedIndication {
     }
 }
 
-//line 28 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
+//line 28 "/home/we/Develop/Squirrel/prog-x/src/device/Main.device.nut"
 
-//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Hardware.device.nut"
+//line 1 "Hardware.device.nut"
 // Temperature-humidity sensor's I2C bus
 // NOTE: This I2C bus is used by the accelerometer as well. And it's configured by the accelerometer
 HW_TEMPHUM_SENSOR_I2C <- hardware.i2cLM;
@@ -527,7 +525,7 @@ const HW_RM_SFL_END_ADDR = 0x100000;
 // Allocation for the SPI Flash File System used by Location Driver
 const HW_LD_SFFS_START_ADDR = 0x200000;
 const HW_LD_SFFS_END_ADDR = 0x240000;
-//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/ProductionManager.device.nut"
+//line 2 "ProductionManager.device.nut"
 
 // ProductionManager's user config field
 const PMGR_USER_CONFIG_FIELD = "ProductionManager";
@@ -789,7 +787,7 @@ class ProductionManager {
     }
 }
 
-//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Configuration.device.nut"
+//line 1 "Configuration.device.nut"
 // Configuration settings for imp-device
 
 // Data reading period, in seconds
@@ -837,7 +835,18 @@ const DEFAULT_MOTION_VELOCITY = 0.5;
 // If 0, distance is not calculated (not used for motion detection)
 const DEFAULT_MOTION_DISTANCE = 5.0;
 
+// Geofence zone:
+// NOTE: The current settings are fake/example only.
+
+// Geofence zone center latitude, in degrees, [-90..90]
+const DEFAULT_GEOFENCE_CENTER_LAT = 1.0;
+// Geofence zone center longitude, in degrees, [-180..180]
+const DEFAULT_GEOFENCE_CENTER_LNG = 2.0;
+// Geofence zone radius, in meters, [0..EARTH_RADIUS]
+const DEFAULT_GEOFENCE_RADIUS = 1.0;
+
 // BLE devices and their locations
+// NOTE: The current settings are fake/example only.
 DEFAULT_BLE_DEVICES <- {
     // This key may contain an empty table but it must be present
     "generic": {
@@ -855,7 +864,7 @@ DEFAULT_BLE_DEVICES <- {
         }
     }
 };
-//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/CustomConnectionManager.device.nut"
+//line 2 "CustomConnectionManager.device.nut"
 
 // Customized ConnectionManager library
 class CustomConnectionManager extends ConnectionManager {
@@ -1034,7 +1043,7 @@ class CustomConnectionManager extends ConnectionManager {
     }
 }
 
-//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/CustomReplayMessenger.device.nut"
+//line 2 "CustomReplayMessenger.device.nut"
 
 // Customized ReplayMessenger library
 
@@ -1474,7 +1483,7 @@ class CustomReplayMessenger extends ReplayMessenger {
     }
 }
 
-//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/bg96_gps.device.lib.nut"
+//line 1 "bg96_gps.device.lib.nut"
 /*
  * BG96_GPS library
  * Copyright 2020 Twilio
@@ -2070,7 +2079,7 @@ BG96_GPS <- {
         }
     }
 }
-//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/BG96CellInfo.device.nut"
+//line 2 "BG96CellInfo.device.nut"
 
 // Required BG96 AT Commands
 enum AT_COMMAND {
@@ -2399,7 +2408,7 @@ class BG96CellInfo {
     }
 }
 
-//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/ESP32Driver.device.nut"
+//line 2 "ESP32Driver.device.nut"
 
 // Enum for BLE scan enable
 enum ESP32_BLE_SCAN {
@@ -3057,7 +3066,7 @@ class ESP32Driver {
     }
 }
 
-//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/AccelerometerDriver.device.nut"
+//line 2 "AccelerometerDriver.device.nut"
 
 // Accelerometer Driver class:
 // - utilizes LIS2DH12 accelerometer connected via I2C
@@ -3847,7 +3856,7 @@ class AccelerometerDriver {
     }
 }
 
-//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/MotionMonitor.device.nut"
+//line 2 "MotionMonitor.device.nut"
 
 // Mean earth radius in meters (https://en.wikipedia.org/wiki/Great-circle_distance)
 const MM_EARTH_RAD = 6371009;
@@ -3947,7 +3956,7 @@ class MotionMonitor {
         _ld = locDriver;
 
         _geofenceIsEnable = false;
-        _geofenceRadius = 0.0;
+        _geofenceRadius = DEFAULT_GEOFENCE_RADIUS;
         _motionStopAssumption = false;
         _inMotion = false;
         _curLocFresh = false;
@@ -3962,8 +3971,8 @@ class MotionMonitor {
                     "accuracy": MM_EARTH_RAD,
                     "longitude": INIT_LONGITUDE,
                     "latitude": INIT_LATITUDE};
-        _geofenceCenter = {"longitude": INIT_LONGITUDE,
-                            "latitude": INIT_LATITUDE};
+        _geofenceCenter = {"longitude": DEFAULT_GEOFENCE_CENTER_LNG,
+                            "latitude": DEFAULT_GEOFENCE_CENTER_LAT};
         _locReadingPeriod = DEFAULT_LOCATION_READING_PERIOD;
         _movementMax = DEFAULT_MOVEMENT_ACCELERATION_MAX;
         _movementMin = DEFAULT_MOVEMENT_ACCELERATION_MIN;
@@ -4098,7 +4107,7 @@ class MotionMonitor {
                     _geofenceIsEnable = settings.enabled;
                 }
             }
-            _geofenceRadius = 0.0;
+            _geofenceRadius = DEFAULT_GEOFENCE_RADIUS;
             if ("radius" in settings) {
                 if (typeof settings.radius == "float" && 
                     settings.radius >= 0) {
@@ -4106,8 +4115,8 @@ class MotionMonitor {
                     _geofenceRadius = settings.radius > MM_EARTH_RAD ? MM_EARTH_RAD : settings.radius;
                 }
             }
-            _geofenceCenter = {"longitude": INIT_LONGITUDE,
-                               "latitude" : INIT_LATITUDE};
+            _geofenceCenter = {"longitude": DEFAULT_GEOFENCE_CENTER_LNG,
+                               "latitude" : DEFAULT_GEOFENCE_CENTER_LAT};
             if ("lng" in settings && "lat" in settings) {
                 if (typeof settings.lat == "float") {
                     ::info("Geofence latitude: " + settings.lat, "MotionMonitor");
@@ -4352,16 +4361,27 @@ class MotionMonitor {
      *          "latitude" : {float}    - Latitude, in degrees.  
      */
     function _procGeofence(curLocation) {
+        //              _____GeofenceZone
+        //             /      \
+        //            /__     R\    dist           __Location
+        //           |/\ \  .---|-----------------/- \
+        //           |\__/      |                 \_\/accuracy (radius)
+        //            \ Location/
+        //             \______ /
+        //            in zone                     not in zone
+        // (location with accuracy radius      (location with accuracy radius
+        //  entirely in geofence zone)          entirely not in geofence zone)
+        // TODO: location after reboot/reconfigure - not in geofence zone
         if (_geofenceIsEnable) {
-            local dist = _greatCircleDistance(_geofenceCenter, curLocation);               //       _____GeofenceZone
-            ::debug("Geofence distance: " + dist, "MotionMonitor");                        //      /      \
-            if (dist > _geofenceRadius) {                                                  //     / __    R\    dist    __Location
-                local distWithoutAccurace = dist - curLocation.accuracy;                   //    | /\ \ .---|----------/- \
-                if (distWithoutAccurace > 0 && distWithoutAccurace > _geofenceRadius) {    //    | \__/     |          \_\/acc.
-                    if (_inGeofenceZone == null || _inGeofenceZone == true) {              //     \ Location/
-                        _geofencingEventCb && _geofencingEventCb(false);                   //      \______ /
-                        _inGeofenceZone = false;                                           //       
-                    }                                                                      //
+            local dist = _greatCircleDistance(_geofenceCenter, curLocation);
+            ::debug("Geofence distance: " + dist, "MotionMonitor");
+            if (dist > _geofenceRadius) {
+                local distWithoutAccurace = dist - curLocation.accuracy;
+                if (distWithoutAccurace > 0 && distWithoutAccurace > _geofenceRadius) {
+                    if (_inGeofenceZone == null || _inGeofenceZone == true) {
+                        _geofencingEventCb && _geofencingEventCb(false);
+                        _inGeofenceZone = false;
+                    }
                 }
             } else {
                 local distWithAccurace = dist + curLocation.accuracy;
@@ -4425,7 +4445,7 @@ class MotionMonitor {
     }
 }
 
-//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/DataProcessor.device.nut"
+//line 2 "DataProcessor.device.nut"
 
 // Temperature state enum
 enum DP_TEMPERATURE_LEVEL {
@@ -4456,6 +4476,9 @@ const DP_BATTERY_LEV_HYST = 2.0;
 // Processes data, saves and sends messages
 class DataProcessor {
 
+    // Array of alert names
+    _alertNames = null;
+
     // Data reading timer period
     _dataReadingPeriod = null;
 
@@ -4483,9 +4506,6 @@ class DataProcessor {
     // Last temperature value
     _curTemper = null;
 
-// TODO: Save location between restarts
-// TODO: Reset alerts between restarts and re-configurations (if the cfg impacts this alert)
-// TODO: Add inGeofence
     // Last location
     _currentLocation = null;
 
@@ -4570,7 +4590,7 @@ class DataProcessor {
      *                    "batteryLowThr": {float} - Battery low alert threshold
      *                                          Default: DEFAULT_BATTERY_LOW
      *                   "shockThreshold": {float} - Shock acceleration threshold, in g.
-     *                                          Default: DEFAULT_SHOCK_THRESHOLD
+     *                                      Default: DEFAULT_SHOCK_THRESHOLD
      */
     function start(dataProcSettings = {}) {
         _temperatureHighAlertThr = DEFAULT_TEMPERATURE_HIGH;
@@ -4907,9 +4927,9 @@ class DataProcessor {
     }
 }
 
-//line 40 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
+//line 40 "/home/we/Develop/Squirrel/prog-x/src/device/Main.device.nut"
 
-//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/LocationDriver.device.nut"
+//line 2 "LocationDriver.device.nut"
 
 // GNSS options:
 // Accuracy threshold of positioning, in meters
@@ -5659,7 +5679,7 @@ class LocationDriver {
     }
 }
 
-//line 46 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
+//line 46 "/home/we/Develop/Squirrel/prog-x/src/device/Main.device.nut"
 
 // Main application on Imp-Device: does the main logic of the application
 
@@ -5817,5 +5837,3 @@ function startApp() {
 
 pm <- ProductionManager(startApp);
 pm.start();
-//line 7 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/not_for_uploading/my_main.device.nut"
-

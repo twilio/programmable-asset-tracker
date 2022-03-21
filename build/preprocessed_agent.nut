@@ -1,4 +1,4 @@
-//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/agent/Main.agent.nut"
+//line 1 "/home/we/Develop/Squirrel/prog-x/src/agent/Main.agent.nut"
 #require "Promise.lib.nut:4.0.0"
 #require "Messenger.lib.nut:0.2.0"
 #require "UBloxAssistNow.agent.lib.nut:1.0.0"
@@ -231,10 +231,10 @@ class GoogleMaps {
         return result.toupper();
     }
 }
-//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/shared/Version.shared.nut"
+//line 1 "../shared/Version.shared.nut"
 // Application Version
 const APP_VERSION = "1.3.0";
-//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/shared/Constants.shared.nut"
+//line 1 "../shared/Constants.shared.nut"
 // Constants common for the imp-agent and the imp-device
 
 // ReplayMessenger message names
@@ -249,7 +249,7 @@ const INIT_LATITUDE = 90.0;
 
 // Init longitude value (Greenwich)
 const INIT_LONGITUDE = 0.0;
-//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/shared/Logger/Logger.shared.nut"
+//line 1 "../shared/Logger/Logger.shared.nut"
 // Logger for "DEBUG", "INFO" and "ERROR" information.
 // Prints out information to the standard impcentral log ("server.log").
 // The supported data types: string, table. Other types may be printed out incorrectly.
@@ -572,7 +572,7 @@ Logger <- {
 
 Logger.setLogLevelStr("INFO");
 
-//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/agent/CloudClient.agent.nut"
+//line 2 "CloudClient.agent.nut"
 
 // Communicates with the cloud.
 //   - Sends data to the cloud using REST API
@@ -622,7 +622,7 @@ class CloudClient {
     }
 }
 
-//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/agent/LocationAssistant.agent.nut"
+//line 2 "LocationAssistant.agent.nut"
 
 // URL to request BG96 Assist data
 const LA_BG96_ASSIST_DATA_URL = "http://xtrapath4.izatcloud.net/xtra3grc.bin";
@@ -690,7 +690,7 @@ class LocationAssistant {
     }
 }
 
-//line 11 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/agent/Main.agent.nut"
+//line 11 "/home/we/Develop/Squirrel/prog-x/src/agent/Main.agent.nut"
 
 // Main application on Imp-Agent:
 // - Forwards Data messages from Imp-Device to Cloud REST API
