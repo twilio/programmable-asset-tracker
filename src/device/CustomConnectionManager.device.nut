@@ -155,6 +155,7 @@ class CustomConnectionManager extends ConnectionManager {
 
         if (_maxConnectedTime != null) {
             delay = _maxConnectedTime - (hardware.millis() - _connectTime) / 1000.0;
+            delay < 0 && (delay = 0);
         }
 
         if (_autoDisconnectDelay != null && _consumers.len() == 0) {

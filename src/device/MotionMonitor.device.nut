@@ -3,6 +3,15 @@
 // Mean earth radius in meters (https://en.wikipedia.org/wiki/Great-circle_distance)
 const MM_EARTH_RAD = 6371009;
 
+// min longitude
+const MM_MIN_LNG = -180.0;
+// max latitude
+const MM_MAX_LNG = 180.0;
+// min latitude
+const MM_MIN_LAT = -90.0;
+// max latitude
+const MM_MAX_LAT = 90.0;
+
 // Motion Monitor class.
 // Starts and stops motion monitoring.
 class MotionMonitor {
@@ -67,6 +76,18 @@ class MotionMonitor {
     // Minimal movement distance to determine motion detection condition
     _motionDistance = null;
 
+    // geofence zone center location
+    _geofenceCenter = null;
+
+    // geofence zone radius
+    _geofenceRadius = null;
+
+    // enable/disable flag
+    _geofenceIsEnable = null;
+
+    // in zone or not
+    _inGeofenceZone = null;
+
     /**
      *  Constructor for Motion Monitor class.
      *  @param {object} accelDriver - Accelerometer driver object.
@@ -76,6 +97,8 @@ class MotionMonitor {
         _ad = accelDriver;
         _ld = locDriver;
 
+        _geofenceIsEnable = false;
+        _geofenceRadius = DEFAULT_GEOFENCE_RADIUS;
         _motionStopAssumption = false;
         _inMotion = false;
         _curLocFresh = false;
@@ -90,6 +113,8 @@ class MotionMonitor {
                     "accuracy": MM_EARTH_RAD,
                     "longitude": INIT_LONGITUDE,
                     "latitude": INIT_LATITUDE};
+        _geofenceCenter = {"longitude": DEFAULT_GEOFENCE_CENTER_LNG,
+                            "latitude": DEFAULT_GEOFENCE_CENTER_LAT};
         _locReadingPeriod = DEFAULT_LOCATION_READING_PERIOD;
         _movementMax = DEFAULT_MOVEMENT_ACCELERATION_MAX;
         _movementMin = DEFAULT_MOVEMENT_ACCELERATION_MIN;
@@ -201,6 +226,63 @@ class MotionMonitor {
             _geofencingEventCb = geofencingEventCb;
         } else {
             ::error("Argument not a function or null", "@{CLASS_NAME}");
+        }
+    }
+
+    /**
+     *  Enable/disable and set settings for geofencing.
+     *  @param {table} settings - Table with the center coordinates of geofence zone, radius.
+     *      The settings include:
+     *          "enabled"   : {bool}  - Enable/disable, true - geofence is enabled.
+     *          "lng"       : {float} - Center longitude, in degrees.
+     *          "lat"       : {float} - Center latitude, in degrees.
+     *          "radius"    : {float} - Radius, in meters. (value must exceed the accuracy of the coordinate)
+     */
+    function configureGeofence(settings) {
+        // reset in zone flag
+        _inGeofenceZone = null;
+        if (settings != null && typeof settings == "table") {
+            _geofenceIsEnable = false;
+            if ("enabled" in settings) {
+                if (typeof settings.enabled == "bool") {
+                    ::info("Geofence is " + (settings.enabled ? "enabled" : "disabled"), "@{CLASS_NAME}");
+                    _geofenceIsEnable = settings.enabled;
+                }
+            }
+            _geofenceRadius = DEFAULT_GEOFENCE_RADIUS;
+            if ("radius" in settings) {
+                if (typeof settings.radius == "float" && 
+                    settings.radius >= 0) {
+                    ::info("Geofence radius: " + settings.radius, "@{CLASS_NAME}");
+                    _geofenceRadius = settings.radius > MM_EARTH_RAD ? MM_EARTH_RAD : settings.radius;
+                }
+            }
+            _geofenceCenter = {"longitude": DEFAULT_GEOFENCE_CENTER_LNG,
+                               "latitude" : DEFAULT_GEOFENCE_CENTER_LAT};
+            if ("lng" in settings && "lat" in settings) {
+                if (typeof settings.lat == "float") {
+                    ::info("Geofence latitude: " + settings.lat, "@{CLASS_NAME}");
+                    _geofenceCenter.latitude = settings.lat;
+                    if (_geofenceCenter.latitude < MM_MIN_LAT) {
+                        ::error("Geofence latitude not in range [-90;90]: " + settings.lat, "@{CLASS_NAME}");
+                        _geofenceCenter.latitude = MM_MIN_LAT;
+                    }
+                    if (_geofenceCenter.latitude > MM_MAX_LAT) {
+                        ::error("Geofence latitude not in range [-90;90]: " + settings.lat, "@{CLASS_NAME}");
+                        _geofenceCenter.latitude = MM_MAX_LAT;
+                    }
+                    ::info("Geofence longitude: " + settings.lng, "@{CLASS_NAME}");
+                    _geofenceCenter.longitude = settings.lng;
+                    if (_geofenceCenter.longitude < MM_MIN_LNG) {
+                        ::error("Geofence longitude not in range [-180;180]: " + settings.lng, "@{CLASS_NAME}");
+                        _geofenceCenter.longitude = MM_MIN_LAT;
+                    }
+                    if (_geofenceCenter.longitude > MM_MAX_LAT) {
+                        ::error("Geofence longitude not in range [-180;180]: " + settings.lng, "@{CLASS_NAME}");
+                        _geofenceCenter.longitude = MM_MAX_LAT;
+                    }
+                }
+            }
         }
     }
 
@@ -336,18 +418,16 @@ class MotionMonitor {
         return _locReadingPromise = _ld.getLocation()
         .then(function(loc) {
             _locReadingPromise = null;
-
             _curLoc = loc;
             _curLocFresh = true;
             _newLocCb && _newLocCb(_curLoc);
+            _procGeofence(loc);
         }.bindenv(this), function(_) {
             _locReadingPromise = null;
 
             // the current location becomes non-fresh
             _curLoc = _prevLoc;
             _curLocFresh = false;
-            // in cb location null check exist
-            _newLocCb && _newLocCb(_curLoc);
         }.bindenv(this));
     }
 
@@ -360,17 +440,7 @@ class MotionMonitor {
             local dist = 0;
             if (_curLoc && _prevLoc) {
                 // calculate distance between two locations
-                // https://en.wikipedia.org/wiki/Great-circle_distance
-                local deltaLat = math.fabs(_curLoc.latitude - _prevLoc.latitude)*PI/180.0;
-                local deltaLong = math.fabs(_curLoc.longitude - _prevLoc.longitude)*PI/180.0;
-                local deltaSigma = math.pow(math.sin(0.5*deltaLat), 2);
-                deltaSigma += math.cos(_curLoc.latitude*PI/180.0)*
-                              math.cos(_prevLoc.latitude*PI/180.0)*
-                              math.pow(math.sin(0.5*deltaLong), 2);
-                deltaSigma = 2*math.asin(math.sqrt(deltaSigma));
-
-                // actual arc length on a sphere of radius r (mean Earth radius)
-                dist = MM_EARTH_RAD*deltaSigma;
+                dist = _greatCircleDistance(_curLoc, _prevLoc);
             } else {
                 ::error("Location is null", "@{CLASS_NAME}");
             }
@@ -421,6 +491,99 @@ class MotionMonitor {
             _locReadingTimer && imp.cancelwakeup(_locReadingTimer);
             _locReadingTimer = imp.wakeup(_locReadingPeriod, _locReadingTimerCb.bindenv(this));
         }
+    }
+
+    /**
+     *  Zone border crossing check.
+     *  
+     *   @param {table} curLocation - Table with the current location.
+     *        The table must include parts:
+     *          "accuracy" : {integer}  - Accuracy, in meters.
+     *          "longitude": {float}    - Longitude, in degrees.
+     *          "latitude" : {float}    - Latitude, in degrees.  
+     */
+    function _procGeofence(curLocation) {
+        //              _____GeofenceZone
+        //             /      \
+        //            /__     R\    dist           __Location
+        //           |/\ \  .---|-----------------/- \
+        //           |\__/      |                 \_\/accuracy (radius)
+        //            \ Location/
+        //             \______ /
+        //            in zone                     not in zone
+        // (location with accuracy radius      (location with accuracy radius
+        //  entirely in geofence zone)          entirely not in geofence zone)
+        // TODO: location after reboot/reconfigure - not in geofence zone
+        if (_geofenceIsEnable) {
+            local dist = _greatCircleDistance(_geofenceCenter, curLocation);
+            ::debug("Geofence distance: " + dist, "@{CLASS_NAME}");
+            if (dist > _geofenceRadius) {
+                local distWithoutAccurace = dist - curLocation.accuracy;
+                if (distWithoutAccurace > 0 && distWithoutAccurace > _geofenceRadius) {
+                    if (_inGeofenceZone == null || _inGeofenceZone == true) {
+                        _geofencingEventCb && _geofencingEventCb(false);
+                        _inGeofenceZone = false;
+                    }
+                }
+            } else {
+                local distWithAccurace = dist + curLocation.accuracy;
+                if (distWithAccurace <= _geofenceRadius) {
+                    if (_inGeofenceZone == null || _inGeofenceZone == false) {
+                        _geofencingEventCb && _geofencingEventCb(true);
+                        _inGeofenceZone = true;
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     *  Calculate distance between two locations.
+     *
+     *   @param {table} locationFirstPoint - Table with the first location value.
+     *        The table must include parts:
+     *          "longitude": {float} - Longitude, in degrees.
+     *          "latitude":  {float} - Latitude, in degrees.
+     *   @param {table} locationSecondPoint - Table with the second location value.
+     *        The location must include parts:
+     *          "longitude": {float} - Longitude, in degrees.
+     *          "latitude":  {float} - Latitude, in degrees.
+     *  
+     *   @return {float} If success - value, else - default value (0).
+     */
+    function _greatCircleDistance(locationFirstPoint, locationSecondPoint) {
+        local dist = 0;
+
+        if (locationFirstPoint != null || locationSecondPoint != null) {
+            if ("longitude" in locationFirstPoint &&
+                "longitude" in locationSecondPoint &&
+                "latitude" in locationFirstPoint &&
+                "latitude" in locationSecondPoint) {
+                // https://en.wikipedia.org/wiki/Great-circle_distance
+                local deltaLat = math.fabs(locationFirstPoint.latitude - 
+                                           locationSecondPoint.latitude)*PI/180.0;
+                local deltaLong = math.fabs(locationFirstPoint.longitude - 
+                                            locationSecondPoint.longitude)*PI/180.0;
+                //  -180___180 
+                //     / | \
+                //west|  |  |east   selection of the shortest arc
+                //     \_|_/ 
+                // Earth 0 longitude
+                if (deltaLong > PI) {
+                    deltaLong = 2*PI - deltaLong;
+                }
+                local deltaSigma = math.pow(math.sin(0.5*deltaLat), 2);
+                deltaSigma += math.cos(locationFirstPoint.latitude*PI/180.0)*
+                              math.cos(locationSecondPoint.latitude*PI/180.0)*
+                              math.pow(math.sin(0.5*deltaLong), 2);
+                deltaSigma = 2*math.asin(math.sqrt(deltaSigma));
+
+                // actual arc length on a sphere of radius r (mean Earth radius)
+                dist = MM_EARTH_RAD*deltaSigma;
+            }
+        }
+
+        return dist
     }
 }
 

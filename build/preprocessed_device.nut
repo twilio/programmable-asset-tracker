@@ -4,16 +4,20 @@
 #require "JSONEncoder.class.nut:2.0.0"
 #require "Promise.lib.nut:4.0.0"
 #require "SPIFlashLogger.device.lib.nut:2.2.0"
+#require "SPIFlashFileSystem.device.lib.nut:3.0.1"
 #require "ConnectionManager.lib.nut:3.1.1"
 #require "Messenger.lib.nut:0.2.0"
 #require "ReplayMessenger.device.lib.nut:0.2.0"
-#require "utilities.lib.nut:2.0.0"
+#require "utilities.lib.nut:3.0.1"
 #require "LIS3DH.device.lib.nut:3.0.0"
 #require "HTS221.device.lib.nut:2.0.2"
+#require "UBloxM8N.device.lib.nut:1.0.1"
+#require "UbxMsgParser.lib.nut:2.0.1"
+#require "UBloxAssistNow.device.lib.nut:0.1.0"
 
 //line 1 "../shared/Version.shared.nut"
 // Application Version
-const APP_VERSION = "1.2.1";
+const APP_VERSION = "1.3.0";
 //line 1 "../shared/Constants.shared.nut"
 // Constants common for the imp-agent and the imp-device
 
@@ -21,7 +25,7 @@ const APP_VERSION = "1.2.1";
 enum APP_RM_MSG_NAME {
     DATA = "data",
     GNSS_ASSIST = "gnssAssist",
-    LOCATION_CELL = "locationCell"
+    LOCATION_CELL_WIFI = "locationCellAndWiFi"
 }
 
 // Init latitude value (North Pole)
@@ -352,7 +356,7 @@ Logger <- {
 
 Logger.setLogLevelStr("INFO");
 
-//line 16 "/home/we/Develop/Squirrel/prog-x/src/device/Main.device.nut"
+//line 20 "/home/we/Develop/Squirrel/prog-x/src/device/Main.device.nut"
 
 //line 1 "../shared/Logger/stream/Logger.IOutputStream.shared.nut"
 /**
@@ -399,7 +403,7 @@ class UartOutputStream extends Logger.IOutputStream {
         return server.log(data);
     }
 }
-//line 20 "/home/we/Develop/Squirrel/prog-x/src/device/Main.device.nut"
+//line 24 "/home/we/Develop/Squirrel/prog-x/src/device/Main.device.nut"
 
 //line 2 "LedIndication.device.nut"
 
@@ -481,7 +485,7 @@ class LedIndication {
     }
 }
 
-//line 24 "/home/we/Develop/Squirrel/prog-x/src/device/Main.device.nut"
+//line 28 "/home/we/Develop/Squirrel/prog-x/src/device/Main.device.nut"
 
 //line 1 "Hardware.device.nut"
 // Temperature-humidity sensor's I2C bus
@@ -493,8 +497,17 @@ HW_ACCEL_I2C <- hardware.i2cLM;
 // Accelerometer's interrupt pin
 HW_ACCEL_INT_PIN <- hardware.pinW;
 
+// UART port used for the u-blox module
+HW_UBLOX_UART <- hardware.uartPQRS;
+
 // UART port used for logging (if enabled)
-HW_LOGGING_UART <- hardware.uartXEFGH;
+HW_LOGGING_UART <- hardware.uartYABCD;
+
+// ESP32 UART port
+HW_ESP_UART <- hardware.uartXEFGH;
+
+// ESP32 power enable pin
+HW_ESP_POWER_EN_PIN <- hardware.pinXU;
 
 // LED indication: RED pin
 HW_LED_RED_PIN <- hardware.pinR;
@@ -505,9 +518,13 @@ HW_LED_BLUE_PIN <- hardware.pinXB;
 
 // SPI Flash allocations
 
-// Allocation for the SPI Flash Logger used by ReplayMessenger
+// Allocation for the SPI Flash Logger used by Replay Messenger
 const HW_RM_SFL_START_ADDR = 0x000000;
 const HW_RM_SFL_END_ADDR = 0x100000;
+
+// Allocation for the SPI Flash File System used by Location Driver
+const HW_LD_SFFS_START_ADDR = 0x200000;
+const HW_LD_SFFS_END_ADDR = 0x240000;
 //line 2 "ProductionManager.device.nut"
 
 // ProductionManager's user config field
@@ -817,6 +834,36 @@ const DEFAULT_MOTION_VELOCITY = 0.5;
 // Minimal movement distance to determine motion detection condition, in meters.
 // If 0, distance is not calculated (not used for motion detection)
 const DEFAULT_MOTION_DISTANCE = 5.0;
+
+// Geofence zone:
+// NOTE: The current settings are fake/example only.
+
+// Geofence zone center latitude, in degrees, [-90..90]
+const DEFAULT_GEOFENCE_CENTER_LAT = 1.0;
+// Geofence zone center longitude, in degrees, [-180..180]
+const DEFAULT_GEOFENCE_CENTER_LNG = 2.0;
+// Geofence zone radius, in meters, [0..EARTH_RADIUS]
+const DEFAULT_GEOFENCE_RADIUS = 1.0;
+
+// BLE devices and their locations
+// NOTE: The current settings are fake/example only.
+DEFAULT_BLE_DEVICES <- {
+    // This key may contain an empty table but it must be present
+    "generic": {
+        "656684e1b306": {
+            "lat": 1,
+            "lng": 2
+        }
+    },
+    // This key may contain an empty table but it must be present
+    "iBeacon": {
+        "\x01\x12\x23\x34\x45\x56\x67\x78\x89\x9a\xab\xbc\xcd\xde\xef\xf0": {
+            [1800] = {
+                [1286] = { "lat": 10, "lng": 20 }
+            }
+        }
+    }
+};
 //line 2 "CustomConnectionManager.device.nut"
 
 // Customized ConnectionManager library
@@ -974,6 +1021,7 @@ class CustomConnectionManager extends ConnectionManager {
 
         if (_maxConnectedTime != null) {
             delay = _maxConnectedTime - (hardware.millis() - _connectTime) / 1000.0;
+            delay < 0 && (delay = 0);
         }
 
         if (_autoDisconnectDelay != null && _consumers.len() == 0) {
@@ -2035,11 +2083,10 @@ BG96_GPS <- {
 
 // Required BG96 AT Commands
 enum AT_COMMAND {
-    SET_CGREG = "AT+CGREG=2",  // Enable network registration and location information unsolicited result code
-    GET_CGREG = "AT+CGREG?",   // Query the network registration status
-    SET_COPS  = "AT+COPS=3,2", // Force an attempt to select and register the GSM/UMTS network operator
-    GET_COPS  = "AT+COPS?",    // Query the current mode and selected operator
-    GET_QENG  = "AT+QENG=\"neighbourcell\"" // Query the information of neighbour cells (Detailed information of base station)
+    // Query the information of neighbour cells (Detailed information of base station)
+    GET_QENG  = "AT+QENG=\"neighbourcell\"",
+    // Query the information of serving cell (Detailed information of base station)
+    GET_QENG_SERV_CELL  = "AT+QENG=\"servingcell\""
 }
 
 // Class to obtain cell towers info from BG96 modem.
@@ -2058,7 +2105,7 @@ class BG96CellInfo {
     *
     * @return {Table} The network registration information, or null on error.
     * Table fields include:
-    * "radioType"                   - Always "gsm" string
+    * "radioType"                   - The mobile radio type: "gsm" or "lte"
     * "cellTowers"                  - Array of tables
     *     cellTowers[0]             - Table with information about the connected tower
     *         "locationAreaCode"    - Integer of the location area code  [0, 65535]
@@ -2074,59 +2121,62 @@ class BG96CellInfo {
     *         "signalStrength"      - Signal strength string
     */
     function scanCellTowers() {
-        local resp = null;
-        local parsed = null;
-        local tmp = null;
-        local towers = [];
+        local data = {
+            "radioType": null,
+            "cellTowers": []
+        };
 
         try {
-            local connectedTower = {};
-
-            // connected tower
-            resp = _writeAndParseAT(AT_COMMAND.SET_CGREG);
-            resp = _writeAndParseAT(AT_COMMAND.GET_CGREG);
-
-            if ("error" in resp) {
-                ::error("AT+CGREG command returned error: " + resp.error, "BG96CellInfo");
-                return null;
+            local qengCmdResp = _writeAndParseAT(AT_COMMAND.GET_QENG_SERV_CELL);
+            if ("error" in qengCmdResp) {
+                throw "AT+QENG serving cell command returned error: " + qengCmdResp.error;
             }
 
-            if (!_cgregExtractTowerInfo(resp.data, connectedTower)) {
-                ::info("No connected tower detected (by GCREG cmd)", "BG96CellInfo");
-                return null;
-            }
+            local srvCellRadioType = _qengExtractRadioType(qengCmdResp.data);
 
-            resp = _writeAndParseAT(AT_COMMAND.SET_COPS);
-            resp = _writeAndParseAT(AT_COMMAND.GET_COPS);
-
-            if ("error" in resp) {
-                ::error("AT+COPS command returned error: " + resp.error, "BG96CellInfo");
-                return null;
-            }
-
-            if (!_copsExtractTowerInfo(resp.data, connectedTower)) {
-                ::info("No connected tower detected (by COPS cmd)", "BG96CellInfo");
-                return null;
-            }
-
-            towers.append(connectedTower);
-
-            // neighbor towers
-            resp = _writeAndParseATMultiline(AT_COMMAND.GET_QENG);
-
-            if ("error" in resp) {
-                ::error("AT+QENG command returned error: " + resp.error, "BG96CellInfo");
-            } else {
-                towers.extend(_qengExtractTowersInfo(resp.data));
+            switch (srvCellRadioType) {
+                case "GSM":
+                    data.radioType = "gsm";
+                    // +QENG:
+                    // "servingscell",<state>,"GSM",<mcc>,
+                    // <mnc>,<lac>,<cellid>,<bsic>,<arfcn>,<band>,<rxlev>,<txp>,
+                    // <rla>,<drx>,<c1>,<c2>,<gprs>,<tch>,<ts>,<ta>,<maio>,<hsn>,<rxlevsub>,
+                    // <rxlevfull>,<rxqualsub>,<rxqualfull>,<voicecodec>
+                    data.cellTowers.append(_qengExtractServingCellGSM(qengCmdResp.data));
+                    // Neighbor towers
+                    // +QENG:
+                    // "neighbourcell","GSM",<mcc>,<mnc>,<lac>,<cellid>,<bsic>,<arfcn>,
+                    // <rxlev>,<c1>,<c2>,<c31>,<c32>
+                    qengCmdResp = _writeAndParseATMultiline(AT_COMMAND.GET_QENG);
+                    if ("error" in qengCmdResp) {
+                        ::error("AT+QENG command returned error: " + qengCmdResp.error, "BG96CellInfo");
+                    } else {
+                        data.cellTowers.extend(_qengExtractTowersInfo(qengCmdResp.data, srvCellRadioType));
+                    }
+                    break;
+                case "CAT-M":
+                case "CAT-NB":
+                case "LTE":
+                    data.radioType = "lte";
+                    data.cellTowers.append(_qengExtractServingCellLTE(qengCmdResp.data));
+                    // Neighbor towers parameters not correspond google API
+                    // +QENG:
+                    // "servingcell",<state>,"LTE",<is_tdd>,<mcc>,<mnc>,<cellid>,
+                    // <pcid>,<earfcn>,<freq_band_ind>,
+                    // <ul_bandwidth>,<d_bandwidth>,<tac>,<rsrp>,<rsrq>,<rssi>,<sinr>,<srxlev>
+                    // +QENG: "neighbourcell intra”,"LTE",<earfcn>,<pcid>,<rsrq>,<rsrp>,<rssi>,<sinr>
+                    // ,<srxlev>,<cell_resel_priority>,<s_non_intra_search>,<thresh_serving_low>,
+                    // <s_intra_search>
+                    // https://developers.google.com/maps/documentation/geolocation/overview#wifi_access_point_object
+                    // location is determined by one tower
+                    break;
+                default:
+                    throw "Unknown radio type: " + srvCellRadioType;
             }
         } catch (err) {
             ::error("Scanning cell towers error: " + err, "BG96CellInfo");
             return null;
         }
-
-        local data = {};
-        data.radioType <- "gsm";
-        data.cellTowers <- towers;
 
         return data;
     }
@@ -2205,11 +2255,9 @@ class BG96CellInfo {
 
         try {
             parsed.success <- (resp.find("OK") != null);
-
             lines = split(resp, "\n");
 
             foreach (line in lines) {
-
                 if (line == "OK") {
                     continue;
                 }
@@ -2235,69 +2283,11 @@ class BG96CellInfo {
     }
 
     /**
-     * Extract location area code and cell ID from dataStr parameter
-     * and put it in dstTbl parameter.
-     * Return true if the needed info found, false - otherwise.
-     */
-    function _cgregExtractTowerInfo(dataStr, dstTbl) {
-        try {
-            local splitted = split(dataStr, ",");
-
-            if (splitted.len() >= 4) {
-                local lac = splitted[2];
-                lac = split(lac, "\"")[0];
-                lac = utilities.hexStringToInteger(lac);
-
-                local ci = splitted[3];
-                ci = split(ci, "\"")[0];
-                ci = utilities.hexStringToInteger(ci);
-
-                dstTbl.locationAreaCode <- lac;
-                dstTbl.cellId <- ci;
-
-                return true;
-            } else {
-                return false;
-            }
-        } catch (err) {
-            throw "Couldn't parse registration status (GET_CGREG cmd): " + err;
-        }
-    }
-
-    /**
-     * Extract mobile country and network codes from dataStr parameter
-     * and put it in dstTbl parameter.
-     * Return true if the needed info found, false - otherwise.
-     */
-    function _copsExtractTowerInfo(dataStr, dstTbl) {
-        try {
-            local splitted = split(dataStr, ",");
-
-            if (splitted.len() >= 3) {
-                local lai = splitted[2];
-                lai = split(lai, "\"")[0];
-
-                local mcc = lai.slice(0, 3);
-                local mnc = lai.slice(3);
-
-                dstTbl.mobileCountryCode <- mcc;
-                dstTbl.mobileNetworkCode <- mnc;
-
-                return true;
-            } else {
-                return false;
-            }
-        } catch (err) {
-            throw "Couldn't parse operator selection (GET_COPS cmd): " + err;
-        }
-    }
-
-    /**
      * Extract mobile country and network codes, location area code,
      * cell ID, signal strength from dataLines parameter.
      * Return the info in array.
      */
-    function _qengExtractTowersInfo(dataLines) {
+    function _qengExtractTowersInfo(dataLines, checkRadioType) {
         try {
             local towers = [];
 
@@ -2305,6 +2295,13 @@ class BG96CellInfo {
                 local splitted = split(line, ",");
 
                 if (splitted.len() < 9) {
+                    continue;
+                }
+
+                local radioType = splitted[1];
+                radioType = split(radioType, "\"")[0];
+
+                if (radioType != checkRadioType) {
                     continue;
                 }
 
@@ -2331,299 +2328,741 @@ class BG96CellInfo {
             throw "Couldn't parse neighbour cells (GET_QENG cmd): " + err;
         }
     }
-}
-
-//line 2 "LocationDriver.device.nut"
-
-// GNSS options:
-// Accuracy threshold of positioning, in meters. Range: 1-1000.
-const LD_GNSS_ACCURACY = 10;
-// The maximum positioning time, in seconds. Range: 1-255
-const LD_LOC_TIMEOUT = 55;
-
-// Minimum time of BG96 assist data validity to skip updating of the assist data, in minutes
-const LD_ASSIST_DATA_MIN_VALID_TIME = 1440;
-
-// Location Driver class.
-// Determines the current position.
-class LocationDriver {
-    // Assist data validity time, in minutes
-    _assistDataValidityTime = 0;
-    // Promise that resolves or rejects when the assist data has been obtained.
-    // null if the assist data is not being obtained at the moment
-    _gettingAssistData = null;
-    // Ready-to-use assist data
-    _assistData = null;
 
     /**
-     * Constructor for Location Driver
+     * Extract radio type from the data parameter.
+     * Return the info in a sring.
      */
-    constructor() {
-        cm.onConnect(_onConnected.bindenv(this), "LocationDriver");
-        // Set a "finally" handler only to avoid "Unhandled promise rejection" message
-        _updateAssistData()
-        .finally(@(_) null);
+    function _qengExtractRadioType(data) {
+        // +QENG: "servingcell","NOCONN","GSM",250,99,DC51,B919,26,50,-,-73,255,255,0,38,38,1,-,-,-,-,-,-,-,-,-,"-"
+        // +QENG: "servingcell","CONNECT","CAT-M","FDD",262,03,2FAA03,187,6200,20,3,3,2AFB,-105,-11,-76,10,-
+        try {
+            local splitted = split(data, ",");
+            local radioType = splitted[2];
+            radioType = split(radioType, "\"")[0];
+
+            return radioType;
+        } catch (err) {
+            throw "Couldn't parse radio type (GET_QENG cmd): " + err;
+        }
     }
 
-    /**
-     * Obtain and return the current location.
-     * - First, try to get GNSS fix
-     * - If no success, try to obtain location using cell towers info
-     *
-     * @return {Promise} that:
-     * - resolves with the current location if the operation succeeded
-     * - rejects if the operation failed
+     /**
+     * Extract mobile country and network codes, location area code,
+     * cell ID, signal strength from the data parameter. (GSM networks)
+     * Return the info in a table.
      */
-    function getLocation() {
-        return _getLocationGNSS()
-        .fail(function(err) {
-            ::info("Couldn't get location using GNSS: " + err, "LocationDriver");
-            return _getLocationCellTowers();
-        }.bindenv(this))
-        .fail(function(err) {
-            ::info("Couldn't get location using cell towers: " + err, "LocationDriver");
-            return Promise.reject(null);
-        }.bindenv(this));
-    }
+    function _qengExtractServingCellGSM(data) {
+        // +QENG: "servingcell","NOCONN","GSM",250,99,DC51,B919,26,50,-,-73,255,255,0,38,38,1,-,-,-,-,-,-,-,-,-,"-"
+        try {
+            local splitted = split(data, ",");
 
-    // -------------------- PRIVATE METHODS -------------------- //
-
-    /**
-     * Obtain the current location using GNSS.
-     *
-     * @return {Promise} that:
-     * - resolves with the current location if the operation succeeded
-     * - rejects with an error if the operation failed
-     */
-    function _getLocationGNSS() {
-        return _updateAssistData()
-        .finally(function(_) {
-            ::debug("Getting location using GNSS..", "LocationDriver");
-            return Promise(function(resolve, reject) {
-                BG96_GPS.enableGNSS({
-                    "onLocation": _onGnssLocationFunc(resolve, reject),
-                    "onEnabled": _onGnssEnabledFunc(reject),
-                    "maxPosTime": LD_LOC_TIMEOUT,
-                    "accuracy": LD_GNSS_ACCURACY,
-                    "useAssist": true,
-                    "assistData": _assistData
-                });
-
-                // We've just applied pending assist data (if any), so we clear it
-                _assistData = null;
-            }.bindenv(this));
-        }.bindenv(this));
-    }
-
-    /**
-     * Obtain the current location using cell towers info.
-     *
-     * @return {Promise} that:
-     * - resolves with the current location if the operation succeeded
-     * - rejects with an error if the operation failed
-     */
-    function _getLocationCellTowers() {
-        ::debug("Getting location using cell towers..", "LocationDriver");
-
-        cm.keepConnection("LocationDriver", true);
-
-        return cm.connect()
-        .fail(function(_) {
-            throw "Couldn't connect to the server";
-        }.bindenv(this))
-        .then(function(_) {
-            local scannedTowers = BG96CellInfo.scanCellTowers();
-
-            if (scannedTowers == null) {
-                throw "No towers scanned";
-            }
-
-            ::debug("Cell towers scanned. Sending results to the agent..", "LocationDriver");
-
-            return _requestToAgent(APP_RM_MSG_NAME.LOCATION_CELL, scannedTowers)
-            .fail(function(err) {
-                throw "Error sending a request to the agent: " + err;
-            }.bindenv(this));
-        }.bindenv(this))
-        .then(function(location) {
-            cm.keepConnection("LocationDriver", false);
-
-            if (location == null) {
-                throw "No location received from the agent";
-            }
-
-            ::info("Got location using cell towers", "LocationDriver");
-            ::debug(location, "LocationDriver");
+            local mcc = splitted[3];
+            local mnc = splitted[4];
+            local lac = splitted[5];
+            local ci = splitted[6];
+            local ss = splitted[10];
+            lac = utilities.hexStringToInteger(lac);
+            ci = utilities.hexStringToInteger(ci);
 
             return {
-                // Here we assume that if the device is connected, its time is synced
-                "timestamp": time(),
-                "type": "cell",
-                "accuracy": location.accuracy,
-                "longitude": location.lon,
-                "latitude": location.lat
+                "mobileCountryCode" : mcc,
+                "mobileNetworkCode" : mnc,
+                "locationAreaCode" : lac,
+                "cellId" : ci,
+                "signalStrength" : ss
             };
+        } catch (err) {
+            throw "Couldn't parse serving cell (GET_QENG_SERV_CELL cmd): " + err;
+        }
+    }
+
+    /**
+     * Extract mobile country and network codes, location area code,
+     * cell ID, signal strength from the data parameter. (LTE networks)
+     * Return the info in a table.
+     */
+    function _qengExtractServingCellLTE(data) {
+        // +QENG: "servingcell","CONNECT","CAT-M","FDD",262,03,2FAA03,187,6200,20,3,3,2AFB,-105,-11,-76,10,-
+        try {
+            local splitted = split(data, ",");
+
+            local mcc = splitted[4];
+            local mnc = splitted[5];
+            local lac = splitted[12];
+            local ci = splitted[6];
+            local ss = splitted[15];
+            lac = utilities.hexStringToInteger(lac);
+            ci = utilities.hexStringToInteger(ci);
+
+            return {
+                "mobileCountryCode" : mcc,
+                "mobileNetworkCode" : mnc,
+                "locationAreaCode" : lac,
+                "cellId" : ci,
+                "signalStrength" : ss
+            };
+        } catch (err) {
+            throw "Couldn't parse serving cell (GET_QENG_SERV_CELL cmd): " + err;
+        }
+    }
+}
+
+//line 2 "ESP32Driver.device.nut"
+
+// Enum for BLE scan enable
+enum ESP32_BLE_SCAN {
+    DISABLE = 0,
+    ENABLE = 1
+};
+
+// Enum for BLE scan type
+enum ESP32_BLE_SCAN_TYPE {
+    PASSIVE = 0,
+    ACTIVE = 1
+};
+
+// Enum for own address type
+enum ESP32_BLE_OWN_ADDR_TYPE {
+    PUBLIC = 0,
+    RANDOM = 1,
+    RPA_PUBLIC = 2,
+    RPA_RANDOM = 3
+};
+
+// Enum for filter policy
+enum ESP32_BLE_FILTER_POLICY {
+    ALLOW_ALL = 0,
+    ALLOW_ONLY_WLST = 1,
+    ALLOW_UND_RPA_DIR = 2,
+    ALLOW_WLIST_RPA_DIR = 3
+};
+
+// Enum for BLE roles
+enum ESP32_BLE_ROLE {
+    DEINIT = 0,
+    CLIENT = 1,
+    SERVER = 2
+};
+
+// Enum for WiFi modes
+enum ESP32_WIFI_MODE {
+    DISABLE = 0,
+    STATION = 1,
+    SOFT_AP = 2,
+    SOFT_AP_AND_STATION = 3
+};
+
+// Enum for WiFi scan print mask info
+enum ESP32_WIFI_SCAN_PRINT_MASK {
+    SHOW_ECN = 0x01,
+    SHOW_SSID = 0x02,
+    SHOW_RSSI = 0x04,
+    SHOW_MAC = 0x08,
+    SHOW_CHANNEL = 0x10,
+    SHOW_FREQ_OFFS = 0x20,
+    SHOW_FREQ_VAL = 0x40,
+    SHOW_PAIRWISE_CIPHER = 0x80,
+    SHOW_GROUP_CIPHER = 0x100,
+    SHOW_BGN = 0x200,
+    SHOW_WPS = 0x300
+};
+
+// Enum for WiFi encryption method
+enum ESP32_ECN_METHOD {
+    OPEN = 0,
+    WEP = 1,
+    WPA_PSK = 2,
+    WPA2_PSK = 3,
+    WPA_WPA2_PSK = 4,
+    WPA_ENTERPRISE = 5,
+    WPA3_PSK = 6,
+    WPA2_WPA3_PSK = 7
+};
+
+// Enum for WiFi network parameters order
+enum ESP32_WIFI_PARAM_ORDER {
+    ECN = 0,
+    SSID = 1,
+    RSSI = 2,
+    MAC = 3,
+    CHANNEL = 4
+};
+
+// Enum for BLE scan result parameters order
+enum ESP32_BLE_PARAM_ORDER {
+    ADDR = 0,
+    RSSI = 1,
+    ADV_DATA = 2,
+    SCAN_RSP_DATA = 3,
+    ADDR_TYPE = 4
+};
+
+// Enum power state
+enum ESP32_POWER {
+    OFF = 0,
+    ON = 1
+};
+
+// Internal constants:
+// -------------------
+// Default baudrate
+const ESP32_DEFAULT_BAUDRATE = 115200;
+// Default word size
+const ESP32_DEFAULT_WORD_SIZE = 8;
+// Default parity (PARITY_NONE)
+const ESP32_DEFAULT_PARITY = 0;
+// Default count on stop bits
+const ESP32_DEFAULT_STOP_BITS = 1;
+// Default control flags (NO_CTSRTS)
+const ESP32_DEFAULT_FLAGS = 4;
+// Default RX FIFO size
+const ESP32_DEFAULT_RX_FIFO_SZ = 4096;
+// Maximum time allowed for waiting for data, in seconds
+const ESP32_WAIT_DATA_TIMEOUT = 8;
+// Maximum amount of data expected to be received, in bytes
+const ESP32_MAX_DATA_LEN = 12288;
+// Automatic switch off delay, in seconds
+const ESP32_SWITCH_OFF_DELAY = 10;
+
+// TODO: Tune the following 3 constants. Sometimes it can scan not all devices
+//       But we also should avoid OOM (please, see the TODO above _waitForData())
+// Scan interval. It should be more than or equal to the value of <scan_window>.
+// The range of this parameter is [0x0004,0x4000].
+// The scan interval equals this parameter multiplied by 0.625 ms,
+// so the range for the actual scan interval is [2.5,10240] ms.
+const ESP32_BLE_SCAN_INTERVAL = 8;
+// Scan window. It should be less than or equal to the value of <scan_interval>.
+// The range of this parameter is [0x0004,0x4000].
+// The scan window equals this parameter multiplied by 0.625 ms,
+// so the range for the actual scan window is [2.5,10240] ms.
+const ESP32_BLE_SCAN_WINDOW = 8;
+// BLE advertisements scan period, in seconds
+const ESP32_BLE_SCAN_PERIOD = 6;
+
+// ESP32 Driver class.
+// Ability to work with WiFi networks and BLE
+class ESP32Driver {
+    // Power switch pin
+    _switchPin = null;
+    // UART object
+    _serial = null;
+    // All settings
+    _settings = null;
+    // True if the ESP32 board is switched ON, false otherwise
+    _switchedOn = false;
+    // True if the ESP32 board is initialized, false otherwise
+    _initialized = false;
+    // Timer for automatic switch-off of the ESP32 board when idle
+    _switchOffTimer = null;
+
+    /**
+     * Constructor for ESP32 Driver Class
+     *
+     * @param {object} switchPin - Hardware pin object connected to load switch
+     * @param {object} uart - UART object connected to a ESP32 board
+     * @param {table} settings - Connection settings.
+     *      Optional, all settings have defaults.
+     *      If a setting is missed, it is reset to default.
+     *      The settings:
+     *          "baudRate"  : {integer} - UART baudrate, in baud per second.
+     *                                          Default: ESP32_DEFAULT_BAUDRATE
+     *          "wordSize"  : {integer} - Word size, in bits.
+     *                                          Default: ESP32_DEFAULT_WORD_SIZE
+     *          "parity"    : {integer} - Parity.
+     *                                          Default: ESP32_DEFAULT_PARITY
+     *          "stopBits"  : {integer} - Count of stop bits.
+     *                                          Default: ESP32_DEFAULT_STOP_BITS
+     *          "flags"     : {integer} - Control flags.
+     *                                          Default: ESP32_DEFAULT_FLAGS
+     *          "rxFifoSize": {integer} - The new size of the receive FIFO, in bytes.
+     *                                          Default: ESP32_DEFAULT_RX_FIFO_SZ
+     * An exception will be thrown in case of settings or UART configuration error.
+     */
+    constructor(switchPin, uart, settings = {}) {
+        _switchPin = switchPin;
+        _serial = uart;
+
+        _settings = {
+            "baudRate"  : ("baudRate" in settings)   ? settings.baudRate   : ESP32_DEFAULT_BAUDRATE,
+            "wordSize"  : ("wordSize" in settings)   ? settings.wordSize   : ESP32_DEFAULT_WORD_SIZE,
+            "parity"    : ("parity" in settings)     ? settings.parity     : ESP32_DEFAULT_PARITY,
+            "stopBits"  : ("stopBits" in settings)   ? settings.stopBits   : ESP32_DEFAULT_STOP_BITS,
+            "flags"     : ("flags" in settings)      ? settings.flags      : ESP32_DEFAULT_FLAGS,
+            "rxFifoSize": ("rxFifoSize" in settings) ? settings.rxFifoSize : ESP32_DEFAULT_RX_FIFO_SZ
+        };
+
+        // Increase the RX FIFO size to make sure all data from ESP32 will fit into the buffer
+        _serial.setrxfifosize(_settings.rxFifoSize);
+        // Keep the ESP32 board switched off
+        _switchOff();
+    }
+
+    /**
+     * Scan WiFi networks.
+     * NOTE: Parallel requests (2xWiFi or WiFi+BLE scanning) are not allowed
+     *
+     * @return {Promise} that:
+     * - resolves with an array of WiFi networks scanned if the operation succeeded
+     *   Each element of the array is a table with the following fields:
+     *      "ssid"      : {string}  - SSID (network name).
+     *      "bssid"     : {string}  - BSSID (access point’s MAC address), in 0123456789ab format.
+     *      "channel"   : {integer} - Channel number: 1-13 (2.4GHz).
+     *      "rssi"      : {integer} - RSSI (signal strength).
+     *      "open"      : {bool}    - Whether the network is open (password-free).
+     * - rejects if the operation failed
+     */
+    function scanWiFiNetworks() {
+        _switchOffTimer && imp.cancelwakeup(_switchOffTimer);
+
+        return _init()
+        .then(function(_) {
+            ::debug("Scanning WiFi networks..", "ESP32Driver");
+
+            local okValidator = @(data, _) data.find("\r\nOK\r\n") != null;
+            // Send "List Available APs" cmd and parse the result
+            return _communicate("AT+CWLAP", okValidator, _parseWifiNetworks, false);
+        }.bindenv(this))
+        .then(function(wifis) {
+            ::debug("Scanning of WiFi networks finished successfully. Scanned items: " + wifis.len(), "ESP32Driver");
+            _switchOffTimer = imp.wakeup(ESP32_SWITCH_OFF_DELAY, _switchOff.bindenv(this));
+            return wifis;
         }.bindenv(this), function(err) {
-            cm.keepConnection("LocationDriver", false);
+            _switchOffTimer = imp.wakeup(ESP32_SWITCH_OFF_DELAY, _switchOff.bindenv(this));
             throw err;
         }.bindenv(this));
     }
 
     /**
-     * Create a handler called when GNSS is enabled or an error occurred
-     *
-     * @param {function} onError - Function to be called in case of an error during enabling of GNSS
-     *         onError(error), where
-     *         @param {string} error - Error occurred during enabling of GNSS
-     *
-     * @return {function} Handler called when GNSS is enabled or an error occurred
-     */
-    function _onGnssEnabledFunc(onError) {
-        return function(err) {
-            if (err == null) {
-                ::debug("GNSS enabled successfully", "LocationDriver");
-
-                // Update the validity info
-                local assistDataValidity = BG96_GPS.isAssistDataValid();
-                if (assistDataValidity.valid) {
-                    _assistDataValidityTime = assistDataValidity.time;
-                } else {
-                    _assistDataValidityTime = 0;
-                }
-
-                ::debug("Assist data validity time (min): " + _assistDataValidityTime, "LocationDriver");
-            } else {
-                onError("Error enabling GNSS: " + err);
-            }
-        }.bindenv(this);
-    }
-
-    /**
-     * Create a handler called when GNSS location data is ready or an error occurred
-     *
-     * @param {function} onFix - Function to be called in case of successful getting of a GNSS fix
-     *         onFix(fix), where
-     *         @param {table} fix - GNSS fix (location) data
-     * @param {function} onError - Function to be called in case of an error during GNSS locating
-     *         onError(error), where
-     *         @param {string} error - Error occurred during GNSS locating
-     *
-     * @return {function} Handler called when GNSS is enabled or an error occurred
-     */
-    function _onGnssLocationFunc(onFix, onError) {
-        // A valid timestamp will surely be greater than this value (01.01.2021)
-        const LD_VALID_TS = 1609459200;
-
-        return function(result) {
-            BG96_GPS.disableGNSS();
-
-            if (!("fix" in result)) {
-                if ("error" in result) {
-                    onError(result.error);
-                } else {
-                    onError("Unknown error");
-                }
-
-                return;
-            }
-
-            ::info("Got location using GNSS", "LocationDriver");
-            ::debug(result.fix, "LocationDriver");
-
-            local accuracy = ((4.0 * result.fix.hdop.tofloat()) + 0.5).tointeger();
-
-            onFix({
-                // If we don't have the valid time, we take it from the location data
-                "timestamp": time() > LD_VALID_TS ? time() : result.fix.time,
-                "type": "gnss",
-                "accuracy": accuracy,
-                "longitude": result.fix.lon.tofloat(),
-                "latitude": result.fix.lat.tofloat()
-            });
-        }.bindenv(this);
-    }
-
-    /**
-     * Handler called every time imp-device becomes connected
-     */
-    function _onConnected() {
-        // Set a "finally" handler only to avoid "Unhandled promise rejection" message
-        _updateAssistData()
-        .finally(@(_) null);
-    }
-
-    /**
-     * Update GNSS Assist data if needed
+     * Scan BLE advertisements.
+     * NOTE: Parallel requests (2xBLE or BLE+WiFi scanning) are not allowed
      *
      * @return {Promise} that:
-     * - resolves if assist data was obtained
-     * - rejects if there is no need to update assist data or an error occurred
+     * - resolves with an array of scanned BLE advertisements if the operation succeeded
+     *   Each element of the array is a table with the following fields:
+     *     "address"  : {string}  - BLE address.
+     *     "rssi"     : {integer} - RSSI (signal strength).
+     *     "advData"  : {blob} - Advertising data.
+     *     "addrType" : {integer} - Address type: 0 - public, 1 - random.
+     * - rejects if the operation failed
      */
-    function _updateAssistData() {
-        if (_gettingAssistData) {
-            ::debug("Already getting assist data", "LocationDriver");
-            return _gettingAssistData;
-        }
+    function scanBLEAdverts() {
+        _switchOffTimer && imp.cancelwakeup(_switchOffTimer);
 
-        if (_assistData || _assistDataValidityTime >= LD_ASSIST_DATA_MIN_VALID_TIME || !cm.isConnected()) {
-            // If we already have ready-to-use assist data or assist data validity time is big enough,
-            // it doesn't matter if we resolve or reject the promise.
-            // Since the update was actually not done, let's just reject it
-            return Promise.reject(null);
-        }
+        return _init()
+        .then(function(_) {
+            ::debug("Scanning BLE advertisements..", "ESP32Driver");
 
-        ::debug("Requesting assist data...", "LocationDriver");
-
-        return _gettingAssistData = _requestToAgent(APP_RM_MSG_NAME.GNSS_ASSIST)
-        .then(function(data) {
-            _gettingAssistData = null;
-
-            if (data == null) {
-                ::info("No GNSS Assist data received", "LocationDriver");
-                return Promise.reject(null);
-            }
-
-            ::info("GNSS Assist data received", "LocationDriver");
-            _assistData = data;
+            local bleScanCmd = format("AT+BLESCAN=%d,%d", ESP32_BLE_SCAN.ENABLE, ESP32_BLE_SCAN_PERIOD);
+            local validator = @(data, timeElapsed) (data.find("\r\nOK\r\n") != null &&
+                                                    timeElapsed >= ESP32_BLE_SCAN_PERIOD);
+            // Send "Enable Bluetooth LE Scanning" cmd and parse the result
+            return _communicate(bleScanCmd, validator, _parseBLEAdverts, false);
+        }.bindenv(this))
+        .then(function(adverts) {
+            ::debug("Scanning of BLE advertisements finished successfully. Scanned items: " + adverts.len(), "ESP32Driver");
+            _switchOffTimer = imp.wakeup(ESP32_SWITCH_OFF_DELAY, _switchOff.bindenv(this));
+            return adverts;
         }.bindenv(this), function(err) {
-            _gettingAssistData = null;
-            ::info("GNSS Assist data request failed: " + err, "LocationDriver");
-            return Promise.reject(null);
+            _switchOffTimer = imp.wakeup(ESP32_SWITCH_OFF_DELAY, _switchOff.bindenv(this));
+            throw err;
         }.bindenv(this));
     }
 
     /**
-     * Send a request to imp-agent
-     *
-     * @param {enum} name - ReplayMessenger message name (APP_RM_MSG_NAME)
-     * @param {Any serializable type | null} [data] - data, optional
+     * Init and configure ESP32.
      *
      * @return {Promise} that:
-     * - resolves with the response (if any) if the operation succeeded
+     * - resolves if the operation succeeded
+     * - rejects if the operation failed
+     */
+    function _init() {
+        // Delay between powering OFF and ON to restart the ESP32 board, in seconds
+        const ESP32_RESTART_DURATION = 1.0;
+
+        if (_initialized) {
+            return Promise.resolve(null);
+        }
+
+        // Compare BLE scan period and wait data timeout
+        if (ESP32_BLE_SCAN_PERIOD > ESP32_WAIT_DATA_TIMEOUT) {
+            ::info("BLE scan period is greater than wait data period!", "ESP32Driver");
+        }
+
+        ::debug("Starting initialization", "ESP32Driver");
+
+        // Just in case, check if it's already switched ON and switch OFF to start the initialization process from scratch
+        if (_switchedOn) {
+            _switchOff();
+            imp.sleep(ESP32_RESTART_DURATION);
+        }
+
+        _switchOn();
+
+        local readyMsgValidator   = @(data, _) data.find("\r\nready\r\n") != null;
+        local restoreCmdValidator = @(data, _) data.find("\r\nOK\r\n\r\nready\r\n") != null;
+        local okValidator         = @(data, _) data.find("\r\nOK\r\n") != null;
+
+        local cmdSetPrintMask = format("AT+CWLAPOPT=0,%d",
+                                       ESP32_WIFI_SCAN_PRINT_MASK.SHOW_SSID |
+                                       ESP32_WIFI_SCAN_PRINT_MASK.SHOW_MAC |
+                                       ESP32_WIFI_SCAN_PRINT_MASK.SHOW_CHANNEL |
+                                       ESP32_WIFI_SCAN_PRINT_MASK.SHOW_RSSI |
+                                       ESP32_WIFI_SCAN_PRINT_MASK.SHOW_ECN);
+        local cmdSetBLEScanParam = format("AT+BLESCANPARAM=%d,%d,%d,%d,%d",
+                                          ESP32_BLE_SCAN_TYPE.PASSIVE,
+                                          ESP32_BLE_OWN_ADDR_TYPE.PUBLIC,
+                                          ESP32_BLE_FILTER_POLICY.ALLOW_ALL,
+                                          ESP32_BLE_SCAN_INTERVAL,
+                                          ESP32_BLE_SCAN_WINDOW);
+
+        // Functions that return promises which will be executed serially
+        local promiseFuncs = [
+            // Wait for "ready" message
+            _communicate(null, readyMsgValidator),
+            // Restore Factory Default Settings
+            _communicate("AT+RESTORE", restoreCmdValidator),
+            // Check Version Information
+            _communicate("AT+GMR", okValidator, _logVersionInfo),
+            // Set the Wi-Fi Mode to "Station"
+            _communicate(format("AT+CWMODE=%d", ESP32_WIFI_MODE.STATION), okValidator),
+            // Set the Configuration for the Command AT+CWLAP (Wi-Fi scanning)
+            _communicate(cmdSetPrintMask, okValidator),
+            // Initialize the role of BLE
+            _communicate(format("AT+BLEINIT=%d", ESP32_BLE_ROLE.CLIENT), okValidator),
+            // Set the parameters of Bluetooth LE scanning
+            _communicate(cmdSetBLEScanParam, okValidator)
+        ];
+
+        return Promise.serial(promiseFuncs)
+        .then(function(_) {
+            ::debug("Initialization complete", "ESP32Driver");
+            _initialized = true;
+        }.bindenv(this), function(err) {
+            throw "Initialization failure: " + err;
+        }.bindenv(this));
+    }
+
+    /**
+     * Communicate with the ESP32 board: send a command (if passed) and wait for a reply
+     *
+     * @param {string | null} cmd - String with a command to send or null
+     * @param {function} validator - Function that checks if a reply has been fully received
+     * @param {function} [replyHandler=null] - Handler that is called to process the reply
+     * @param {boolean} [wrapInAFunc=true] - True to wrap the Promise to be returned in an additional function with no params.
+     *                                       This optionis useful for, e.g., serial execution of a list of promises (Promise.serial)
+     *
+     * @return {Promise | function}: Promise or a function with no params that returns this promise. The promise:
+     * - resolves with the reply (pre-processed if a reply handler specified) if the operation succeeded
      * - rejects with an error if the operation failed
      */
-    function _requestToAgent(name, data = null) {
-        return Promise(function(resolve, reject) {
-            local onMsgAck = function(msg, resp) {
-                // Reset the callbacks because the request is finished
-                rm.onAck(null, name);
-                rm.onFail(null, name);
-                resolve(resp);
-            }.bindenv(this);
+    function _communicate(cmd, validator, replyHandler = null, wrapInAFunc = true) {
+        if (wrapInAFunc) {
+            return (@() _communicate(cmd, validator, replyHandler, false)).bindenv(this);
+        }
 
-            local onMsgFail = function(msg, error) {
-                // Reset the callbacks because the request is finished
-                rm.onAck(null, name);
-                rm.onFail(null, name);
-                reject(error);
-            }.bindenv(this);
+        if (cmd) {
+            ::debug(format("Sending %s cmd..", cmd), "ESP32Driver");
+            _serial.write(cmd + "\r\n");
+        }
 
-            // Set temporary callbacks for this request
-            rm.onAck(onMsgAck.bindenv(this), name);
-            rm.onFail(onMsgFail.bindenv(this), name);
-            // Send the request to the agent
-            rm.send(name, data);
+        return _waitForData(validator)
+        .then(function(reply) {
+            cmd && ::debug(format("Reply for %s cmd received", cmd), "ESP32Driver");
+            return replyHandler ? replyHandler(reply) : reply;
         }.bindenv(this));
+    }
+
+    /**
+     * Switch ON the ESP32 board and configure the UART port
+     */
+    function _switchOn() {
+        _serial.configure(_settings.baudRate,
+                          _settings.wordSize,
+                          _settings.parity,
+                          _settings.stopBits,
+                          _settings.flags);
+        _switchPin.configure(DIGITAL_OUT, ESP32_POWER.ON);
+        _switchedOn = true;
+
+        ::debug("ESP32 board has been switched ON", "ESP32Driver");
+    }
+
+    /**
+     * Switch OFF the ESP32 board and disable the UART port
+     */
+    function _switchOff() {
+        _switchPin.disable();
+        _serial.disable();
+        _switchedOn = false;
+        _initialized = false;
+
+        ::debug("ESP32 board has been switched OFF", "ESP32Driver");
+    }
+
+    /**
+     * Parse the data returned by the AT+CWLAP (List Available APs) command
+     *
+     * @param {string} data - String with a reply to the AT+CWLAP command
+     *
+     * @return {array} of parsed WiFi networks
+     *  Each element of the array is a table with the following fields:
+     *     "ssid"      : {string}  - SSID (network name).
+     *     "bssid"     : {string}  - BSSID (access point’s MAC address), in 0123456789ab format.
+     *     "channel"   : {integer} - Channel number: 1-13 (2.4GHz).
+     *     "rssi"      : {integer} - RSSI (signal strength).
+     *     "open"      : {bool}    - Whether the network is open (password-free).
+     * An exception may be thrown in case of an error.
+     */
+    function _parseWifiNetworks(data) {
+        // The data should look like the following:
+        // AT+CWLAP
+        // +CWLAP:(3,"Ger",-64,"f1:b2:d4:88:16:32",8)
+        // +CWLAP:(3,"TP-Link_256",-80,"bb:ae:76:8d:2c:de",10)
+        //
+        // OK
+
+        // Sub-expressions of the regular expression for parsing AT+CWLAP response
+        const ESP32_CWLAP_PREFIX  = @"\+CWLAP:";
+        const ESP32_CWLAP_ECN     = @"\d";
+        const ESP32_CWLAP_SSID    = @".{0,32}";
+        const ESP32_CWLAP_RSSI    = @"-?\d{1,3}";
+        const ESP32_CWLAP_MAC     = @"(?:\x\x:){5}\x\x";
+        // Only WiFi 2.4GHz (5GHz channels can be 100+)
+        const ESP32_CWLAP_CHANNEL = @"\d{1,2}";
+
+        // NOTE: Due to the known issues of regexp (see the electric imp docs), WiFi networks with SSID that contains quotation mark(s) (")
+        // will not be recognized by the regular expression and, therefore, will not be in the result list of scanned networks
+        local regex = regexp(format(@"^%s\((%s),""(%s)"",(%s),""(%s)"",(%s)\)$",
+                                    ESP32_CWLAP_PREFIX,
+                                    ESP32_CWLAP_ECN,
+                                    ESP32_CWLAP_SSID,
+                                    ESP32_CWLAP_RSSI,
+                                    ESP32_CWLAP_MAC,
+                                    ESP32_CWLAP_CHANNEL));
+
+        ::debug("Parsing the WiFi scan response..", "ESP32Driver");
+
+        try {
+            local wifis = [];
+            local dataRows = split(data, "\r\n");
+
+            foreach (row in dataRows) {
+                local regexCapture = regex.capture(row);
+
+                if (regexCapture == null) {
+                    continue;
+                }
+
+                // The first capture is the full row. Let's remove it as we only need the parsed pieces of the row
+                regexCapture.remove(0);
+                // Convert the array of begin/end indexes to an array of substrings parsed out from the row
+                foreach (i, val in regexCapture) {
+                    regexCapture[i] = row.slice(val.begin, val.end);
+                }
+
+                local scannedWifi = {
+                    "ssid"   : regexCapture[ESP32_WIFI_PARAM_ORDER.SSID],
+                    "bssid"  : _removeColon(regexCapture[ESP32_WIFI_PARAM_ORDER.MAC]),
+                    "channel": regexCapture[ESP32_WIFI_PARAM_ORDER.CHANNEL].tointeger(),
+                    "rssi"   : regexCapture[ESP32_WIFI_PARAM_ORDER.RSSI].tointeger(),
+                    "open"   : regexCapture[ESP32_WIFI_PARAM_ORDER.ECN].tointeger() == ESP32_ECN_METHOD.OPEN
+                };
+
+                wifis.push(scannedWifi);
+            }
+
+            return wifis;
+        } catch (err) {
+            throw "WiFi networks parsing error: " + err;
+        }
+    }
+
+    /**
+     * Log the data returned by the AT+GMR (Check Version Information) command
+     *
+     * @param {string} data - String with a reply to the AT+GMR command
+     * An exception may be thrown in case of an error.
+     */
+    function _logVersionInfo(data) {
+        // The data should look like the following:
+        // AT version:2.2.0.0(c6fa6bf - ESP32 - Jul  2 2021 06:44:05)
+        // SDK version:v4.2.2-76-gefa6eca
+        // compile time(3a696ba):Jul  2 2021 11:54:43
+        // Bin version:2.2.0(WROOM-32)
+        //
+        // OK
+
+        ::debug("ESP AT software:", "ESP32Driver");
+
+        try {
+            local rows = split(data, "\r\n");
+            for (local i = 1; i < rows.len() - 1; i++) {
+                ::debug(rows[i], "ESP32Driver");
+            }
+        } catch (err) {
+            throw "AT+GMR cmd response parsing error: " + err;
+        }
+    }
+
+    /**
+     * Wait for certain data to be received from the ESP32 board
+     *
+     * @param {function} validator - Function that checks if the expected data has been fully received
+     *
+     * @return {Promise} that:
+     * - resolves with the data received if the operation succeeded
+     * - rejects if the operation failed
+     */
+    // TODO: On-the-fly data processing may be required. And memory consumption optimization.
+    //       If we wait for all data to be received before processing, we can face OOM due to the need of keeping all raw recevied data
+    function _waitForData(validator) {
+        // Data check/read period, in seconds
+        const ESP32_DATA_CHECK_PERIOD = 0.1;
+        // Maximum data length expected to be received from ESP32, in bytes
+        const ESP32_DATA_READ_CHUNK_LEN = 1024;
+
+        local start = hardware.millis();
+        local data = "";
+
+        return Promise(function(resolve, reject) {
+            local check;
+            check = function() {
+                local chunk = _serial.readblob(ESP32_DATA_READ_CHUNK_LEN);
+
+                // Read until FIFO is empty and accumulate to the result string
+                while (chunk.len() > 0 && data.len() < ESP32_MAX_DATA_LEN) {
+                    data += chunk.tostring();
+                    chunk = _serial.readblob(ESP32_DATA_READ_CHUNK_LEN);
+                }
+
+                local timeElapsed = (hardware.millis() - start) / 1000.0;
+
+                if (validator(data, timeElapsed)) {
+                    return resolve(data);
+                }
+
+                if (timeElapsed >= ESP32_WAIT_DATA_TIMEOUT) {
+                    return reject("Timeout waiting for the expected data or an acknowledge");
+                }
+
+                if (data.len() >= ESP32_MAX_DATA_LEN) {
+                    return reject("Too much data received but still no expected data");
+                }
+
+                imp.wakeup(ESP32_DATA_CHECK_PERIOD, check);
+            }.bindenv(this);
+
+            imp.wakeup(ESP32_DATA_CHECK_PERIOD, check);
+        }.bindenv(this));
+    }
+
+    /**
+     * Remove all colon (:) chars from a string
+     *
+     * @param {string} str - A string
+     *
+     * @return {string} String with all colon chars removed
+     */
+    function _removeColon(str) {
+        local subStrings = split(str, ":");
+        local res = "";
+        foreach (subStr in subStrings) {
+            res += subStr;
+        }
+
+        return res;
+    }
+
+    /**
+     * Parse the data returned by the AT+BLESCAN command
+     *
+     * @param {string} data - String with a reply to the AT+BLESCAN command
+     *
+     * @return {array} of scanned BLE advertisements
+     *  Each element of the array is a table with the following fields:
+     *     "address"  : {string}  - BLE address.
+     *     "rssi"     : {integer} - RSSI (signal strength).
+     *     "advData"  : {blob} - Advertising data.
+     *     "addrType" : {integer} - Address type: 0 - public, 1 - random.
+     * An exception may be thrown in case of an error.
+     */
+    function _parseBLEAdverts(data) {
+        // The data should look like the following:
+        // AT+BLESCAN=1,5
+        // OK
+        // +BLESCAN:6f:92:8a:04:e1:79,-89,1aff4c000215646be3e46e4e4e25ad0177a28f3df4bd00000000bf,,1
+        // +BLESCAN:76:72:c3:3e:29:e4,-79,1bffffffbeac726addafa7044528b00b12f8f57e7d8200000000bb00,,1
+
+        // Sub-expressions of the regular expression for parsing AT+BLESCAN response
+        const ESP32_BLESCAN_PREFIX        = @"\+BLESCAN:";
+        const ESP32_BLESCAN_ADDR          = @"(?:\x\x:){5}\x\x";
+        const ESP32_BLESCAN_RSSI          = @"-?\d{1,3}";
+        const ESP32_BLESCAN_ADV_DATA      = @"(?:\x\x){0,31}";
+        const ESP32_BLESCAN_SCAN_RSP_DATA = @"(?:\x\x){0,31}";
+        const ESP32_BLESCAN_ADDR_TYPE     = @"\d";
+
+        local regex = regexp(format(@"^%s""(%s)"",(%s),(%s),(%s),(%s)$",
+                                    ESP32_BLESCAN_PREFIX,
+                                    ESP32_BLESCAN_ADDR,
+                                    ESP32_BLESCAN_RSSI,
+                                    ESP32_BLESCAN_ADV_DATA,
+                                    ESP32_BLESCAN_SCAN_RSP_DATA,
+                                    ESP32_BLESCAN_ADDR_TYPE));
+        ::debug("Parsing the BLE devices scan response..", "ESP32Driver");
+
+        try {
+            // Result array of scanned advertisements
+            local result = [];
+            // Array of strings to be compared to check the uniqueness of an advertisement
+            local uniqueAdverts = [];
+            local dataRows = split(data, "\r\n");
+
+            // In order to process fresher advertisements first (to get the latest RSSI for duplicated adverts), reverse this array
+            dataRows.reverse();
+
+            foreach (row in dataRows) {
+                local regexCapture = regex.capture(row);
+
+                if (regexCapture == null) {
+                    continue;
+                }
+
+                // The first capture is the full row. Let's remove it as we only need the parsed pieces of the row
+                regexCapture.remove(0);
+                // Convert the array of begin/end indexes to an array of substrings parsed out from the row
+                foreach (i, val in regexCapture) {
+                    regexCapture[i] = row.slice(val.begin, val.end);
+                }
+
+                local address = _removeColon(regexCapture[ESP32_BLE_PARAM_ORDER.ADDR]);
+                local advData = regexCapture[ESP32_BLE_PARAM_ORDER.ADV_DATA];
+                local addrType = regexCapture[ESP32_BLE_PARAM_ORDER.ADDR_TYPE].tointeger();
+
+                // Make a string that helps to compare adverts.
+                // Advertisement uniqueness is determined by equality of address, advData and addrType
+                local stringAdvert = address + advData + addrType;
+
+                if (uniqueAdverts.find(stringAdvert) != null) {
+                    continue;
+                }
+
+                uniqueAdverts.push(stringAdvert);
+
+                local resultAdvert = {
+                    "address" : address,
+                    "rssi"    : regexCapture[ESP32_BLE_PARAM_ORDER.RSSI].tointeger(),
+                    "advData" : advData.len() >= 2 ? utilities.hexStringToBlob(advData) : blob(),
+                    "addrType": addrType
+                };
+
+                result.push(resultAdvert);
+            }
+
+            return result;
+        } catch (err) {
+            throw "BLE advertisements parsing error: " + err;
+        }
     }
 }
 
@@ -3422,6 +3861,15 @@ class AccelerometerDriver {
 // Mean earth radius in meters (https://en.wikipedia.org/wiki/Great-circle_distance)
 const MM_EARTH_RAD = 6371009;
 
+// min longitude
+const MM_MIN_LNG = -180.0;
+// max latitude
+const MM_MAX_LNG = 180.0;
+// min latitude
+const MM_MIN_LAT = -90.0;
+// max latitude
+const MM_MAX_LAT = 90.0;
+
 // Motion Monitor class.
 // Starts and stops motion monitoring.
 class MotionMonitor {
@@ -3486,6 +3934,18 @@ class MotionMonitor {
     // Minimal movement distance to determine motion detection condition
     _motionDistance = null;
 
+    // geofence zone center location
+    _geofenceCenter = null;
+
+    // geofence zone radius
+    _geofenceRadius = null;
+
+    // enable/disable flag
+    _geofenceIsEnable = null;
+
+    // in zone or not
+    _inGeofenceZone = null;
+
     /**
      *  Constructor for Motion Monitor class.
      *  @param {object} accelDriver - Accelerometer driver object.
@@ -3495,6 +3955,8 @@ class MotionMonitor {
         _ad = accelDriver;
         _ld = locDriver;
 
+        _geofenceIsEnable = false;
+        _geofenceRadius = DEFAULT_GEOFENCE_RADIUS;
         _motionStopAssumption = false;
         _inMotion = false;
         _curLocFresh = false;
@@ -3509,6 +3971,8 @@ class MotionMonitor {
                     "accuracy": MM_EARTH_RAD,
                     "longitude": INIT_LONGITUDE,
                     "latitude": INIT_LATITUDE};
+        _geofenceCenter = {"longitude": DEFAULT_GEOFENCE_CENTER_LNG,
+                            "latitude": DEFAULT_GEOFENCE_CENTER_LAT};
         _locReadingPeriod = DEFAULT_LOCATION_READING_PERIOD;
         _movementMax = DEFAULT_MOVEMENT_ACCELERATION_MAX;
         _movementMin = DEFAULT_MOVEMENT_ACCELERATION_MIN;
@@ -3620,6 +4084,63 @@ class MotionMonitor {
             _geofencingEventCb = geofencingEventCb;
         } else {
             ::error("Argument not a function or null", "MotionMonitor");
+        }
+    }
+
+    /**
+     *  Enable/disable and set settings for geofencing.
+     *  @param {table} settings - Table with the center coordinates of geofence zone, radius.
+     *      The settings include:
+     *          "enabled"   : {bool}  - Enable/disable, true - geofence is enabled.
+     *          "lng"       : {float} - Center longitude, in degrees.
+     *          "lat"       : {float} - Center latitude, in degrees.
+     *          "radius"    : {float} - Radius, in meters. (value must exceed the accuracy of the coordinate)
+     */
+    function configureGeofence(settings) {
+        // reset in zone flag
+        _inGeofenceZone = null;
+        if (settings != null && typeof settings == "table") {
+            _geofenceIsEnable = false;
+            if ("enabled" in settings) {
+                if (typeof settings.enabled == "bool") {
+                    ::info("Geofence is " + (settings.enabled ? "enabled" : "disabled"), "MotionMonitor");
+                    _geofenceIsEnable = settings.enabled;
+                }
+            }
+            _geofenceRadius = DEFAULT_GEOFENCE_RADIUS;
+            if ("radius" in settings) {
+                if (typeof settings.radius == "float" && 
+                    settings.radius >= 0) {
+                    ::info("Geofence radius: " + settings.radius, "MotionMonitor");
+                    _geofenceRadius = settings.radius > MM_EARTH_RAD ? MM_EARTH_RAD : settings.radius;
+                }
+            }
+            _geofenceCenter = {"longitude": DEFAULT_GEOFENCE_CENTER_LNG,
+                               "latitude" : DEFAULT_GEOFENCE_CENTER_LAT};
+            if ("lng" in settings && "lat" in settings) {
+                if (typeof settings.lat == "float") {
+                    ::info("Geofence latitude: " + settings.lat, "MotionMonitor");
+                    _geofenceCenter.latitude = settings.lat;
+                    if (_geofenceCenter.latitude < MM_MIN_LAT) {
+                        ::error("Geofence latitude not in range [-90;90]: " + settings.lat, "MotionMonitor");
+                        _geofenceCenter.latitude = MM_MIN_LAT;
+                    }
+                    if (_geofenceCenter.latitude > MM_MAX_LAT) {
+                        ::error("Geofence latitude not in range [-90;90]: " + settings.lat, "MotionMonitor");
+                        _geofenceCenter.latitude = MM_MAX_LAT;
+                    }
+                    ::info("Geofence longitude: " + settings.lng, "MotionMonitor");
+                    _geofenceCenter.longitude = settings.lng;
+                    if (_geofenceCenter.longitude < MM_MIN_LNG) {
+                        ::error("Geofence longitude not in range [-180;180]: " + settings.lng, "MotionMonitor");
+                        _geofenceCenter.longitude = MM_MIN_LAT;
+                    }
+                    if (_geofenceCenter.longitude > MM_MAX_LAT) {
+                        ::error("Geofence longitude not in range [-180;180]: " + settings.lng, "MotionMonitor");
+                        _geofenceCenter.longitude = MM_MAX_LAT;
+                    }
+                }
+            }
         }
     }
 
@@ -3755,18 +4276,16 @@ class MotionMonitor {
         return _locReadingPromise = _ld.getLocation()
         .then(function(loc) {
             _locReadingPromise = null;
-
             _curLoc = loc;
             _curLocFresh = true;
             _newLocCb && _newLocCb(_curLoc);
+            _procGeofence(loc);
         }.bindenv(this), function(_) {
             _locReadingPromise = null;
 
             // the current location becomes non-fresh
             _curLoc = _prevLoc;
             _curLocFresh = false;
-            // in cb location null check exist
-            _newLocCb && _newLocCb(_curLoc);
         }.bindenv(this));
     }
 
@@ -3779,17 +4298,7 @@ class MotionMonitor {
             local dist = 0;
             if (_curLoc && _prevLoc) {
                 // calculate distance between two locations
-                // https://en.wikipedia.org/wiki/Great-circle_distance
-                local deltaLat = math.fabs(_curLoc.latitude - _prevLoc.latitude)*PI/180.0;
-                local deltaLong = math.fabs(_curLoc.longitude - _prevLoc.longitude)*PI/180.0;
-                local deltaSigma = math.pow(math.sin(0.5*deltaLat), 2);
-                deltaSigma += math.cos(_curLoc.latitude*PI/180.0)*
-                              math.cos(_prevLoc.latitude*PI/180.0)*
-                              math.pow(math.sin(0.5*deltaLong), 2);
-                deltaSigma = 2*math.asin(math.sqrt(deltaSigma));
-
-                // actual arc length on a sphere of radius r (mean Earth radius)
-                dist = MM_EARTH_RAD*deltaSigma;
+                dist = _greatCircleDistance(_curLoc, _prevLoc);
             } else {
                 ::error("Location is null", "MotionMonitor");
             }
@@ -3840,6 +4349,99 @@ class MotionMonitor {
             _locReadingTimer && imp.cancelwakeup(_locReadingTimer);
             _locReadingTimer = imp.wakeup(_locReadingPeriod, _locReadingTimerCb.bindenv(this));
         }
+    }
+
+    /**
+     *  Zone border crossing check.
+     *  
+     *   @param {table} curLocation - Table with the current location.
+     *        The table must include parts:
+     *          "accuracy" : {integer}  - Accuracy, in meters.
+     *          "longitude": {float}    - Longitude, in degrees.
+     *          "latitude" : {float}    - Latitude, in degrees.  
+     */
+    function _procGeofence(curLocation) {
+        //              _____GeofenceZone
+        //             /      \
+        //            /__     R\    dist           __Location
+        //           |/\ \  .---|-----------------/- \
+        //           |\__/      |                 \_\/accuracy (radius)
+        //            \ Location/
+        //             \______ /
+        //            in zone                     not in zone
+        // (location with accuracy radius      (location with accuracy radius
+        //  entirely in geofence zone)          entirely not in geofence zone)
+        // TODO: location after reboot/reconfigure - not in geofence zone
+        if (_geofenceIsEnable) {
+            local dist = _greatCircleDistance(_geofenceCenter, curLocation);
+            ::debug("Geofence distance: " + dist, "MotionMonitor");
+            if (dist > _geofenceRadius) {
+                local distWithoutAccurace = dist - curLocation.accuracy;
+                if (distWithoutAccurace > 0 && distWithoutAccurace > _geofenceRadius) {
+                    if (_inGeofenceZone == null || _inGeofenceZone == true) {
+                        _geofencingEventCb && _geofencingEventCb(false);
+                        _inGeofenceZone = false;
+                    }
+                }
+            } else {
+                local distWithAccurace = dist + curLocation.accuracy;
+                if (distWithAccurace <= _geofenceRadius) {
+                    if (_inGeofenceZone == null || _inGeofenceZone == false) {
+                        _geofencingEventCb && _geofencingEventCb(true);
+                        _inGeofenceZone = true;
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     *  Calculate distance between two locations.
+     *
+     *   @param {table} locationFirstPoint - Table with the first location value.
+     *        The table must include parts:
+     *          "longitude": {float} - Longitude, in degrees.
+     *          "latitude":  {float} - Latitude, in degrees.
+     *   @param {table} locationSecondPoint - Table with the second location value.
+     *        The location must include parts:
+     *          "longitude": {float} - Longitude, in degrees.
+     *          "latitude":  {float} - Latitude, in degrees.
+     *  
+     *   @return {float} If success - value, else - default value (0).
+     */
+    function _greatCircleDistance(locationFirstPoint, locationSecondPoint) {
+        local dist = 0;
+
+        if (locationFirstPoint != null || locationSecondPoint != null) {
+            if ("longitude" in locationFirstPoint &&
+                "longitude" in locationSecondPoint &&
+                "latitude" in locationFirstPoint &&
+                "latitude" in locationSecondPoint) {
+                // https://en.wikipedia.org/wiki/Great-circle_distance
+                local deltaLat = math.fabs(locationFirstPoint.latitude - 
+                                           locationSecondPoint.latitude)*PI/180.0;
+                local deltaLong = math.fabs(locationFirstPoint.longitude - 
+                                            locationSecondPoint.longitude)*PI/180.0;
+                //  -180___180 
+                //     / | \
+                //west|  |  |east   selection of the shortest arc
+                //     \_|_/ 
+                // Earth 0 longitude
+                if (deltaLong > PI) {
+                    deltaLong = 2*PI - deltaLong;
+                }
+                local deltaSigma = math.pow(math.sin(0.5*deltaLat), 2);
+                deltaSigma += math.cos(locationFirstPoint.latitude*PI/180.0)*
+                              math.cos(locationSecondPoint.latitude*PI/180.0)*
+                              math.pow(math.sin(0.5*deltaLong), 2);
+                deltaSigma = 2*math.asin(math.sqrt(deltaSigma));
+
+                // actual arc length on a sphere of radius r (mean Earth radius)
+                dist = MM_EARTH_RAD*deltaSigma;
+            }
+        }
+
+        return dist
     }
 }
 
@@ -4325,7 +4927,759 @@ class DataProcessor {
     }
 }
 
-//line 36 "/home/we/Develop/Squirrel/prog-x/src/device/Main.device.nut"
+//line 40 "/home/we/Develop/Squirrel/prog-x/src/device/Main.device.nut"
+
+//line 2 "LocationDriver.device.nut"
+
+// GNSS options:
+// Accuracy threshold of positioning, in meters
+const LD_GNSS_ACCURACY = 30;
+// The maximum positioning time, in seconds
+const LD_GNSS_LOC_TIMEOUT = 55;
+// The number of fails allowed before the cooldown period is activated
+const LD_GNSS_FAILS_BEFORE_COOLDOWN = 3;
+// Duration of the cooldown period, in seconds
+const LD_GNSS_COOLDOWN_PERIOD = 300;
+
+// U-blox UART baudrate
+const LD_UBLOX_UART_BAUDRATE = 115200;
+// U-blox location check (polling) period, in seconds
+const LD_UBLOX_LOC_CHECK_PERIOD = 1;
+// The minimum period of updating the offline assist data of u-blox, in seconds
+const LD_ASSIST_DATA_UPDATE_MIN_PERIOD = 43200;
+
+// U-blox fix types enumeration
+enum LD_UBLOX_FIX_TYPE {
+    NO_FIX,
+    DEAD_REC_ONLY,
+    FIX_2D,
+    FIX_3D,
+    GNSS_DEAD_REC,
+    TIME_ONLY
+}
+
+// Location Driver class.
+// Determines the current position.
+class LocationDriver {
+    // UBloxM8N instance
+    _ubxDriver = null;
+    // UBloxAssistNow instance
+    _ubxAssist = null;
+    // SPIFlashFileSystem instance. Used to store u-blox assist data
+    _assistDataStorage = null;
+    // Timestamp of the latest assist data check (download)
+    _assistDataUpdateTs = 0;
+    // Promise that resolves or rejects when the location has been obtained.
+    // null if the location is not being obtained at the moment
+    _gettingLocation = null;
+    // Promise that resolves or rejects when the assist data has been obtained.
+    // null if the assist data is not being obtained at the moment
+    _gettingAssistData = null;
+    // Fails counter for GNSS. If it exceeds the threshold, the cooldown period will be applied
+    _gnssFailsCounter = 0;
+    // ESP32 object
+    _esp = null;
+    // Known BLE devices
+    _knownBLEDevices = null;
+
+    /**
+     * Constructor for Location Driver
+     */
+    constructor() {
+        _knownBLEDevices = DEFAULT_BLE_DEVICES;
+
+        _ubxDriver = UBloxM8N(HW_UBLOX_UART);
+        local ubxSettings = {
+            "baudRate"     : LD_UBLOX_UART_BAUDRATE,
+            "outputMode"   : UBLOX_M8N_MSG_MODE.UBX_ONLY,
+            // TODO: Why BOTH?
+            "inputMode"    : UBLOX_M8N_MSG_MODE.BOTH
+        };
+
+
+        _ubxDriver.configure(ubxSettings);
+        _ubxAssist = UBloxAssistNow(_ubxDriver);
+
+        _assistDataStorage = SPIFlashFileSystem(HW_LD_SFFS_START_ADDR, HW_LD_SFFS_END_ADDR);
+        _assistDataStorage.init();
+
+        cm.onConnect(_onConnected.bindenv(this), "LocationDriver");
+        _esp = ESP32Driver(HW_ESP_POWER_EN_PIN, HW_ESP_UART);
+        _updateAssistData();
+    }
+
+    /**
+     * Obtain and return the current location
+     * - First, try to get GNSS fix
+     * - If no success, try to obtain location using cell towers info
+     *
+     * @return {Promise} that:
+     * - resolves with the current location if the operation succeeded
+     * - rejects if the operation failed
+     */
+    function getLocation() {
+        if (_gettingLocation) {
+            ::debug("Already getting location", "LocationDriver");
+            return _gettingLocation;
+        }
+
+        return _gettingLocation = _getLocationBLEDevices()
+        .fail(function(err) {
+            ::info("Couldn't get location using BLE devices: " + err, "LocationDriver");
+            return _getLocationGNSS();
+        }.bindenv(this))
+        .fail(function(err) {
+            ::info("Couldn't get location using GNSS: " + err, "LocationDriver");
+            return _getLocationCellTowersAndWiFi();
+        }.bindenv(this))
+        .then(function(location) {
+            _gettingLocation = null;
+            return location;
+        }.bindenv(this), function(err) {
+            ::info("Couldn't get location using WiFi networks and cell towers: " + err, "LocationDriver");
+            _gettingLocation = null;
+            return Promise.reject(null);
+        }.bindenv(this));
+    }
+
+    // -------------------- PRIVATE METHODS -------------------- //
+
+    /**
+     * Obtain the current location using GNSS
+     *
+     * @return {Promise} that:
+     * - resolves with the current location if the operation succeeded
+     * - rejects with an error if the operation failed
+     */
+    function _getLocationGNSS() {
+        if (_gnssFailsCounter >= LD_GNSS_FAILS_BEFORE_COOLDOWN) {
+            return Promise.reject("Cooldown period is active");
+        }
+
+        return _updateAssistData()
+        .finally(function(_) {
+            // TODO: Power on the module?
+            ::debug("Writing the UTC time to u-blox..", "LocationDriver");
+            _ubxAssist.writeUtcTimeAssist();
+            return _writeAssistDataToUBlox();
+        }.bindenv(this))
+        .finally(function(_) {
+            ::debug("Getting location using GNSS (u-blox)..", "LocationDriver");
+            return Promise(function(resolve, reject) {
+                local onTimeout = function() {
+                    // Failed to obtain the location
+                    // Increase the fails counter, disable the u-blox, and reject the promise
+
+                    // If the fails counter equals to LD_GNSS_FAILS_BEFORE_COOLDOWN, we activate the cooldown period.
+                    // After this period, the counter will be reset and GNSS will be available again
+                    if (++_gnssFailsCounter == LD_GNSS_FAILS_BEFORE_COOLDOWN) {
+                        ::debug("GNSS cooldown period activated", "LocationDriver");
+
+                        local onCooldownPeriodFinish = function() {
+                            ::debug("GNSS cooldown period finished", "LocationDriver");
+                            _gnssFailsCounter = 0;
+                        }.bindenv(this);
+
+                        imp.wakeup(LD_GNSS_COOLDOWN_PERIOD, onCooldownPeriodFinish);
+                    }
+
+                    _disableUBlox();
+                    reject("Timeout");
+                }.bindenv(this);
+
+                local timeoutTimer = imp.wakeup(LD_GNSS_LOC_TIMEOUT, onTimeout);
+
+                local onFix = function(location) {
+                    ::info("Got location using GNSS", "LocationDriver");
+                    ::debug(location, "LocationDriver");
+
+                    // Successful location!
+                    // Zero the fails counter, cancel the timeout timer, disable the u-blox, and resolve the promise
+                    _gnssFailsCounter = 0;
+                    imp.cancelwakeup(timeoutTimer);
+                    _disableUBlox();
+                    resolve(location);
+                }.bindenv(this);
+
+                // Enable Position Velocity Time Solution messages
+                _ubxDriver.enableUbxMsg(UBX_MSG_PARSER_CLASS_MSG_ID.NAV_PVT, LD_UBLOX_LOC_CHECK_PERIOD, _onUBloxNavMsgFunc(onFix));
+            }.bindenv(this));
+        }.bindenv(this));
+    }
+
+    /**
+     * Obtain the current location using cell towers info and WiFi
+     *
+     * @return {Promise} that:
+     * - resolves with the current location if the operation succeeded
+     * - rejects with an error if the operation failed
+     */
+    function _getLocationCellTowersAndWiFi() {
+        ::debug("Getting location using cell towers and WiFi..", "LocationDriver");
+
+        cm.keepConnection("LocationDriver", true);
+
+        local scannedWifis = null;
+        local scannedTowers = null;
+        local locType = null;
+
+        // Run WiFi scanning in the background
+        local scanWifiPromise = _esp.scanWiFiNetworks()
+        .then(function(wifis) {
+            scannedWifis = wifis;
+        }.bindenv(this), function(err) {
+            ::error("Couldn't scan WiFi networks: " + err, "LocationDriver");
+        }.bindenv(this));
+
+        return cm.connect()
+        .then(function(_) {
+            scannedTowers = BG96CellInfo.scanCellTowers();
+            // Wait until the WiFi scanning is finished (if not yet)
+            return scanWifiPromise;
+        }.bindenv(this), function(_) {
+            throw "Couldn't connect to the server";
+        }.bindenv(this))
+        .then(function(_) {
+            local locationData = {};
+
+            if (scannedWifis && scannedTowers) {
+                locationData.wifiAccessPoints <- scannedWifis;
+                locationData.radioType <- scannedTowers.radioType;
+                locationData.cellTowers <- scannedTowers.cellTowers;
+                locType = "wifi+cell";
+            } else if (scannedWifis) {
+                locationData.wifiAccessPoints <- scannedWifis;
+                locType = "wifi";
+            } else if (scannedTowers) {
+                locationData.radioType <- scannedTowers.radioType;
+                locationData.cellTowers <- scannedTowers.cellTowers;
+                locType = "cell";
+            } else {
+                throw "No towers and WiFi scanned";
+            }
+
+            ::debug("Sending results to the agent..", "LocationDriver");
+
+            return _requestToAgent(APP_RM_MSG_NAME.LOCATION_CELL_WIFI, locationData)
+            .fail(function(err) {
+                throw "Error sending a request to the agent: " + err;
+            }.bindenv(this));
+        }.bindenv(this))
+        .then(function(resp) {
+            cm.keepConnection("LocationDriver", false);
+
+            if (resp == null) {
+                throw "No location received from the agent";
+            }
+
+            ::info("Got location using cell towers and/or WiFi", "LocationDriver");
+            ::debug(resp, "LocationDriver");
+
+            return {
+                // Here we assume that if the device is connected, its time is synced
+                "timestamp": time(),
+                "type": locType,
+                "accuracy": resp.accuracy,
+                "longitude": resp.location.lng,
+                "latitude": resp.location.lat
+            };
+        }.bindenv(this), function(err) {
+            cm.keepConnection("LocationDriver", false);
+            throw err;
+        }.bindenv(this));
+    }
+
+    /**
+     * Obtain the current location using BLE devices
+     *
+     * @return {Promise} that:
+     * - resolves with the current location if the operation succeeded
+     * - rejects with an error if the operation failed
+     */
+    function _getLocationBLEDevices() {
+        ::debug("Getting location using BLE devices..", "LocationDriver");
+        // Default accuracy
+        const LD_BLE_BEACON_DEFAULT_ACCURACY = 10;
+
+        return _esp.scanBLEAdverts()
+        .then(function(adverts) {
+            local knownGeneric = _knownBLEDevices.generic;
+            local knownIBeacons = _knownBLEDevices.iBeacon;
+            // Table of "recognized" advertisements (for which the location is known) and their locations
+            local recognized = {};
+
+            foreach (advert in adverts) {
+                if (advert.address in knownGeneric) {
+                    ::debug("A generic BLE device with known location found: " + advert.address, "LocationDriver");
+
+                    recognized[advert] <- knownGeneric[advert.address];
+                    continue;
+                }
+
+                local parsed = _parseIBeaconPacket(advert.advData);
+
+                if (parsed && parsed.uuid  in knownIBeacons
+                           && parsed.major in knownIBeacons[parsed.uuid]
+                           && parsed.minor in knownIBeacons[parsed.uuid][parsed.major]) {
+                    local iBeaconInfo = format("UUID %s, Major %d, Minor %d", _formatUUID(parsed.uuid), parsed.major, parsed.minor);
+                    ::debug(format("An iBeacon device with known location found: %s, %s", advert.address, iBeaconInfo), "LocationDriver");
+
+                    recognized[advert] <- knownIBeacons[parsed.uuid][parsed.major][parsed.minor];
+                }
+            }
+
+            if (recognized.len() == 0) {
+                return Promise.reject("No known devices available");
+            }
+
+            local closestDevice = null;
+            foreach (advert, _ in recognized) {
+                if (closestDevice == null || closestDevice.rssi < advert.rssi) {
+                    closestDevice = advert;
+                }
+            }
+
+            ::info("Got location using BLE devices", "LocationDriver");
+            ::debug("The closest BLE device with known location: " + closestDevice.address, "LocationDriver");
+
+            return {
+                "timestamp": time(),
+                "type": "ble",
+                "accuracy": LD_BLE_BEACON_DEFAULT_ACCURACY,
+                "longitude": recognized[closestDevice].lng,
+                "latitude": recognized[closestDevice].lat
+            };
+        }.bindenv(this), function(err) {
+            throw "Couldn't scan BLE devices: " + err;
+        }.bindenv(this));
+    }
+
+    /**
+     * Handler called every time imp-device becomes connected
+     */
+    function _onConnected() {
+        _updateAssistData();
+    }
+
+    /**
+     * Update GNSS Assist data if needed
+     *
+     * @return {Promise} that always resolves
+     */
+    function _updateAssistData() {
+        if (_gettingAssistData) {
+            ::debug("Already getting u-blox assist data", "LocationDriver");
+            return _gettingAssistData;
+        }
+
+        local dataIsUpToDate = time() < _assistDataUpdateTs + LD_ASSIST_DATA_UPDATE_MIN_PERIOD;
+
+        if (dataIsUpToDate || !cm.isConnected()) {
+            dataIsUpToDate && ::debug("U-blox assist data is up to date...", "LocationDriver");
+            return Promise.resolve(null);
+        }
+
+        ::debug("Requesting u-blox assist data...", "LocationDriver");
+
+        return _gettingAssistData = _requestToAgent(APP_RM_MSG_NAME.GNSS_ASSIST)
+        .then(function(data) {
+            _gettingAssistData = null;
+
+            if (data == null) {
+                ::info("No u-blox assist data received", "LocationDriver");
+                return;
+            }
+
+            ::info("U-blox assist data received", "LocationDriver");
+
+            _assistDataUpdateTs = time();
+            _eraseStaleUBloxAssistData();
+            _saveUBloxAssistData(data);
+        }.bindenv(this), function(err) {
+            _gettingAssistData = null;
+            ::info("U-blox assist data request failed: " + err, "LocationDriver");
+        }.bindenv(this));
+    }
+
+    /**
+     * Send a request to imp-agent
+     *
+     * @param {enum} name - ReplayMessenger message name (APP_RM_MSG_NAME)
+     * @param {Any serializable type | null} [data] - data, optional
+     *
+     * @return {Promise} that:
+     * - resolves with the response (if any) if the operation succeeded
+     * - rejects with an error if the operation failed
+     */
+    function _requestToAgent(name, data = null) {
+        return Promise(function(resolve, reject) {
+            local onMsgAck = function(msg, resp) {
+                // Reset the callbacks because the request is finished
+                rm.onAck(null, name);
+                rm.onFail(null, name);
+                resolve(resp);
+            }.bindenv(this);
+
+            local onMsgFail = function(msg, error) {
+                // Reset the callbacks because the request is finished
+                rm.onAck(null, name);
+                rm.onFail(null, name);
+                reject(error);
+            }.bindenv(this);
+
+            // Set temporary callbacks for this request
+            rm.onAck(onMsgAck.bindenv(this), name);
+            rm.onFail(onMsgFail.bindenv(this), name);
+            // Send the request to the agent
+            rm.send(name, data);
+        }.bindenv(this));
+    }
+
+    /**
+     * Parse the iBeacon packet (if any) from BLE advertisement data
+     *
+     * @param {blob} data - BLE advertisement data
+     *
+     * @return {table | null} Parsed iBeacon packet or null if no iBeacon packet found
+     *  The keys and values of the table:
+     *     "uuid"  : {string}  - UUID (16 bytes).
+     *     "major" : {integer} - Major (from 0 to 65535).
+     *     "minor" : {integer} - Minor (from 0 to 65535).
+     */
+    function _parseIBeaconPacket(data) {
+        // Packet length: 0x1A = 26 bytes
+        // Packet type: 0xFF = Custom Manufacturer Packet
+        // Manufacturer ID: 0x4C00 (little-endian) = Apple’s Bluetooth Sig ID
+        // Sub-packet type: 0x02 = iBeacon
+        // Sub-packet length: 0x15 = 21 bytes
+        const LD_IBEACON_PREFIX = "\x1A\xFF\x4C\x00\x02\x15";
+        const LD_IBEACON_DATA_LEN = 27;
+
+        local dataStr = data.tostring();
+
+        if (dataStr.len() < LD_IBEACON_DATA_LEN || dataStr.find(LD_IBEACON_PREFIX) == null) {
+            return null;
+        }
+
+        local checkPrefix = function(startIdx) {
+            return dataStr.slice(startIdx, startIdx + LD_IBEACON_PREFIX.len()) == LD_IBEACON_PREFIX;
+        };
+
+        // Advertisement data may consist of several sub-packets. Every packet contains its length in the first byte.
+        // We are jumping across these packets and checking if some of them contains the prefix we are looking for
+        local packetStartIdx = 0;
+        while (!checkPrefix(packetStartIdx)) {
+            // Add up the sub-packet's length to jump to the next one
+            packetStartIdx += data[packetStartIdx] + 1;
+
+            // If we see that there will surely be no iBeacon packet in further bytes, we stop
+            if (packetStartIdx + LD_IBEACON_DATA_LEN > data.len()) {
+                return null;
+            }
+        }
+
+        data.seek(packetStartIdx + LD_IBEACON_PREFIX.len());
+
+        return {
+            "uuid": data.readblob(16).tostring(),
+            "major": (data.readn('b') << 8) | data.readn('b'),
+            "minor": (data.readn('b') << 8) | data.readn('b'),
+        }
+    }
+
+    // -------------------- UBLOX-SPECIFIC METHODS -------------------- //
+
+    /**
+     * Create a handler called when a navigation message received from the u-blox module
+     *
+     * @param {function} onFix - Function to be called in case of successful getting of a GNSS fix
+     *         onFix(fix), where
+     *         @param {table} fix - GNSS fix (location) data
+     *
+     * @return {function} Handler called when a navigation message received
+     */
+    function _onUBloxNavMsgFunc(onFix) {
+        // A valid timestamp will surely be greater than this value (01.01.2021)
+        const LD_VALID_TS = 1609459200;
+
+        return function(payload) {
+            local parsed = UbxMsgParser[UBX_MSG_PARSER_CLASS_MSG_ID.NAV_PVT](payload);
+
+
+            if (parsed.error != null) {
+                // TODO: Check if this can be printed and read ok
+                ::error(parsed.error, "LocationDriver");
+                ::debug("The full payload containing the error: " + payload, "LocationDriver");
+                return;
+            }
+
+
+            // Check fixtype
+            if (parsed.fixType >= LD_UBLOX_FIX_TYPE.FIX_3D) {
+                local accuracy = _getUBloxAccuracy(parsed.hAcc);
+
+                if (accuracy <= LD_GNSS_ACCURACY) {
+                    onFix({
+                        // If we don't have the valid time, we take it from the location data
+                        "timestamp": time() > LD_VALID_TS ? time() : _dateToTimestamp(parsed),
+                        "type": "gnss",
+                        "accuracy": accuracy,
+                        "longitude": parsed.lon,
+                        "latitude": parsed.lat
+                    });
+                }
+            }
+        }.bindenv(this);
+    }
+
+    /**
+     * Disable u-blox navigation messages
+     * TODO: And power off the u-blox module?
+     */
+    function _disableUBlox() {
+        ::debug("Disable u-blox navigation messages...", "LocationDriver._disableNavMsgs");
+        // Disable Position Velocity Time Solution messages
+        _ubxDriver.enableUbxMsg(UBX_MSG_PARSER_CLASS_MSG_ID.NAV_PVT, 0);
+
+        // TODO: Power off the module?
+    }
+
+    /**
+     * Write the applicable u-blox assist data (if any) saved in the storage to the u-blox module
+     *
+     * @return {Promise} that:
+     * - resolves if the operation succeeded
+     * - rejects if the operation failed
+     */
+    function _writeAssistDataToUBlox() {
+        return Promise(function(resolve, reject) {
+            local assistData = _readUBloxAssistData();
+            if (assistData == null) {
+                return reject(null);
+            }
+
+            local onDone = function(errors) {
+                // TODO: Temporarily print this log message as we have never seen this
+                // callback called and want to be aware if it is suddenly called one day
+                ::info("ATTENTION!!! U-BLOX WRITE-ASSIST-DATA CALLBACK HAS BEEN CALLED!");
+
+                if (!errors) {
+                    ::debug("Assist data has been written to u-blox successfully", "LocationDriver");
+                    return resolve(null);
+                }
+
+                ::error("Errors during u-blox assist data writing:", "LocationDriver");
+                foreach(err in errors) {
+                    // Log errors encountered
+                    ::error(err, "LocationDriver");
+                }
+
+                reject(null);
+            }.bindenv(this);
+
+            ::debug("Writing assist data to u-blox..", "LocationDriver");
+            _ubxAssist.writeAssistNow(assistData, onDone);
+
+            // TODO: Temporarily resolve this Promise immediately because for some reason,
+            // the callback is not called by the writeAssistNow() method
+            resolve(null);
+        }.bindenv(this));
+    }
+
+    /**
+     * Read the applicable u-blox assist data (if any) from in the storage
+     *
+     * @return {blob | null} The assist data read or null if no applicable assist data found
+     */
+    function _readUBloxAssistData() {
+        const LD_DAY_SEC = 86400;
+
+        ::debug("Reading u-blox assist data..", "LocationDriver");
+
+        try {
+            local chosenFile = null;
+            local todayFileName = UBloxAssistNow.getDateString();
+            local tomorrowFileName = UBloxAssistNow.getDateString(date(time() + LD_DAY_SEC));
+            local yesterdayFileName = UBloxAssistNow.getDateString(date(time() - LD_DAY_SEC));
+
+            if (_assistDataStorage.fileExists(todayFileName)) {
+                chosenFile = todayFileName;
+            } else if (_assistDataStorage.fileExists(tomorrowFileName)) {
+                chosenFile = tomorrowFileName;
+            } else if (_assistDataStorage.fileExists(yesterdayFileName)) {
+                chosenFile = yesterdayFileName;
+            }
+
+            if (chosenFile == null) {
+                ::debug("No applicable u-blox assist data found", "LocationDriver");
+                return null;
+            }
+
+            ::debug("Found applicable u-blox assist data with the following date: " + chosenFile, "LocationDriver");
+
+            local file = _assistDataStorage.open(chosenFile, "r");
+            local data = file.read();
+            file.close();
+            data.seek(0, 'b');
+
+            return data;
+        } catch (err) {
+            ::error("Couldn't read u-blox assist data: " + err, "LocationDriver");
+        }
+
+        return null;
+    }
+
+    /**
+     * Save u-blox assist data to the storage
+     *
+     * @param {blob} data - Assist data
+     */
+    function _saveUBloxAssistData(data) {
+        ::debug("Saving u-blox assist data..", "LocationDriver");
+
+        try {
+            foreach (date, assistMsgs in data) {
+                // Erase the existing file if any
+                if (_assistDataStorage.fileExists(date)) {
+                    _assistDataStorage.eraseFile(date);
+                }
+
+                local file = _assistDataStorage.open(date, "w");
+                file.write(assistMsgs);
+                file.close();
+            }
+        } catch (err) {
+            ::error("Couldn't save u-blox assist data: " + err, "LocationDriver");
+        }
+    }
+
+    /**
+     * Erase stale u-blox assist data from the storage
+     */
+    function _eraseStaleUBloxAssistData() {
+        ::debug("Erasing stale u-blox assist data..", "LocationDriver");
+
+        try {
+            local files = _assistDataStorage.getFileList();
+            // Since the date has the following format YYYYMMDD, we can compare dates as integer numbers
+            local yesterday = UBloxAssistNow.getDateString(date(time() - LD_DAY_SEC)).tointeger();
+
+            foreach (file in files) {
+                local name = file.fname;
+                local erase = true;
+
+                try {
+                    // We need to find assist files for dates before yesterday
+                    local fileDate = name.tointeger();
+
+                    erase = fileDate < yesterday;
+                } catch (err) {
+                    ::error("Couldn't check the date of a u-blox assist data file: " + err, "LocationDriver");
+                }
+
+                if (erase) {
+                    ::debug("Erasing u-blox assist data file: " + name, "LocationDriver");
+                    // Erase stale assist message
+                    _assistDataStorage.eraseFile(name);
+                }
+            }
+        } catch (err) {
+            ::error("Couldn't erase stale u-blox assist data: " + err, "LocationDriver");
+        }
+    }
+
+    /**
+     * Get the accuracy of a u-blox GNSS fix
+     *
+     * @param {blob} hAcc - Accuracy, 32 bit unsigned integer (little endian)
+     *
+     * @return {integer} The accuracy of a u-blox GNSS fix
+     */
+    function _getUBloxAccuracy(hAcc) {
+        // Mean earth radius in meters (https://en.wikipedia.org/wiki/Great-circle_distance)
+        const LD_EARTH_RAD = 6371009;
+
+        // Squirrel only handles 32 bit signed integers
+        // hAcc (horizontal accuracy estimate in mm) is an unsigned 32 bit integer
+        // Read as signed integer and if value is negative set to
+        // highly inaccurate default
+        hAcc.seek(0, 'b');
+        local gpsAccuracy = hAcc.readn('i');
+        return (gpsAccuracy < 0) ? LD_EARTH_RAD : gpsAccuracy / 1000.0;
+    }
+
+
+    // -------------------- HELPER METHODS -------------------- //
+
+    /**
+     * Convert a date-time to a UNIX timestamp
+     *
+     * @param {table} date - A table containing "year", "month", "day", "hour", "min" and "sec" fields
+     *                       IMPORTANT: "month" must be from 1 to 12. But the standard date() function returns 0-11
+     *
+     * @return {integer} The UNIX timestamp
+     */
+    function _dateToTimestamp(date) {
+        try {
+            local y = date.year;
+            // IMPORTANT: Here we assume that month is from 1 to 12. But the standard date() function returns 0-11
+            local m = date.month;
+            local d = date.day;
+            local hrs = date.hour;
+            local min = date.min;
+            local sec = date.sec;
+            local ts;
+
+            // January and February are counted as months 13 and 14 of the previous year
+            if (m <= 2) {
+                m += 12;
+                y -= 1;
+            }
+
+            // Convert years to days
+            ts = (365 * y) + (y / 4) - (y / 100) + (y / 400);
+            // Convert months to days
+            ts += (30 * m) + (3 * (m + 1) / 5) + d;
+            // Unix time starts on January 1st, 1970
+            ts -= 719561;
+            // Convert days to seconds
+            ts *= 86400;
+            // Add hours, minutes and seconds
+            ts += (3600 * hrs) + (60 * min) + sec;
+
+            return ts;
+        } catch (err) {
+            ::error("Invalid date object passed: " + err, "LocationDriver");
+            return 0;
+        }
+    }
+
+    /**
+     * Format a UUID string to make it printable and human-readable
+     *
+     * @param {string} str - UUID string (16 bytes)
+     *
+     * @return {string} Printable and human-readable UUID string
+     *  The format is: 00112233-4455-6677-8899-aabbccddeeff
+     */
+    function _formatUUID(str) {
+        // The indexes where the dash character ("-") must be placed in the UUID representation
+        local uuidDashes = [3, 5, 7, 9];
+        local res = "";
+
+        for (local i = 0; i < str.len(); i++) {
+            res += format("%02x", str[i]);
+            if (uuidDashes.find(i) != null) {
+                res += "-";
+            }
+        }
+
+        return res;
+    }
+}
+
+//line 46 "/home/we/Develop/Squirrel/prog-x/src/device/Main.device.nut"
 
 // Main application on Imp-Device: does the main logic of the application
 
@@ -4344,6 +5698,10 @@ const APP_RM_MSG_SENDING_MAX_RATE = 5;
 // The maximum number of messages to queue at any given time when replaying
 const APP_RM_MSG_RESEND_LIMIT = 5;
 
+// Send buffer size, in bytes
+const APP_SEND_BUFFER_SIZE = 10240;
+
+// TODO: Check the RAM consumption!
 class Application {
     _locationDriver = null;
     _accelDriver = null;
@@ -4395,6 +5753,8 @@ class Application {
         }.bindenv(this))
         .fail(function(err) {
             ::error("Error during initialization of business logic modules: " + err);
+
+            // TODO: Reboot after a delay? Or enter the emergency mode?
         }.bindenv(this));
     }
 
@@ -4404,6 +5764,8 @@ class Application {
      * Create and intialize Connection Manager
      */
     function _initConnectionManager() {
+        imp.setsendbuffersize(APP_SEND_BUFFER_SIZE);
+
         // Customized Connection Manager is used
         local cmConfig = {
             "blinkupBehavior"    : CM_BLINK_ON_CONNECT,

@@ -1,8 +1,9 @@
 #require "Promise.lib.nut:4.0.0"
 #require "Messenger.lib.nut:0.2.0"
 
+@include once "github:electricimp/GoogleMaps/GoogleMaps.agent.lib.nut@develop"
 @include once "../src/shared/Constants.shared.nut"
-@include once "../src/shared/Logger.shared.nut"
+@include once "../src/shared/Logger/Logger.shared.nut"
 @include once "../src/agent/LocationAssistant.agent.nut"
 
 // Test for Location determination.
@@ -26,12 +27,12 @@
     }
 
     /**
-     * Handler for Location By Cell Info request received from Imp-Device
+     * Handler for Location By Cell Info and WiFi request received from Imp-Device
      */
-    function _onLocationCell(msg, customAck) {
+    function _onLocationCellAndWiFi(msg, customAck) {
         local ack = customAck();
 
-        LocationAssistant.getLocationByCellInfo(msg.data)
+        LocationAssistant.getLocationByCellInfoAndWiFi(msg.data)
         .then(function(location) {
             ::info("Location obtained using Google Geolocation API");
             ack(location);
@@ -49,4 +50,4 @@ Logger.setLogLevel(LGR_LOG_LEVEL.DEBUG);
 // Initialize library for communication with Imp-Device
 msngr <- Messenger();
 msngr.on(APP_RM_MSG_NAME.GNSS_ASSIST, _onGnssAssist.bindenv(this));
-msngr.on(APP_RM_MSG_NAME.LOCATION_CELL, _onLocationCell.bindenv(this));
+msngr.on(APP_RM_MSG_NAME.LOCATION_CELL_WIFI, _onLocationCellAndWiFi.bindenv(this));

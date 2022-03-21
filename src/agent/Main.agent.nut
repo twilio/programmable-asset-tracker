@@ -1,6 +1,8 @@
 #require "Promise.lib.nut:4.0.0"
 #require "Messenger.lib.nut:0.2.0"
+#require "UBloxAssistNow.agent.lib.nut:1.0.0"
 
+@include once "github:electricimp/GoogleMaps/GoogleMaps.agent.lib.nut@develop"
 @include once "../shared/Version.shared.nut"
 @include once "../shared/Constants.shared.nut"
 @include once "../shared/Logger/Logger.shared.nut"
@@ -36,7 +38,7 @@ class Application {
         _msngr = Messenger();
         _msngr.on(APP_RM_MSG_NAME.DATA, _onData.bindenv(this));
         _msngr.on(APP_RM_MSG_NAME.GNSS_ASSIST, _onGnssAssist.bindenv(this));
-        _msngr.on(APP_RM_MSG_NAME.LOCATION_CELL, _onLocationCell.bindenv(this));
+        _msngr.on(APP_RM_MSG_NAME.LOCATION_CELL_WIFI, _onLocationCellAndWiFi.bindenv(this));
     }
 
     /**
@@ -63,28 +65,27 @@ class Application {
 
         LocationAssistant.getGnssAssistData()
         .then(function(data) {
-            ::info("BG96 Assist data downloaded");
+            ::info("Assist data downloaded");
             ack(data);
         }.bindenv(this), function(err) {
-            ::error("Error during downloading BG96 Assist data: " + err);
+            ::error("Error during downloading assist data: " + err);
             // Send `null` in reply to the request
             ack(null);
         }.bindenv(this));
     }
 
     /**
-     * Handler for Location By Cell Info request received from Imp-Device
+     * Handler for Location By Cell Info and WiFi request received from Imp-Device
      */
-    function _onLocationCell(msg, customAck) {
+    function _onLocationCellAndWiFi(msg, customAck) {
         local ack = customAck();
 
-        LocationAssistant.getLocationByCellInfo(msg.data)
+        LocationAssistant.getLocationByCellInfoAndWiFi(msg.data)
         .then(function(location) {
             ::info("Location obtained using Google Geolocation API");
             ack(location);
         }.bindenv(this), function(err) {
             ::error("Error during location obtaining using Google Geolocation API: " + err);
-            // Send `null` in reply to the request
             ack(null);
         }.bindenv(this));
     }
