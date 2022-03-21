@@ -69,9 +69,9 @@ Should be passed to [Builder](https://github.com/electricimp/Builder/):
 
 Variables:
 - `LOGGER_LEVEL` - Set logging level ("ERROR", "INFO", "DEBUG") on Imp-Agent/Device after the Imp firmware is deployed. Optional. Default: **"INFO"**
-- `UART_LOGGING` - Enable (define the variable) / disable (undefine the variable) [UART logging](#uart-logging) on Imp-Device. Optional. Default: **enabled**
-- `LED_INDICATION` - Enable (define the variable) / disable (undefine the variable) [LED indication](#led-indication) of events. Optional. Default: **enabled**
-- `BG96_GNSS` - Enable (define the variable) / disable (undefine the variable) usage of BG96 GNSS rather than U-blox GNSS. Optional. Default: **disabled**
+- `UART_LOGGING` - Enable (`1`) / disable (`0`) [UART logging](#uart-logging) on Imp-Device. Optional. Default: **enabled**
+- `LED_INDICATION` - Enable (`1`) / disable (`0`) [LED indication](#led-indication) of events. Optional. Default: **enabled**
+- `BG96_GNSS` - Enable (`1`) / disable (`0`) usage of BG96 GNSS rather than U-blox GNSS. Optional. Default: **disabled**
 
 ### User-Defined Environment Variables ###
 
