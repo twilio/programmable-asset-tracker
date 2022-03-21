@@ -3,12 +3,16 @@
 #require "JSONEncoder.class.nut:2.0.0"
 #require "Promise.lib.nut:4.0.0"
 #require "SPIFlashLogger.device.lib.nut:2.2.0"
+#require "SPIFlashFileSystem.device.lib.nut:3.0.1"
 #require "ConnectionManager.lib.nut:3.1.1"
 #require "Messenger.lib.nut:0.2.0"
 #require "ReplayMessenger.device.lib.nut:0.2.0"
-#require "utilities.lib.nut:2.0.0"
+#require "utilities.lib.nut:3.0.1"
 #require "LIS3DH.device.lib.nut:3.0.0"
 #require "HTS221.device.lib.nut:2.0.2"
+#require "UBloxM8N.device.lib.nut:1.0.1"
+#require "UbxMsgParser.lib.nut:2.0.1"
+#require "UBloxAssistNow.device.lib.nut:0.1.0"
 
 @include once "../shared/Version.shared.nut"
 @include once "../shared/Constants.shared.nut"
@@ -29,10 +33,16 @@
 @include once "CustomReplayMessenger.device.nut"
 @include once "bg96_gps.device.lib.nut"
 @include once "BG96CellInfo.device.nut"
-@include once "LocationDriver.device.nut"
+@include once "ESP32Driver.device.nut"
 @include once "AccelerometerDriver.device.nut"
 @include once "MotionMonitor.device.nut"
 @include once "DataProcessor.device.nut"
+
+@if BG96_GNSS
+@include once "LocationDriverBG96.device.nut"
+@else
+@include once "LocationDriver.device.nut"
+@endif
 
 // Main application on Imp-Device: does the main logic of the application
 
@@ -51,6 +61,10 @@ const APP_RM_MSG_SENDING_MAX_RATE = 5;
 // The maximum number of messages to queue at any given time when replaying
 const APP_RM_MSG_RESEND_LIMIT = 5;
 
+// Send buffer size, in bytes
+const APP_SEND_BUFFER_SIZE = 10240;
+
+// TODO: Check the RAM consumption!
 class Application {
     _locationDriver = null;
     _accelDriver = null;
@@ -106,6 +120,8 @@ class Application {
         }.bindenv(this))
         .fail(function(err) {
             ::error("Error during initialization of business logic modules: " + err);
+
+            // TODO: Reboot after a delay? Or enter the emergency mode?
         }.bindenv(this));
     }
 
@@ -115,6 +131,8 @@ class Application {
      * Create and intialize Connection Manager
      */
     function _initConnectionManager() {
+        imp.setsendbuffersize(APP_SEND_BUFFER_SIZE);
+
         // Customized Connection Manager is used
         local cmConfig = {
 @if LED_INDICATION || !defined(LED_INDICATION)

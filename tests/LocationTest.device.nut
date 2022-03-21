@@ -1,17 +1,32 @@
 #require "Promise.lib.nut:4.0.0"
 #require "Serializer.class.nut:1.0.0"
 #require "SPIFlashLogger.device.lib.nut:2.2.0"
+#require "SPIFlashFileSystem.device.lib.nut:3.0.1"
 #require "ConnectionManager.lib.nut:3.1.1"
 #require "Messenger.lib.nut:0.2.0"
 #require "ReplayMessenger.device.lib.nut:0.2.0"
-#require "utilities.lib.nut:2.0.0"
+#require "utilities.lib.nut:3.0.1"
+#require "UBloxM8N.device.lib.nut:1.0.1"
+#require "UbxMsgParser.lib.nut:2.0.1"
+#require "UBloxAssistNow.device.lib.nut:0.1.0"
 
 @include once "../src/shared/Constants.shared.nut"
-@include once "../src/shared/Logger.shared.nut"
+@include once "../src/shared/Logger/Logger.shared.nut"
+@include once "../src/device/Hardware.device.nut"
+@include once "../src/device/CustomConnectionManager.device.nut"
 @include once "../src/device/CustomReplayMessenger.device.nut"
 @include once "../src/device/bg96_gps.device.lib.nut"
 @include once "../src/device/BG96CellInfo.device.nut"
+@include once "../src/device/ESP32Driver.device.nut"
+@include once "../src/device/Configuration.device.nut"
+
+
+@if BG96_GNSS
+@include once "../src/device/LocationDriverBG96.device.nut"
+@else
 @include once "../src/device/LocationDriver.device.nut"
+@endif
+
 
 // Test for Location determination.
 // Periodically tries to obtain the current location by different ways.
@@ -64,33 +79,64 @@ function initReplayMessenger() {
     }.bindenv(this));
 }
 
+function printResult(loc) {
+    foreach (key, value in loc) {
+        ::info(key + ":" + value);
+    }
+}
+
 /**
- * Obtains location
+ * Obtains location Cell Towers and WiFi
  */
- function getLocation() {
+ function testGetLocationCellTowersAndWiFi() {
 
-    // Obtain and log location by cell info
-    ld._getLocationCellTowers().then(function(loc){
-        ::info("Location cell tower:");
-        foreach (key, value in loc) {
-            ::info(key + ":" + value);
-        };
+     // Obtain and log location by cell info and WiFi
+    ld._getLocationCellTowersAndWiFi()
+    .then(function(loc){
+        ::info("Location cell tower and wifi:");
+        printResult(loc);
+        imp.wakeup(TEST_GET_LOCATION_PERIOD, testGetLocationBLE);
+    })
+    .fail(function(err){
+        ::info("Location cell tower and wifi error: " + err);
+        imp.wakeup(TEST_GET_LOCATION_PERIOD, testGetLocationBLE);
     });
+}
 
-    // Obtain and log location by GNSS
-    ld._getLocationGNSS().then(function(loc){
+/**
+ * Obtains location GNSS
+ */
+ function testGetLocationGNSS() {
+
+     // Obtain and log location by GNSS
+    ld._getLocationGNSS()
+    .then(function(loc){
         ::info("Location GNSS:");
-        foreach (key, value in loc) {
-            ::info(key + ":" + value);
-        };
+        printResult(loc);
+        imp.wakeup(0, testGetLocationCellTowersAndWiFi);
+    })
+    .fail(function(err){
+        ::info("Location GNSS error: " + err);
+        imp.wakeup(0, testGetLocationCellTowersAndWiFi);
     });
+}
 
-    // Obtain and log location by WiFi info - TBD
+/**
+ * Obtains location BLE beacons
+ */
+ function testGetLocationBLE() {
 
-    // Obtain and log location by BLE beacons - TBD
-
-    // Periodically repeat
-    imp.wakeup(TEST_GET_LOCATION_PERIOD, getLocation);
+     // Obtain and log location by BLE device
+    ld._getLocationBLEDevices()
+    .then(function(loc){
+        ::info("Location BLE device:");
+        printResult(loc);
+        imp.wakeup(0, testGetLocationGNSS);
+    })
+    .fail(function(err){
+        ::info("Location BLE device error: " + err);
+        imp.wakeup(0, testGetLocationGNSS);
+    });
 }
 
 // ---------------------------- THE MAIN CODE ---------------------------- //
@@ -109,11 +155,11 @@ ld <- null;
 // in order to run the application without a connection to the Internet
 // (it sets the appropriate send timeout policy)
 cmConfig <- {
-        "stayConnected"   : true,
-        "errorPolicy"     : RETURN_ON_ERROR_NO_DISCONNECT,
-        "connectTimeout"  : APP_CM_CONNECT_TIMEOUT
+    "stayConnected"   : true,
+    "errorPolicy"     : RETURN_ON_ERROR_NO_DISCONNECT,
+    "connectTimeout"  : APP_CM_CONNECT_TIMEOUT
 };
-cm = ConnectionManager(cmConfig);
+cm = CustomConnectionManager(cmConfig);
 cm.connect();
 
 Logger.setLogLevel(LGR_LOG_LEVEL.DEBUG);
@@ -126,7 +172,7 @@ initReplayMessenger()
     ld = LocationDriver();
 
     // Start periodic obtaining of the current location
-    getLocation();
+    testGetLocationBLE();
 
 }.bindenv(this), function(err) {
     ::error("Replay Messenger initialization error: " + err);
