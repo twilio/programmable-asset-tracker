@@ -120,7 +120,9 @@ class CfgService {
             foreach (fieldName, field in cfgGroup) {
                 if (rule.name == fieldName) {
                     if (typeof(field) != rule.ruleType) return false;
-                    if (field < rule.low || field > rule.high) return false;
+                    if ("low" in rule && "high" in rule) {
+                        if (field < rule.low || field > rule.high) return false;
+                    }
                 }
             }
         }
@@ -180,9 +182,29 @@ class CfgService {
         return true;
     }
 
+    function _checkCorrectnessIndividualField(conf) {
+
+        local rules = [];
+        rules.append({"name":"connectingPeriod",
+                      "ruleType":"float", 
+                      "low":0.0, 
+                      "high":36000.0});
+        rules.append({"name":"readingPeriod",
+                      "ruleType":"float", 
+                      "low":0.0, 
+                      "high":36000.0});
+        rules.append({"name":"updateId",
+                      "ruleType":"string"});
+
+        if (!_rulesCheck(rules, conf)) return false;
+
+        return true;
+    }
+
     function _checkCorrectnessCfg(msg) {
         if ("configuration" in msg) {
             local conf = msg.configuration;
+            if (!_checkCorrectnessIndividualField(conf)) return false;
             if ("alerts" in conf) {
                 local alerts = conf.alerts;
                 if (!_checkCorrectnessAlerts(alerts)) return false;
