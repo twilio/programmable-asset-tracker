@@ -6,6 +6,8 @@ const CFG_SERVICE_REST_API_USERNAME = "test";
 const CFG_SERVICE_REST_API_PASSWORD = "test";
 // API endpoints:
 const CFG_SERVICE_REST_API_DATA_ENDPOINT = "/cfg";
+// Timeout to re-check connection with imp-device, in seconds
+const CFG_SERVICE_CHECK_IMP_CONNECT_TIMEOUT = 10;
 
 // Minimal shock acceleration alert threshold, in g.
 const CFG_SERVICE_SHOCK_ACC_SAFEGUARD_MIN = 0;
@@ -46,6 +48,10 @@ class CfgService {
     _pendingUpdateId = null;
     //
     _isPendingCfg = null;
+    // device online check timer
+    _sendMsgTimer = null;
+    // sending configuration
+    _sendingCfg = null;
 
     /**
      * Constructor for Configuration Service Class
@@ -56,8 +62,9 @@ class CfgService {
     constructor(msngr, rocky) {
         _msngr = msngr;
         _rocky = rocky;
-        // _msngr.onAck(_onAckCb.bindenv(this));
-        // _msngr.onFail(_onFailCb.bindenv(this));
+        _msngr.on(APP_RM_MSG_NAME.CFG, _cfgCb.bindenv(this));
+        _msngr.onAck(_ackCb.bindenv(this));
+        _msngr.onFail(_failCb.bindenv(this));
 
         _authHeader = "Basic " + 
                       http.base64encode(CFG_SERVICE_REST_API_USERNAME + 
@@ -81,23 +88,9 @@ class CfgService {
                   null);
     }
 
-    // -------------------- PRIVATE METHODS -------------------- //ct
+    // -------------------- PRIVATE METHODS -------------------- //
 
-    /**
-     * Callback that is triggered when a message is acknowledged.
-     */
-    function _onAckCb(msg, ackData) {
-       
-    }
-
-    /**
-     * Callback that is triggered when a message sending fails.
-     */
-    function _onFailCb(msg, error) {
-        
-    }
-
-    /**
+   /**
      * HTTP GET request callback function.
      *
      * @param context - Rocky.Context object
@@ -107,9 +100,8 @@ class CfgService {
             // only description is returned
             ::debug("Only description is returned", "@{CLASS_NAME}");
             local descr = {
-                            "trackerId": "",
-                            "cfgSchemeVersion": "1.1",
-                            "cfgTimestamp": _lastCfgUpdAplTime,
+                            "trackerId": imp.configparams.deviceid,
+                            "cfgSchemeVersion": "1.1"
                           };
             if (_isPendingCfg) {
                 descr["pendingUpdateId"] <- _pendingUpdateId;
@@ -120,6 +112,85 @@ class CfgService {
             ::debug("Returns reported configuration", "@{CLASS_NAME}");
             context.send(CFG_SERVICE_HTTP_CODES.OK, http.jsonencode(_reportedCfg));
         }
+    }
+
+    /**
+     * HTTP PATCH request callback function.
+     *
+     * @param context - Rocky.Context object
+     */
+    function _patchCfgRockyHandler(context) {
+        local newCfg = context.req.body;
+
+        // configuration validate
+        if (!_validateCfg(newCfg)) {
+            context.send(CFG_SERVICE_HTTP_CODES.INVALID_REQ);
+            return;
+        }
+        // configuration is valid, send 200
+        context.send(CFG_SERVICE_HTTP_CODES.OK);
+        // send new configuration to device
+        _sendingCfg = newCfg;
+        _sendMessage();
+    }
+
+    /**
+     * Sends a message to imp-device, only when imp-device is connected
+     *
+     * @param {Boolean} repeated - True when called by timer from the wakeup function, otherwise False
+     */
+    function _sendMessage(repeated = false) {
+        if (device.isconnected()) {
+            if (repeated) {
+                ::info("Imp-Device is back online", "@{CLASS_NAME}");
+            }
+            if (_sendMsgTimer != null) {
+                imp.cancelwakeup(_sendMsgTimer);
+                _sendMsgTimer = null;
+            }
+            // Send messages (if any) which wait for connection
+            if (_sendingCfg) {
+                _msngr.send(APP_RM_MSG_NAME.CFG, _sendingCfg);
+            //     _mcuMsgId = _msngr.send(_mcuMsgToSend.name, _mcuMsgToSend.data).payload.id;
+            //     _mcuMsgToSend = null;
+            }
+        } else {
+            _isPendingCfg = true;
+            // Imp-device is disconnected
+            if (_sendMsgTimer == null || repeated) {
+                // Periodically repeat checking the connection till imp-device becomes online
+                _sendMsgTimer = imp.wakeup(CFG_SERVICE_CHECK_IMP_CONNECT_TIMEOUT, function() {
+                                    _sendMessage(true);
+                                }.bindenv(this));
+
+                if (!repeated) {
+                    ::info("Imp-Device is offline. Waiting for connection.", "@{CLASS_NAME}");
+                }
+            }
+        }
+    }
+
+    /**
+     * Handler for Cfg received from Imp-Device
+     */
+    function _cfgCb(msg, ackData) {
+        ::debug("Cfg received from imp-device, msgId = " + msg.id, "@{CLASS_NAME}");
+        // saves it as reported cfg
+        _reportedCfg = msg.data;
+    }
+
+    /**
+     * Callback that is triggered when a message is acknowledged.
+     */
+    function _ackCb(msg, ackData) {
+       ::debug("Ack cfg", "@{CLASS_NAME}");
+    }
+
+    /**
+     * Callback that is triggered when a message sending fails.
+     */
+    function _failCb(msg, error) {
+        ::debug("Fail cfg", "@{CLASS_NAME}");
     }
 
     /**
@@ -328,7 +399,7 @@ class CfgService {
                                     "validationType":"float", 
                                     "lowLim":0.0, // CFG_SERVICE_MOTION_DIST_SAFEGUARD_MIN
                                     "highLim":CFG_SERVICE_MOTION_DIST_SAFEGUARD_MAX});
-             if (!_rulesCheck(rules, motionMon)) return false;
+             if (!_rulesCheck(validationRules, motionMon)) return false;
         }
 
         if ("geofence" in locTracking) {
@@ -345,7 +416,12 @@ class CfgService {
         return true;
     }
 
-    function _checkCorrectnessCfg(msg) {
+    function _validateCfg(msg) {
+        // set log level
+        if ("debug" in msg) {
+            local debugParam = msg.debug;
+            if (!_checkAndSetLogLevel(debugParam)) return false;
+        }
         if ("configuration" in msg) {
             local conf = msg.configuration;
             if (!_checkCorrectnessIndividualField(conf)) return false;
@@ -358,35 +434,11 @@ class CfgService {
                 if (!_checkCorrectnessLocTracking(tracking)) return false;
             }
         } else {
+            ::error("Configuration not exist", "@{CLASS_NAME}");
             return false;
         }
 
         return true;
-    } 
-
-    /**
-     * HTTP PATCH request callback function.
-     *
-     * @param context - Rocky.Context object
-     */
-    function _patchCfgRockyHandler(context) {
-        local body = context.req.body;
-
-        // set log level
-        if ("debug" in body) {
-            local debugParam = body.debug;
-            if (!_checkAndSetLogLevel(debugParam)) {
-                context.send(CFG_SERVICE_HTTP_CODES.INVALID_REQ);
-                return;
-            }
-        }
-        // check correctness of configuration
-        if (!_checkCorrectnessCfg(body)) {
-            context.send(CFG_SERVICE_HTTP_CODES.INVALID_REQ);
-            return;
-        }
-
-        context.send(CFG_SERVICE_HTTP_CODES.OK);
     }
 
     /**
