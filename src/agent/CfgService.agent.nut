@@ -121,12 +121,12 @@ class CfgService {
      */
     function _patchCfgRockyHandler(context) {
         local newCfg = context.req.body;
-
         // configuration validate
         if (!_validateCfg(newCfg)) {
             context.send(CFG_SERVICE_HTTP_CODES.INVALID_REQ);
             return;
         }
+        ::debug("Configuration validated", "@{CLASS_NAME}");
         // configuration is valid, send 200
         context.send(CFG_SERVICE_HTTP_CODES.OK);
         // send new configuration to device
@@ -229,7 +229,10 @@ class CfgService {
      */
     function _checkEnableField(cfgGroup) {
         if ("enabled" in cfgGroup) {
-            if (typeof(cfgGroup.enabled) != "bool") return false;
+            if (typeof(cfgGroup.enabled) != "bool") {
+                ::error("Enable field type mismatch", "@{CLASS_NAME}");
+                return false;
+            }
         }
 
         return true;
@@ -253,13 +256,32 @@ class CfgService {
      */
     function _rulesCheck(rules, cfgGroup) {
         foreach (rule in rules) {
+            local fieldNotExist = true;
             foreach (fieldName, field in cfgGroup) {
-        //         if (rule.name == fieldName) {
-        //             if (typeof(field) != rule.ruleType) return false;
-        //             if ("low" in rule && "high" in rule) {
-        //                 if (field < rule.low || field > rule.high) return false;
-        //             }
-        //         }
+                if (rule.name == fieldName) {
+                    fieldNotExist = false;
+                    if (typeof(field) != rule.validationType) {
+                        ::error("Field "  + fieldName + " type mismatch", "@{CLASS_NAME}");
+                        return false;
+                    }
+                    if ("lowLim" in rule && "highLim" in rule) {
+                        if (field < rule.lowLim || field > rule.highLim) {
+                            ::error("Field "  + fieldName + " value not in range", "@{CLASS_NAME}");
+                            return false;
+                        }
+                    }
+                    if ("minLen" in rule && "maxLen" in rule) {
+                        local fieldLen = field.len();
+                        if (fieldLen < rule.minLen || fieldLen > rule.maxLen) {
+                            ::error("Field "  + fieldName + " length not in range", "@{CLASS_NAME}");
+                            return false;
+                        }
+                    }
+                }
+            }
+            if (rule.required && fieldNotExist) {
+                ::error("Field "  + fieldName + " not exist", "@{CLASS_NAME}");
+                return false;
             }
         }
 
@@ -273,7 +295,7 @@ class CfgService {
      *
      * @return {boolean} true - Parameters are correct.
      */
-    function _checkCorrectnessAlerts(alerts) {
+    function _validateAlerts(alerts) {
         foreach (alertName, alert in alerts) {
             local validationRules = [];
             // check enable field
@@ -337,7 +359,7 @@ class CfgService {
      *
      * @return {boolean} true - Parameters are correct.
      */
-    function _checkCorrectnessIndividualField(conf) {
+    function _validateIndividualField(conf) {
 
         local validationRules = [];
         validationRules.append({"name":"connectingPeriod",
@@ -361,7 +383,7 @@ class CfgService {
         return true;
     }
 
-    function _checkCorrectnessLocTracking(locTracking) {
+    function _validateLocTracking(locTracking) {
 
         if ("motionMonitoring" in locTracking) {
             local validationRules = [];
@@ -424,14 +446,14 @@ class CfgService {
         }
         if ("configuration" in msg) {
             local conf = msg.configuration;
-            if (!_checkCorrectnessIndividualField(conf)) return false;
+            if (!_validateIndividualField(conf)) return false;
             if ("alerts" in conf) {
                 local alerts = conf.alerts;
-                if (!_checkCorrectnessAlerts(alerts)) return false;
+                if (!_validateAlerts(alerts)) return false;
             }
             if ("locationTracking" in conf) {
                 local tracking = conf.locationTracking;
-                if (!_checkCorrectnessLocTracking(tracking)) return false;
+                if (!_validateLocTracking(tracking)) return false;
             }
         } else {
             ::error("Configuration not exist", "@{CLASS_NAME}");
