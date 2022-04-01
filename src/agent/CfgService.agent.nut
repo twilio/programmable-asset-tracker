@@ -10,21 +10,29 @@ const CFG_SERVICE_REST_API_DATA_ENDPOINT = "/cfg";
 const CFG_SERVICE_CHECK_IMP_CONNECT_TIMEOUT = 10;
 
 // Minimal shock acceleration alert threshold, in g.
-const CFG_SERVICE_SHOCK_ACC_SAFEGUARD_MIN = 0;
+const CFG_SERVICE_SHOCK_ACC_SAFEGUARD_MIN = 0.125;
 // Maximal shock acceleration alert threshold, in g.
 const CFG_SERVICE_SHOCK_ACC_SAFEGUARD_MAX = 16.0;
 // How often the tracker connects to network (minimal value), in seconds.
-const CFG_SERVICE_CONNECTING_SAFEGUARD_MIN = 0;
+const CFG_SERVICE_CONNECTING_SAFEGUARD_MIN = 10.0;
 // How often the tracker connects to network (maximal value), in seconds.
-const CFG_SERVICE_CONNECTING_SAFEGUARD_MAX = 0;
+const CFG_SERVICE_CONNECTING_SAFEGUARD_MAX = 360000.0;
 // How often the tracker polls various data (minimal value), in seconds.
-const CFG_SERVICE_READING_SAFEGUARD_MIN = 0;
+const CFG_SERVICE_READING_SAFEGUARD_MIN = 10.0;
 // How often the tracker polls various data (maximal value), in seconds.
-const CFG_SERVICE_READING_SAFEGUARD_MAX = 0;
+const CFG_SERVICE_READING_SAFEGUARD_MAX = 360000.0;
 // Minimal distance to determine motion detection condition, in meters.
-const CFG_SERVICE_MOTION_DIST_SAFEGUARD_MIN = 0;
+const CFG_SERVICE_MOTION_DIST_SAFEGUARD_MIN = 1.0;
 // Minimal distance to determine motion detection condition, in meters.
-const CFG_SERVICE_MOTION_DIST_SAFEGUARD_MAX = 0;
+const CFG_SERVICE_MOTION_DIST_SAFEGUARD_MAX = 1000.0;
+// Mean Earth radius, in meters.
+const CFG_SERVICE_EARTH_RADIUS = 6371009.0;
+// Unix timestamp 31.03.2020 18:53:04 (example)
+const CFG_SERVICE_MIN_TIMESTAMP = "1585666384";
+//
+const CFG_SERVICE_LOC_READING_SAFEGUARD_MIN = 0.1;
+//
+const CFG_SERVICE_LOC_READING_SAFEGUARD_MAX = 360000.0;
 
 // Enum for HTTP codes 
 enum CFG_SERVICE_HTTP_CODES {
@@ -33,6 +41,7 @@ enum CFG_SERVICE_HTTP_CODES {
     UNAUTHORIZED = 401
 };
 
+// Configuration service class
 class CfgService {
     // Messenger instance
     _msngr = null;
@@ -230,7 +239,7 @@ class CfgService {
     function _checkEnableField(cfgGroup) {
         if ("enabled" in cfgGroup) {
             if (typeof(cfgGroup.enabled) != "bool") {
-                ::error("Enable field type mismatch", "@{CLASS_NAME}");
+                ::error("Enable field - type mismatch", "@{CLASS_NAME}");
                 return false;
             }
         }
@@ -261,26 +270,46 @@ class CfgService {
                 if (rule.name == fieldName) {
                     fieldNotExist = false;
                     if (typeof(field) != rule.validationType) {
-                        ::error("Field "  + fieldName + " type mismatch", "@{CLASS_NAME}");
+                        ::error("Field: "  + fieldName + " - type mismatch", "@{CLASS_NAME}");
                         return false;
                     }
                     if ("lowLim" in rule && "highLim" in rule) {
                         if (field < rule.lowLim || field > rule.highLim) {
-                            ::error("Field "  + fieldName + " value not in range", "@{CLASS_NAME}");
-                            return false;
+                            if ("fixedValues" in rule) {
+                                local notFound = true;
+                                foreach (fixedValue in rule.fixedValues) {
+                                    if (field == fixedValue) {
+                                        notFound = false;
+                                        break;
+                                    }
+                                }
+                                if (notFound) {
+                                    ::error("Field: "  + fieldName + " - value not in range", "@{CLASS_NAME}");
+                                    return false;
+                                }
+                            } else {
+                                ::error("Field: "  + fieldName + " - value not in range", "@{CLASS_NAME}");
+                                return false;
+                            }
                         }
                     }
                     if ("minLen" in rule && "maxLen" in rule) {
                         local fieldLen = field.len();
                         if (fieldLen < rule.minLen || fieldLen > rule.maxLen) {
-                            ::error("Field "  + fieldName + " length not in range", "@{CLASS_NAME}");
+                            ::error("Field: "  + fieldName + " - length not in range", "@{CLASS_NAME}");
+                            return false;
+                        }
+                    }
+                    if ("minTimeStamp" in rule) {
+                        if (field.tointeger() < rule.minTimeStamp.tointeger()) {
+                            ::error("Field: "  + fieldName + " - time not in range", "@{CLASS_NAME}");
                             return false;
                         }
                     }
                 }
             }
             if (rule.required && fieldNotExist) {
-                ::error("Field "  + fieldName + " not exist", "@{CLASS_NAME}");
+                ::error("Field: "  + fieldName + " - not exist", "@{CLASS_NAME}");
                 return false;
             }
         }
@@ -377,13 +406,106 @@ class CfgService {
                                 "validationType":"string",
                                 "minLen":1,
                                 "maxLen":150});
-
         if (!_rulesCheck(validationRules, conf)) return false;
 
         return true;
     }
 
+    function _validateGenericBLE(bleDevices) {
+        const BLE_MAC_ADDR = @"(?:\x\x){5}\x\x";
+        foreach (bleDeviveMAC, bleDevive  in bleDevices) {
+            local regex = regexp(format(@"^%s$", BLE_MAC_ADDR));
+            local regexCapture = regex.capture(bleDeviveMAC);
+            if (regexCapture == null) {
+                ::error("Generic BLE device MAC address error", "@{CLASS_NAME}");
+                return false;
+            }
+            local validationRules = [];
+            validationRules.append({"name":"lng",
+                                    "required":true,
+                                    "validationType":"float", 
+                                    "lowLim":-180.0, 
+                                    "highLim":180.0});
+            validationRules.append({"name":"lat",
+                                    "required":true,
+                                    "validationType":"float", 
+                                    "lowLim":-90.0, 
+                                    "highLim":90.0});
+            if (!_rulesCheck(validationRules, bleDevive)) return false;
+        }
+
+        return true;
+    }
+
+    function _validateiBeacon(iBeacons) {
+        const IBEACON_UUID = @"(?:\x\x){15}\x\x";
+        const IBEACON_MAJOR_MINOR = @"\d{1,5}";
+        foreach (iBeaconUUID, iBeacon in iBeacons) {
+            local regex = regexp(format(@"^%s$", IBEACON_UUID));
+            local regexCapture = regex.capture(iBeaconUUID);
+            if (regexCapture == null) {
+                ::error("iBeacon UUID error", "@{CLASS_NAME}");
+                return false;
+            }
+            foreach (majorVal, major in iBeacon) {
+                regex = regexp(format(@"^%s$", IBEACON_MAJOR_MINOR));
+                regexCapture = regex.capture(majorVal);
+                if (regexCapture == null) {
+                    ::error("iBeacon major error", "@{CLASS_NAME}");
+                    return false;
+                }
+                if (majorVal.tointeger() > 65535) {
+                    ::error("iBeacon major error (more then 65535)", "@{CLASS_NAME}");
+                    return false;
+                }
+                foreach (minorVal, minor in major) {
+                    regexCapture = regex.capture(minorVal);
+                    if (regexCapture == null) {
+                        ::error("iBeacon minor error", "@{CLASS_NAME}");
+                        return false;
+                    }
+                    if (minorVal.tointeger() > 65535) {
+                        ::error("iBeacon minor error (more then 65535)", "@{CLASS_NAME}");
+                        return false;
+                    }
+                    local validationRules = [];
+                    validationRules.append({"name":"lng",
+                                            "required":true,
+                                            "validationType":"float", 
+                                            "lowLim":-180.0, 
+                                            "highLim":180.0});
+                    validationRules.append({"name":"lat",
+                                            "required":true,
+                                            "validationType":"float", 
+                                            "lowLim":-90.0, 
+                                            "highLim":90.0});
+                    if (!_rulesCheck(validationRules, minor)) return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
     function _validateLocTracking(locTracking) {
+
+        if ("locReadingPeriod" in locTracking) {
+            local validationRules = [];
+            validationRules.append({"name":"locReadingPeriod",
+                                    "required":true,
+                                    "validationType":"float", 
+                                    "lowLim":CFG_SERVICE_LOC_READING_SAFEGUARD_MIN, 
+                                    "highLim":CFG_SERVICE_LOC_READING_SAFEGUARD_MAX});
+            if (!_rulesCheck(validationRules, locTracking)) return false;
+        }
+
+        if ("alwaysOn" in locTracking) {
+            local validationRules = [];
+            validationRules.append({"name":"alwaysOn",
+                                    "required":true,
+                                    "validationType":"bool"});
+            if (!_rulesCheck(validationRules, locTracking)) return false;
+        }
 
         if ("motionMonitoring" in locTracking) {
             local validationRules = [];
@@ -393,46 +515,88 @@ class CfgService {
             validationRules.append({"name":"movementAccMin",
                                     "required":true,
                                     "validationType":"float", 
-                                    "lowLim":0.0, 
-                                    "highLim":36000.0});
+                                    "lowLim":0.1, 
+                                    "highLim":4.0});
             validationRules.append({"name":"movementAccMax",
                                     "required":true,
                                     "validationType":"float", 
-                                    "lowLim":0.0, 
-                                    "highLim":36000.0});
+                                    "lowLim":0.1, 
+                                    "highLim":4.0});
+            // min 1/ODR (current 100 Hz), max INT1_DURATION - 127/ODR
             validationRules.append({"name":"movementAccDur",
                                     "required":true,
                                     "validationType":"float", 
-                                    "lowLim":0.0, 
-                                    "highLim":36000.0});
+                                    "lowLim":0.01, 
+                                    "highLim":1.27});
             validationRules.append({"name":"motionTime",
                                     "required":true,
                                     "validationType":"float", 
-                                    "lowLim":0.0, 
-                                    "highLim":36000.0});
+                                    "lowLim":0.01, 
+                                    "highLim":3600.0});
             validationRules.append({"name":"motionVelocity",
                                     "required":true,
                                     "validationType":"float", 
-                                    "lowLim":0.0, 
-                                    "highLim":36000.0});
-            
+                                    "lowLim":0.1, 
+                                    "highLim":10.0});
             validationRules.append({"name":"motionDistance",
                                     "required":true,
                                     "validationType":"float", 
-                                    "lowLim":0.0, // CFG_SERVICE_MOTION_DIST_SAFEGUARD_MIN
+                                    "fixedValues":[0.0],
+                                    "lowLim":CFG_SERVICE_MOTION_DIST_SAFEGUARD_MIN, 
                                     "highLim":CFG_SERVICE_MOTION_DIST_SAFEGUARD_MAX});
-             if (!_rulesCheck(validationRules, motionMon)) return false;
+            if (!_rulesCheck(validationRules, motionMon)) return false;
         }
 
         if ("geofence" in locTracking) {
             local validationRules = [];
             local geofence = locTracking.geofence;
+            // check enable field
             if (!_checkEnableField(geofence)) return false;
-
+            validationRules.append({"name":"lng",
+                                    "required":true,
+                                    "validationType":"float", 
+                                    "lowLim":-180.0, 
+                                    "highLim":180.0});
+            validationRules.append({"name":"lat",
+                                    "required":true,
+                                    "validationType":"float", 
+                                    "lowLim":-90.0, 
+                                    "highLim":90.0});
+            validationRules.append({"name":"radius",
+                                    "required":true,
+                                    "validationType":"float", 
+                                    "lowLim":0.0, 
+                                    "highLim":CFG_SERVICE_EARTH_RADIUS});
+            if (!_rulesCheck(validationRules, geofence)) return false;
         }
 
         if ("repossessionMode" in locTracking) {
+            local validationRules = [];
+            local repossession = locTracking.repossessionMode;
+            // check enable field
+            if (!_checkEnableField(repossession)) return false;
+            validationRules.append({"name":"after",
+                                    "required":true,
+                                    "validationType":"string", 
+                                    "minLen":1,
+                                    "maxLen":150,
+                                    "minTimeStamp": CFG_SERVICE_MIN_TIMESTAMP});
+            if (!_rulesCheck(validationRules, repossession)) return false;
+        }
 
+        if ("bleDevices" in locTracking) {
+            local validationRules = [];
+            local ble = locTracking.bleDevices;
+            // check enable field
+            if (!_checkEnableField(ble)) return false;
+            if ("generic" in ble) {
+                local bleDevices = ble.generic;
+                if (!_validateGenericBLE(bleDevices)) return false;
+            }
+            if ("iBeacon" in ble) {
+                local iBeacons = ble.iBeacon;
+                if (!_validateiBeacon(iBeacons)) return false;
+            }
         }
 
         return true;
