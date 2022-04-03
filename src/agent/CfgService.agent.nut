@@ -29,9 +29,9 @@ const CFG_SERVICE_MOTION_DIST_SAFEGUARD_MAX = 1000.0;
 const CFG_SERVICE_EARTH_RADIUS = 6371009.0;
 // Unix timestamp 31.03.2020 18:53:04 (example)
 const CFG_SERVICE_MIN_TIMESTAMP = "1585666384";
-//
+// Minimal location reading period, in seconds.
 const CFG_SERVICE_LOC_READING_SAFEGUARD_MIN = 0.1;
-//
+// Maximal location reading period, in seconds.
 const CFG_SERVICE_LOC_READING_SAFEGUARD_MAX = 360000.0;
 
 // Enum for HTTP codes 
@@ -47,20 +47,24 @@ class CfgService {
     _msngr = null;
     // Rocky instance
     _rocky = null;
-    //
+    // HTTP Authorization 
     _authHeader = null;
     // Reported configuration
     _reportedCfg = null;
     // Latest configuration applied time
     _lastCfgUpdAplTime = null;
+    // Last valid update Id
+    _lastUpdateId = null;
     // Pending configuration Id
     _pendingUpdateId = null;
-    //
+    // Pending configuration flag
     _isPendingCfg = null;
     // device online check timer
     _sendMsgTimer = null;
     // sending configuration
     _sendingCfg = null;
+    // coordinates validation rules
+    _coordValidationRules = null;
 
     /**
      * Constructor for Configuration Service Class
@@ -75,10 +79,22 @@ class CfgService {
         _msngr.onAck(_ackCb.bindenv(this));
         _msngr.onFail(_failCb.bindenv(this));
 
+        _isPendingCfg = false;
         _authHeader = "Basic " + 
                       http.base64encode(CFG_SERVICE_REST_API_USERNAME + 
                       ":" + 
                       CFG_SERVICE_REST_API_PASSWORD);
+        // coordinates validation rules
+        _coordValidationRules = [{"name":"lng",
+                                  "required":true,
+                                  "validationType":"float", 
+                                  "lowLim":-180.0, 
+                                  "highLim":180.0},
+                                 {"name":"lat",
+                                  "required":true,
+                                  "validationType":"float", 
+                                  "lowLim":-90.0, 
+                                  "highLim":90.0}];
     }
 
     /**
@@ -102,7 +118,7 @@ class CfgService {
    /**
      * HTTP GET request callback function.
      *
-     * @param context - Rocky.Context object
+     * @param context - Rocky.Context object.
      */
     function _getCfgRockyHandler(context) {
         if (_reportedCfg == null) {
@@ -135,18 +151,24 @@ class CfgService {
             context.send(CFG_SERVICE_HTTP_CODES.INVALID_REQ);
             return;
         }
-        ::debug("Configuration validated", "@{CLASS_NAME}");
+        local newUpdateId = newCfg.configuration.updateId; 
+        ::info("Configuration validated. Update ID: " + 
+               newUpdateId, 
+               "@{CLASS_NAME}");
         // configuration is valid, send 200
         context.send(CFG_SERVICE_HTTP_CODES.OK);
-        // send new configuration to device
-        _sendingCfg = newCfg;
-        _sendMessage();
+        // if (_lastUpdateId == null || _lastUpdateId != newUpdateId) {
+            // send new configuration to device
+            _sendingCfg = newCfg;
+            _sendMessage();
+        // }
+        _lastUpdateId = newUpdateId;
     }
 
     /**
      * Sends a message to imp-device, only when imp-device is connected
      *
-     * @param {Boolean} repeated - True when called by timer from the wakeup function, otherwise False
+     * @param {Boolean} repeated - true when called by timer from the wakeup function, otherwise - false
      */
     function _sendMessage(repeated = false) {
         if (device.isconnected()) {
@@ -200,6 +222,7 @@ class CfgService {
      */
     function _failCb(msg, error) {
         ::debug("Fail cfg", "@{CLASS_NAME}");
+
     }
 
     /**
@@ -259,6 +282,8 @@ class CfgService {
      *          "highLim": {float, integer} - Parameter maximum value (for float and integer).
      *          "minLen": {integer} - Minimal length of the string parameter.
      *          "maxLen": {integer} - Maximal length of the string parameter.
+     *          "minTimeStamp": {string} - UNIX timestamp string.
+     *          "fixedValues": {array} - Permissible fixed value array (not in [lowLim, highLim]).
      * @param {table} cfgGroup - Table with the configuration parameters.
      *
      * @return {boolean} true - validation success.
@@ -318,9 +343,9 @@ class CfgService {
     }
 
     /**
-     * Check correctness of alert parameters
+     * Validation of the alert parameters.
      *
-     * @param {table} alerts - The alerts table.
+     * @param {table} alerts - The alerts configuration table.
      *
      * @return {boolean} true - Parameters are correct.
      */
@@ -382,9 +407,9 @@ class CfgService {
     }
 
     /**
-     * Check correctness of alert parameters.
+     * Validation of individual fields.
      *
-     * @param {table} alerts - The alerts table.
+     * @param {table} conf - Configuration table.
      *
      * @return {boolean} true - Parameters are correct.
      */
@@ -411,6 +436,13 @@ class CfgService {
         return true;
     }
 
+    /**
+     * Validation of the BLE device configuration.
+     * 
+     * @param {table} bleDevices - Generic BLE device configuration table.
+     *
+     * @return {boolean} - true - validation success.
+     */
     function _validateGenericBLE(bleDevices) {
         const BLE_MAC_ADDR = @"(?:\x\x){5}\x\x";
         foreach (bleDeviveMAC, bleDevive  in bleDevices) {
@@ -420,24 +452,20 @@ class CfgService {
                 ::error("Generic BLE device MAC address error", "@{CLASS_NAME}");
                 return false;
             }
-            local validationRules = [];
-            validationRules.append({"name":"lng",
-                                    "required":true,
-                                    "validationType":"float", 
-                                    "lowLim":-180.0, 
-                                    "highLim":180.0});
-            validationRules.append({"name":"lat",
-                                    "required":true,
-                                    "validationType":"float", 
-                                    "lowLim":-90.0, 
-                                    "highLim":90.0});
-            if (!_rulesCheck(validationRules, bleDevive)) return false;
+            if (!_rulesCheck(_coordValidationRules, bleDevive)) return false;
         }
 
         return true;
     }
 
-    function _validateiBeacon(iBeacons) {
+    /**
+     * Validation of the iBeacon configuration.
+     * 
+     * @param {table} iBeacons - iBeacon configuration table.
+     *
+     * @return {boolean} - true - validation success.
+     */
+    function _validateBeacon(iBeacons) {
         const IBEACON_UUID = @"(?:\x\x){15}\x\x";
         const IBEACON_MAJOR_MINOR = @"\d{1,5}";
         foreach (iBeaconUUID, iBeacon in iBeacons) {
@@ -454,6 +482,7 @@ class CfgService {
                     ::error("iBeacon major error", "@{CLASS_NAME}");
                     return false;
                 }
+                // max 2 bytes (65535)
                 if (majorVal.tointeger() > 65535) {
                     ::error("iBeacon major error (more then 65535)", "@{CLASS_NAME}");
                     return false;
@@ -464,22 +493,12 @@ class CfgService {
                         ::error("iBeacon minor error", "@{CLASS_NAME}");
                         return false;
                     }
+                    // max 2 bytes (65535)
                     if (minorVal.tointeger() > 65535) {
                         ::error("iBeacon minor error (more then 65535)", "@{CLASS_NAME}");
                         return false;
                     }
-                    local validationRules = [];
-                    validationRules.append({"name":"lng",
-                                            "required":true,
-                                            "validationType":"float", 
-                                            "lowLim":-180.0, 
-                                            "highLim":180.0});
-                    validationRules.append({"name":"lat",
-                                            "required":true,
-                                            "validationType":"float", 
-                                            "lowLim":-90.0, 
-                                            "highLim":90.0});
-                    if (!_rulesCheck(validationRules, minor)) return false;
+                    if (!_rulesCheck(_coordValidationRules, minor)) return false;
                 }
             }
         }
@@ -487,6 +506,13 @@ class CfgService {
         return true;
     }
 
+    /**
+     * Validation of the location tracking configuration block.
+     * 
+     * @param {table} locTracking - Location tracking configuration table.
+     *
+     * @return {boolean} - true - validation success.
+     */
     function _validateLocTracking(locTracking) {
 
         if ("locReadingPeriod" in locTracking) {
@@ -506,7 +532,7 @@ class CfgService {
                                     "validationType":"bool"});
             if (!_rulesCheck(validationRules, locTracking)) return false;
         }
-
+        // validate motion monitoring configuration
         if ("motionMonitoring" in locTracking) {
             local validationRules = [];
             local motionMon = locTracking.motionMonitoring;
@@ -549,19 +575,10 @@ class CfgService {
 
         if ("geofence" in locTracking) {
             local validationRules = [];
+            validationRules.extend(_coordValidationRules);
             local geofence = locTracking.geofence;
             // check enable field
             if (!_checkEnableField(geofence)) return false;
-            validationRules.append({"name":"lng",
-                                    "required":true,
-                                    "validationType":"float", 
-                                    "lowLim":-180.0, 
-                                    "highLim":180.0});
-            validationRules.append({"name":"lat",
-                                    "required":true,
-                                    "validationType":"float", 
-                                    "lowLim":-90.0, 
-                                    "highLim":90.0});
             validationRules.append({"name":"radius",
                                     "required":true,
                                     "validationType":"float", 
@@ -595,26 +612,36 @@ class CfgService {
             }
             if ("iBeacon" in ble) {
                 local iBeacons = ble.iBeacon;
-                if (!_validateiBeacon(iBeacons)) return false;
+                if (!_validateBeacon(iBeacons)) return false;
             }
         }
 
         return true;
     }
 
+    /**
+     * Validation of the full or partial input configuration.
+     * 
+     * @param {table} msg - Configuration table.
+     *
+     * @return {boolean} - true - validation success.
+     */
     function _validateCfg(msg) {
         // set log level
         if ("debug" in msg) {
             local debugParam = msg.debug;
             if (!_checkAndSetLogLevel(debugParam)) return false;
         }
+        // validate configuration
         if ("configuration" in msg) {
             local conf = msg.configuration;
             if (!_validateIndividualField(conf)) return false;
+            // validate alerts
             if ("alerts" in conf) {
                 local alerts = conf.alerts;
                 if (!_validateAlerts(alerts)) return false;
             }
+            // validate location tracking
             if ("locationTracking" in conf) {
                 local tracking = conf.locationTracking;
                 if (!_validateLocTracking(tracking)) return false;
@@ -630,7 +657,9 @@ class CfgService {
     /**
      * Authorization callback function.
      *
-     * @param context - Rocky.Context object
+     * @param context - Rocky.Context object.
+     *
+     * @return {boolean} - true - authorization success.
      */
     function _authCb(context) {
         return (context.getHeader("Authorization") == _authHeader.tostring());
