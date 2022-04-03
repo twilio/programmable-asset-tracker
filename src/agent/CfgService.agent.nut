@@ -33,12 +33,15 @@ const CFG_SERVICE_MIN_TIMESTAMP = "1585666384";
 const CFG_SERVICE_LOC_READING_SAFEGUARD_MIN = 0.1;
 // Maximal location reading period, in seconds.
 const CFG_SERVICE_LOC_READING_SAFEGUARD_MAX = 360000.0;
+// Maximal count of sending configuration in queue
+const CFG_SERVICE_MAX_COUNT_SENDING_CFG = 5;
 
 // Enum for HTTP codes 
 enum CFG_SERVICE_HTTP_CODES {
     OK = 200,
     INVALID_REQ = 400,
-    UNAUTHORIZED = 401
+    UNAUTHORIZED = 401,
+    TOO_MANY_REQ = 429
 };
 
 // Configuration service class
@@ -53,17 +56,17 @@ class CfgService {
     _reportedCfg = null;
     // Latest configuration applied time
     _lastCfgUpdAplTime = null;
-    // Last valid update Id
-    _lastUpdateId = null;
     // Pending configuration Id
     _pendingUpdateId = null;
     // Pending configuration flag
     _isPendingCfg = null;
-    // device online check timer
-    _sendMsgTimer = null;
-    // sending configuration
-    _sendingCfg = null;
-    // coordinates validation rules
+    // Current sending configuration
+    _currentSendingCfg = null;
+    // Queue sheduler timer
+    _timerQueue = null;
+    // Sending configuration
+    _sendingCfgs = null;
+    // Coordinates validation rules
     _coordValidationRules = null;
 
     /**
@@ -79,6 +82,7 @@ class CfgService {
         _msngr.onAck(_ackCb.bindenv(this));
         _msngr.onFail(_failCb.bindenv(this));
 
+        _sendingCfgs = [];
         _isPendingCfg = false;
         _authHeader = "Basic " + 
                       http.base64encode(CFG_SERVICE_REST_API_USERNAME + 
@@ -121,18 +125,26 @@ class CfgService {
      * @param context - Rocky.Context object.
      */
     function _getCfgRockyHandler(context) {
+        local descr = {
+                          "trackerId": imp.configparams.deviceid,
+                          "cfgSchemeVersion": "1.1"
+                      };
+        if (_isPendingCfg) {
+            descr["pendingUpdateId"] <- _pendingUpdateId;
+        }
         if (_reportedCfg == null) {
             // only description is returned
             ::debug("Only description is returned", "@{CLASS_NAME}");
-            local descr = {
-                            "trackerId": imp.configparams.deviceid,
-                            "cfgSchemeVersion": "1.1"
-                          };
-            if (_isPendingCfg) {
-                descr["pendingUpdateId"] <- _pendingUpdateId;
-            }
             context.send(CFG_SERVICE_HTTP_CODES.OK, http.jsonencode(descr));
         } else {
+            if (_lastCfgUpdAplTime != null) {
+                descr["cfgTimestamp"] <- _lastCfgUpdAplTime;
+            }
+            if ("description" in _reportedCfg) {
+                ::debug("Description exist in reported cfg", "@{CLASS_NAME}");
+            } else {
+                _reportedCfg["description"] <- descr;
+            }
             // Returns reported configuration
             ::debug("Returns reported configuration", "@{CLASS_NAME}");
             context.send(CFG_SERVICE_HTTP_CODES.OK, http.jsonencode(_reportedCfg));
@@ -155,54 +167,86 @@ class CfgService {
         ::info("Configuration validated. Update ID: " + 
                newUpdateId, 
                "@{CLASS_NAME}");
-        // configuration is valid, send 200
-        context.send(CFG_SERVICE_HTTP_CODES.OK);
-        // if (_lastUpdateId == null || _lastUpdateId != newUpdateId) {
-            // send new configuration to device
-            _sendingCfg = newCfg;
-            _sendMessage();
-        // }
-        _lastUpdateId = newUpdateId;
-    }
-
-    /**
-     * Sends a message to imp-device, only when imp-device is connected
-     *
-     * @param {Boolean} repeated - true when called by timer from the wakeup function, otherwise - false
-     */
-    function _sendMessage(repeated = false) {
-        if (device.isconnected()) {
-            if (repeated) {
-                ::info("Imp-Device is back online", "@{CLASS_NAME}");
-            }
-            if (_sendMsgTimer != null) {
-                imp.cancelwakeup(_sendMsgTimer);
-                _sendMsgTimer = null;
-            }
-            // Send messages (if any) which wait for connection
-            if (_sendingCfg) {
-                _msngr.send(APP_RM_MSG_NAME.CFG, _sendingCfg);
-            //     _mcuMsgId = _msngr.send(_mcuMsgToSend.name, _mcuMsgToSend.data).payload.id;
-            //     _mcuMsgToSend = null;
-            }
-        } else {
-            _isPendingCfg = true;
-            // Imp-device is disconnected
-            if (_sendMsgTimer == null || repeated) {
-                // Periodically repeat checking the connection till imp-device becomes online
-                _sendMsgTimer = imp.wakeup(CFG_SERVICE_CHECK_IMP_CONNECT_TIMEOUT, function() {
-                                    _sendMessage(true);
-                                }.bindenv(this));
-
-                if (!repeated) {
-                    ::info("Imp-Device is offline. Waiting for connection.", "@{CLASS_NAME}");
-                }
+        // check new configuration update id
+        if (_updateIdIsUniq(newUpdateId)) {
+            // save cfg to queue if in queue enough free space
+            if (_queuePush(newCfg)) {
+                // configuration is added, send 200
+                context.send(CFG_SERVICE_HTTP_CODES.OK);
+            } else {
+                ::error("Sending configuration queue is full", "@{CLASS_NAME}");
+                context.send(CFG_SERVICE_HTTP_CODES.TOO_MANY_REQ);
             }
         }
     }
 
     /**
-     * Handler for Cfg received from Imp-Device
+     *  Search update id in queue.
+     * 
+     *  @param newUpdateId - update id of incoming configuration.
+     *
+     *  @return {boolean} true - new update id is uniq.
+     */
+    function _updateIdIsUniq(newUpdateId) {
+        foreach (cfg in _sendingCfgs) {
+            local findRes = cfg.configuration.updateId.find(newUpdateId); 
+            if (findRes != null) {
+                // ::debug("_updateIdIsUniq " + findRes, "@{CLASS_NAME}");
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     *  Push new configuration to queue.
+     *
+     *  @param {table} newCfg - configuration for sending to Imp-device.
+     *
+     *  @return {boolean} true - new configuration is append.
+     */
+    function _queuePush(newCfg) {
+        local appendToQueue = false;
+        if (_sendingCfgs.len() < CFG_SERVICE_MAX_COUNT_SENDING_CFG) {
+            ::debug("Push new cfg", "@{CLASS_NAME}");
+            _sendingCfgs.append(newCfg);
+            appendToQueue = true;
+            if (null == _timerQueue) {
+                _timerQueue = imp.wakeup(0, _queueScheduler.bindenv(this));
+            }
+        }
+
+        return appendToQueue;
+    }
+
+    /**
+     * Configuration queue scheduler.
+     */
+    function _queueScheduler() {
+        if (_sendingCfgs.len() > 0 || _currentSendingCfg != null) {
+            if (_currentSendingCfg == null) {
+                _currentSendingCfg = _sendingCfgs.pop();
+            }
+            if (device.isconnected()) {
+                _msngr.send(APP_RM_MSG_NAME.CFG, _currentSendingCfg);
+            } else {
+                _isPendingCfg = true;
+                // If there was another pending cfg, it is overwritten by the new one
+                if (_sendingCfgs.len() > 0) {
+                    _sendingCfgs.reverse();
+                    _currentSendingCfg = _sendingCfgs.pop();
+                    _sendingCfgs.clear();
+                }
+                _pendingUpdateId = _currentSendingCfg.configuration.updateId;
+                _timerQueue = imp.wakeup(CFG_SERVICE_CHECK_IMP_CONNECT_TIMEOUT, 
+                                         _queueScheduler.bindenv(this));
+            }
+        }
+    }
+
+    /**
+     * Handler for configuration received from Imp-Device
      */
     function _cfgCb(msg, ackData) {
         ::debug("Cfg received from imp-device, msgId = " + msg.id, "@{CLASS_NAME}");
@@ -215,6 +259,16 @@ class CfgService {
      */
     function _ackCb(msg, ackData) {
        ::debug("Ack cfg", "@{CLASS_NAME}");
+       _lastCfgUpdAplTime = time();
+       _currentSendingCfg = null;
+       _isPendingCfg = false;
+       _pendingUpdateId = null;
+       if (_sendingCfgs.len() > 0) {
+           _timerQueue = imp.wakeup(CFG_SERVICE_CHECK_IMP_CONNECT_TIMEOUT, 
+                                    _queueScheduler.bindenv(this));
+       } else {
+           _timerQueue = null;
+       }
     }
 
     /**
@@ -222,7 +276,8 @@ class CfgService {
      */
     function _failCb(msg, error) {
         ::debug("Fail cfg", "@{CLASS_NAME}");
-
+        _timerQueue = imp.wakeup(CFG_SERVICE_CHECK_IMP_CONNECT_TIMEOUT, 
+                                 _queueScheduler.bindenv(this));
     }
 
     /**
