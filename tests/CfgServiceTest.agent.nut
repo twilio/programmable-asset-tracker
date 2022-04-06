@@ -3,6 +3,7 @@
 
 @include once "../src/shared/Constants.shared.nut"
 @include once "../src/shared/Logger/Logger.shared.nut"
+@include once "../src/agent/CfgValidation.agent.nut"
 @include once "../src/agent/CfgService.agent.nut"
 
 // send configuration via curl example (cfg.json is located in the same directory):
@@ -92,7 +93,31 @@
 
 // ---------------------------- THE MAIN CODE ---------------------------- //
 
-Logger.setLogLevel(LGR_LOG_LEVEL.DEBUG);
+/**
+ * Initialize Logger by settings from Imp-agent persistent memory
+ */
+function initLoggerSettings() {
+    local storedAgentData = server.load();
+    if (!("deploymentId" in storedAgentData)) {
+        ::debug("No saved deployment ID found");
+    } else if (storedAgentData["deploymentId"] == __EI.DEPLOYMENT_ID) {
+        local logLevel = "agentLogLevel" in storedAgentData ? 
+                         storedAgentData["agentLogLevel"] : 
+                         null;
+        if (logLevel) {
+            ::info("Imp-agent log level is set to \"" + logLevel + "\"");
+            Logger.setLogLevelStr(logLevel);
+        } else {
+            ::debug("No saved imp-agent log level found");
+        }
+    } else {
+        ::debug("Current Deployment Id: " + 
+                __EI.DEPLOYMENT_ID + 
+                " - is not equal to the stored one");
+    }
+}
+
+initLoggerSettings();
 ::info("Configuration service test started");
 
 // Initialize library for communication with Imp-Device
