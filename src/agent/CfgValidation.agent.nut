@@ -1,9 +1,6 @@
-@set CLASS_NAME = "CfgService" // Class name for logging
 
 // JSON format/scheme version
 const CFG_SCHEME_VERSION = "1.0";
-// Timeout to re-check connection with imp-device, in seconds
-const CFG_CHECK_IMP_CONNECT_TIMEOUT = 10;
 // Minimal shock acceleration alert threshold, in g.
 // 1 LSb = 16 mg @ FS = 2 g
 // 1 LSb = 32 mg @ FS = 4 g
@@ -65,7 +62,7 @@ coordValidationRules <- [{"name":"lng",
  *          "fixedValues": {array} - Permissible fixed value array (not in [lowLim, highLim]).
  * @param {table} cfgGroup - Table with the configuration parameters.
  *
- * @return {boolean} true - validation success.
+ * @return {null | string} null - validation success, otherwise error string.
  */
 function rulesCheck(rules, cfgGroup) {
     foreach (rule in rules) {
@@ -74,8 +71,7 @@ function rulesCheck(rules, cfgGroup) {
             if (rule.name == fieldName) {
                 fieldNotExist = false;
                 if (typeof(field) != rule.validationType) {
-                    ::error("Field: "  + fieldName + " - type mismatch", "@{CLASS_NAME}");
-                    return false;
+                    return ("Field: "  + fieldName + " - type mismatch");
                 }
                 if ("lowLim" in rule && "highLim" in rule) {
                     if (field < rule.lowLim || field > rule.highLim) {
@@ -88,36 +84,32 @@ function rulesCheck(rules, cfgGroup) {
                                 }
                             }
                             if (notFound) {
-                                ::error("Field: "  + fieldName + " - value not in range", "@{CLASS_NAME}");
-                                return false;
+                                return ("Field: "  + fieldName + " - value not in range");
                             }
                         } else {
-                            ::error("Field: "  + fieldName + " - value not in range", "@{CLASS_NAME}");
-                            return false;
+                            return ("Field: "  + fieldName + " - value not in range");
                         }
                     }
                 }
                 if ("minLen" in rule && "maxLen" in rule) {
                     local fieldLen = field.len();
                     if (fieldLen < rule.minLen || fieldLen > rule.maxLen) {
-                        ::error("Field: "  + fieldName + " - length not in range", "@{CLASS_NAME}");
-                        return false;
+                        return ("Field: "  + fieldName + " - length not in range");
                     }
                 }
                 if ("minTimeStamp" in rule) {
                     if (field.tointeger() < rule.minTimeStamp.tointeger()) {
-                        ::error("Field: "  + fieldName + " - time not in range", "@{CLASS_NAME}");
-                        return false;
+                        return ("Field: "  + fieldName + " - time not in range");
                     }
                 }
             }
         }
         if (rule.required && fieldNotExist) {
-            ::error("Field: "  + fieldName + " - not exist", "@{CLASS_NAME}");
-            return false;
+            return ("Field: "  + fieldName + " - not exist");
         }
     }
-    return true;
+
+    return null;
 }
 
 /**
@@ -125,31 +117,45 @@ function rulesCheck(rules, cfgGroup) {
  * 
  * @param {table} msg - Configuration table.
  *
- * @return {boolean} - true - validation success.
+ * @return {null | string} null - validation success, otherwise error string.
  */
 function validateCfg(msg) {
-    // set log level
-    if ("debug" in msg) {
-        local debugParam = msg.debug;
-        if (!validateLogLevel(debugParam)) return false;
+    // validate agent configuration
+    if ("agentConfiguration" in msg) {
+        local agentCfg = msg.agentConfiguration;
+        if ("debug" in agentCfg) {
+            local debugParam = agentCfg.debug;
+            local validLogLevRes = validateLogLevel(debugParam);
+            if (validLogLevRes != null) return validLogLevRes;    
+        }
     }
+    
     // validate configuration
     if ("configuration" in msg) {
         local conf = msg.configuration;
-        if (!validateIndividualField(conf)) return false;
+        local validIndFieldRes = validateIndividualField(conf); 
+        if (validIndFieldRes != null) return validIndFieldRes;
+        // validate device log level
+        if ("debug" in conf) {
+            local debugParam = conf.debug;
+            local validLogLevRes = validateLogLevel(debugParam);
+            if (validLogLevRes != null) return validLogLevRes;
+        }
         // validate alerts
         if ("alerts" in conf) {
             local alerts = conf.alerts;
-            if (!validateAlerts(alerts)) return false;
+            local validAlertsRes = validateAlerts(alerts); 
+            if (validAlertsRes != null) return validAlertsRes;
         }
         // validate location tracking
         if ("locationTracking" in conf) {
             local tracking = conf.locationTracking;
-            if (!validateLocTracking(tracking)) return false;
+            local validLocTrackRes = validateLocTracking(tracking);
+            if (validLocTrackRes != null) return validLocTrackRes;
         }
     }
 
-    return true;
+    return null;
 }
 
 /**
@@ -157,29 +163,24 @@ function validateCfg(msg) {
  *
  * @param {table} logLevels - Table with the agent log level value.
  *        The table fields:
- *          "agentLogLevel" : {string} Log level ("ERROR", "INFO", "DEBUG")
- *          "deviceLogLevel": {string} Log level ("ERROR", "INFO", "DEBUG")
+ *          "logLevel" : {string} Log level ("ERROR", "INFO", "DEBUG")
  *
- * @return {boolean} true - set log level success.
+ * @return {null | string} null - validation success, otherwise error string.
  */
 function validateLogLevel(logLevels) {
-    if (!("agentLogLevel" in logLevels) &&
-        !("deviceLogLevel" in logLevels)) {
-            ::error("Unknown log level type", "@{CLASS_NAME}");
-            return false;
+    if (!("logLevel" in logLevels)) {
+        return ("Unknown log level type");
     }
-    foreach (elName, el in logLevels) {
-        switch (logLevels.agentLogLevel) {
-            case "DEBUG":
-            case "INFO":
-            case "ERROR":               
-                break;
-            default:
-                ::error("Unknown log level for " + elName, "@{CLASS_NAME}");
-                return false;
-        }
+
+    switch (logLevels.logLevel) {
+        case "DEBUG":
+        case "INFO":
+        case "ERROR":               
+            break;
+        default:
+            return ("Unknown log level");
     }
-    return true;
+    return null;
 }
 
 /**
@@ -187,7 +188,7 @@ function validateLogLevel(logLevels) {
  *
  * @param {table} conf - Configuration table.
  *
- * @return {boolean} true - Parameters are correct.
+ * @return {null | string} null - Parameters are correct, otherwise error string.
  */
 function validateIndividualField(conf) {
     local validationRules = [];
@@ -206,8 +207,10 @@ function validateIndividualField(conf) {
                             "validationType":"string",
                             "minLen":1,
                             "maxLen":150});
-    if (!rulesCheck(validationRules, conf)) return false;
-    return true;
+    local rulesCheckRes = rulesCheck(validationRules, conf);
+    if (rulesCheckRes != null) return rulesCheckRes;
+
+    return null;
 }
 
 /**
@@ -215,13 +218,14 @@ function validateIndividualField(conf) {
  *
  * @param {table} alerts - The alerts configuration table.
  *
- * @return {boolean} true - Parameters are correct.
+ * @return {null | string} null - validation success, otherwise error string.
  */
 function validateAlerts(alerts) {
     foreach (alertName, alert in alerts) {
         local validationRules = [];
         // check enable field
-        if (!checkEnableField(alert)) return false;
+        local checkEnableRes = checkEnableField(alert); 
+        if (checkEnableRes != null) return checkEnableRes;
         // check other fields
         switch (alertName) {
             case "batteryLow": 
@@ -259,17 +263,18 @@ function validateAlerts(alerts) {
                 break;
         }
         // rules checking
-        if (!rulesCheck(validationRules, alert)) return false;
+        local rulesCheckRes = rulesCheck(validationRules, alert); 
+        if (rulesCheckRes != null) return rulesCheckRes;
     }
     // check low < high temperature
     if ("temperatureLow" in alerts && 
         "temperatureHigh" in alerts) {
         if (alerts.temperatureLow.threshold >= 
             alerts.temperatureHigh.threshold) {
-            return false;
+            return "Temperature low threshold >= high threshold";
         }
     }
-    return true;
+    return null;
 }
 
 /**
@@ -277,9 +282,11 @@ function validateAlerts(alerts) {
  * 
  * @param {table} locTracking - Location tracking configuration table.
  *
- * @return {boolean} - true - validation success.
+ * @return {null | string} null - validation success, otherwise error string.
  */
 function validateLocTracking(locTracking) {
+    local rulesCheckRes = null;
+    local checkEnableRes = null;
     if ("locReadingPeriod" in locTracking) {
         local validationRules = [];
         validationRules.append({"name":"locReadingPeriod",
@@ -287,21 +294,24 @@ function validateLocTracking(locTracking) {
                                 "validationType":"float", 
                                 "lowLim":CFG_LOC_READING_SAFEGUARD_MIN, 
                                 "highLim":CFG_LOC_READING_SAFEGUARD_MAX});
-        if (!rulesCheck(validationRules, locTracking)) return false;
+        rulesCheckRes = rulesCheck(validationRules, locTracking);
+        if (rulesCheckRes != null) return rulesCheckRes;
     }
     if ("alwaysOn" in locTracking) {
         local validationRules = [];
         validationRules.append({"name":"alwaysOn",
                                 "required":true,
                                 "validationType":"bool"});
-        if (!rulesCheck(validationRules, locTracking)) return false;
+        rulesCheckRes = rulesCheck(validationRules, locTracking);
+        if (rulesCheckRes != null) return rulesCheckRes;
     }
     // validate motion monitoring configuration
     if ("motionMonitoring" in locTracking) {
         local validationRules = [];
         local motionMon = locTracking.motionMonitoring;
         // check enable field
-        if (!checkEnableField(motionMon)) return false;
+        checkEnableRes = checkEnableField(motionMon);
+        if (checkEnableRes != null) return checkEnableRes;
         validationRules.append({"name":"movementAccMin",
                                 "required":true,
                                 "validationType":"float", 
@@ -334,49 +344,57 @@ function validateLocTracking(locTracking) {
                                 "fixedValues":[0.0],
                                 "lowLim":CFG_MOTION_DIST_SAFEGUARD_MIN, 
                                 "highLim":CFG_MOTION_DIST_SAFEGUARD_MAX});
-        if (!rulesCheck(validationRules, motionMon)) return false;
+        rulesCheckRes = rulesCheck(validationRules, motionMon);
+        if (rulesCheckRes != null) return rulesCheckRes;
     }
     if ("geofence" in locTracking) {
         local validationRules = [];
         validationRules.extend(coordValidationRules);
         local geofence = locTracking.geofence;
         // check enable field
-        if (!checkEnableField(geofence)) return false;
+        checkEnableRes = checkEnableField(geofence);
+        if (checkEnableRes != null) return checkEnableRes;
         validationRules.append({"name":"radius",
                                 "required":true,
                                 "validationType":"float", 
                                 "lowLim":0.0, 
                                 "highLim":CFG_EARTH_RADIUS});
-        if (!rulesCheck(validationRules, geofence)) return false;
+        rulesCheckRes = rulesCheck(validationRules, geofence);
+        if (rulesCheckRes != null) return rulesCheckRes;
     }
     if ("repossessionMode" in locTracking) {
         local validationRules = [];
         local repossession = locTracking.repossessionMode;
         // check enable field
-        if (!checkEnableField(repossession)) return false;
+        checkEnableRes = checkEnableField(repossession);
+        if (checkEnableRes != null) return checkEnableRes;
         validationRules.append({"name":"after",
                                 "required":true,
                                 "validationType":"string", 
                                 "minLen":1,
                                 "maxLen":150,
                                 "minTimeStamp": CFG_MIN_TIMESTAMP});
-        if (!rulesCheck(validationRules, repossession)) return false;
+        rulesCheckRes = rulesCheck(validationRules, repossession);
+        if (rulesCheckRes != null) return rulesCheckRes;
     }
     if ("bleDevices" in locTracking) {
         local validationRules = [];
         local ble = locTracking.bleDevices;
         // check enable field
-        if (!checkEnableField(ble)) return false;
+        checkEnableRes = checkEnableField(ble); 
+        if (checkEnableRes) return checkEnableRes;
         if ("generic" in ble) {
             local bleDevices = ble.generic;
-            if (!validateGenericBLE(bleDevices)) return false;
+            local validateGenericBLERes = validateGenericBLE(bleDevices);
+            if (validateGenericBLERes != null) return validateGenericBLERes;
         }
         if ("iBeacon" in ble) {
             local iBeacons = ble.iBeacon;
-            if (!validateBeacon(iBeacons)) return false;
+            local validateBeaconRes = validateBeacon(iBeacons);
+            if (validateBeaconRes != null) return validateBeaconRes;
         }
     }
-    return true;
+    return null;
 }
 
 /**
@@ -384,16 +402,15 @@ function validateLocTracking(locTracking) {
  *
  * @param {table} cfgGroup - Configuration parameters table.
  *
- * @return {boolean} true - availability and value type admissible.
+ * @return {null | string} null - validation success, otherwise error string.
  */
 function checkEnableField(cfgGroup) {
     if ("enabled" in cfgGroup) {
         if (typeof(cfgGroup.enabled) != "bool") {
-            ::error("Enable field - type mismatch", "@{CLASS_NAME}");
-            return false;
+            return "Enable field - type mismatch";
         }
     }
-    return true;
+    return null;
 }
 
 /**
@@ -401,7 +418,7 @@ function checkEnableField(cfgGroup) {
  * 
  * @param {table} bleDevices - Generic BLE device configuration table.
  *
- * @return {boolean} - true - validation success.
+ * @return {null | string} null - validation success, otherwise error string.
  */
 function validateGenericBLE(bleDevices) {
     const BLE_MAC_ADDR = @"(?:\x\x){5}\x\x";
@@ -409,12 +426,12 @@ function validateGenericBLE(bleDevices) {
         local regex = regexp(format(@"^%s$", BLE_MAC_ADDR));
         local regexCapture = regex.capture(bleDeviveMAC);
         if (regexCapture == null) {
-            ::error("Generic BLE device MAC address error", "@{CLASS_NAME}");
-            return false;
+            return "Generic BLE device MAC address error";
         }
-        if (!rulesCheck(coordValidationRules, bleDevive)) return false;
+        local rulesCheckRes = rulesCheck(coordValidationRules, bleDevive);
+        if (rulesCheckRes != null) return rulesCheckRes;
     }
-    return true;
+    return null;
 }
 
 /**
@@ -422,7 +439,7 @@ function validateGenericBLE(bleDevices) {
  * 
  * @param {table} iBeacons - iBeacon configuration table.
  *
- * @return {boolean} - true - validation success.
+ * @return {null | string} null - validation success, otherwise error string.
  */
 function validateBeacon(iBeacons) {
     const IBEACON_UUID = @"(?:\x\x){15}\x\x";
@@ -431,37 +448,31 @@ function validateBeacon(iBeacons) {
         local regex = regexp(format(@"^%s$", IBEACON_UUID));
         local regexCapture = regex.capture(iBeaconUUID);
         if (regexCapture == null) {
-            ::error("iBeacon UUID error", "@{CLASS_NAME}");
-            return false;
+            return "iBeacon UUID error";
         }
         foreach (majorVal, major in iBeacon) {
             regex = regexp(format(@"^%s$", IBEACON_MAJOR_MINOR));
             regexCapture = regex.capture(majorVal);
             if (regexCapture == null) {
-                ::error("iBeacon major error", "@{CLASS_NAME}");
-                return false;
+                return "iBeacon \"major\" error";
             }
             // max 2 bytes (65535)
             if (majorVal.tointeger() > 65535) {
-                ::error("iBeacon major error (more then 65535)", "@{CLASS_NAME}");
-                return false;
+                return "iBeacon \"major\" error (more then 65535)";
             }
             foreach (minorVal, minor in major) {
                 regexCapture = regex.capture(minorVal);
                 if (regexCapture == null) {
-                    ::error("iBeacon minor error", "@{CLASS_NAME}");
-                    return false;
+                    return "iBeacon \"minor\" error";
                 }
                 // max 2 bytes (65535)
                 if (minorVal.tointeger() > 65535) {
-                    ::error("iBeacon minor error (more then 65535)", "@{CLASS_NAME}");
-                    return false;
+                    return "iBeacon \"minor\" error (more then 65535)";
                 }
-                if (!rulesCheck(coordValidationRules, minor)) return false;
+                local rulesCheckRes = rulesCheck(coordValidationRules, minor); 
+                if (rulesCheckRes != null) return rulesCheckRes;
             }
         }
     }
-    return true;
+    return null;
 }
-
-@set CLASS_NAME = null // Reset the variable

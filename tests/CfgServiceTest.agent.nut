@@ -83,11 +83,15 @@
 //     "tamperingDetected": {
 //       "enabled": true
 //     }
+//   },
+// "debug": {
+//     "logLevel": "INFO"
 //   }
 // },
-// "debug": {
-//   "agentLogLevel": "DEBUG",
-//   "deviceLogLevel": "INFO"
+// "agentConfiguration": {
+//     "debug": {
+//       "logLevel": "INFO"
+//     }
 //   }
 // }
 
@@ -124,4 +128,3 @@ initLoggerSettings();
 msngr <- Messenger();
 rocky <- Rocky();
 cfgService <- CfgService(msngr, rocky);
-cfgService.init();

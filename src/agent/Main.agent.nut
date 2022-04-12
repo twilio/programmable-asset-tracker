@@ -1,3 +1,4 @@
+#require "rocky.class.nut:2.0.2"
 #require "Promise.lib.nut:4.0.0"
 #require "Messenger.lib.nut:0.2.0"
 #require "UBloxAssistNow.agent.lib.nut:1.0.0"
@@ -8,6 +9,8 @@
 @include once "../shared/Logger/Logger.shared.nut"
 @include once "CloudClient.agent.nut"
 @include once "LocationAssistant.agent.nut"
+@include once "CfgValidation.agent.nut"
+@include once "CfgService.agent.nut"
 
 // Main application on Imp-Agent:
 // - Forwards Data messages from Imp-Device to Cloud REST API
@@ -18,15 +21,22 @@
 class Application {
     // Messenger instance
     _msngr = null;
+    // Rocky instance
+    _rocky = null;
+    // Configuration service instance
+    _cfgService =null;
 
     /**
      * Application Constructor
      */
     constructor() {
         ::info("Application Version: " + APP_VERSION);
-
+        // init logger settings
+        _initLoggerSettings();
         // Initialize library for communication with Imp-Device
         _initMsngr();
+        // Init configuration service
+        _initCfgService();
     }
 
     // -------------------- PRIVATE METHODS -------------------- //
@@ -88,6 +98,38 @@ class Application {
             ::error("Error during location obtaining using Google Geolocation API: " + err);
             ack(null);
         }.bindenv(this));
+    }
+
+    /**
+     * Create and initialize configuration service instance
+     */
+    function _initCfgService() {
+        _rocky = Rocky();
+        _cfgService = CfgService(_msngr, _rocky);
+    }
+
+    /**
+     * Initialize Logger by settings from Imp-agent persistent memory
+     */
+    function _initLoggerSettings() {
+        local storedAgentData = server.load();
+        if (!("deploymentId" in storedAgentData)) {
+            ::debug("No saved deployment ID found");
+        } else if (storedAgentData["deploymentId"] == __EI.DEPLOYMENT_ID) {
+            local logLevel = "agentLogLevel" in storedAgentData ? 
+                             storedAgentData["agentLogLevel"] : 
+                             null;
+            if (logLevel) {
+                ::info("Imp-agent log level is set to \"" + logLevel + "\"");
+                Logger.setLogLevelStr(logLevel);
+            } else {
+                ::debug("No saved imp-agent log level found");
+            }
+        } else {
+            ::debug("Current Deployment Id: " + 
+                    __EI.DEPLOYMENT_ID + 
+                    " - is not equal to the stored one");
+        }
     }
 }
 

@@ -106,6 +106,16 @@ Logger <- {
     },
 
     /**
+     * Get current log level in string format.
+     * Supported strings: "error", "info", "debug" - case insensitive.
+     *
+     * @return {string} - Log level string ["error", "info", "debug"]
+     */
+    function getLogLevelStr() {
+        return _logLevelEnumToStr(_logLevel);
+    },
+
+    /**
      * Sets output stream
      *
      * @param {Logger.IOutputStream} iStream - instance of an object that implements the Logger.IOutputStreem interface
@@ -450,6 +460,33 @@ Logger <- {
                 break;
         }
         return lgrLvl;
+    },
+
+    /**
+     * Converts log level to string.
+     * Supported strings: "error", "info", "debug", "unknown".
+     *
+     * @param {enum} [level] - Log level enum value
+     *
+     * @return {string} - Log level case insensitive string ["error", "info", "debug", "unknown"]
+     */
+    function _logLevelEnumToStr(level) {
+        local lgrLvlStr;
+        switch (level) {
+            case LGR_LOG_LEVEL.ERROR:
+                lgrLvlStr = "error";
+                break;
+            case LGR_LOG_LEVEL.INFO:
+                lgrLvlStr = "info";
+                break;
+            case LGR_LOG_LEVEL.DEBUG:
+                lgrLvlStr = "debug";
+                break;
+            default:
+                lgrLvlStr = "unknown";
+                break;
+        }
+        return lgrLvlStr;
     }
 }
 
