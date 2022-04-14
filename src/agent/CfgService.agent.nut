@@ -123,7 +123,7 @@ class CfgService {
                    newUpdateId, 
                    "@{CLASS_NAME}");
             // Pending cfg is always overwritten by the new cfg update
-            _pendingCfg = newCfg;
+            _pendingCfg = newCfg.configuration;
             if (_sendingCfg == null) {
                 // If another sending process is not in progress, 
                 // then start the sending process
