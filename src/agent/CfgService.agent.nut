@@ -70,32 +70,55 @@ class CfgService {
      * @param context - Rocky.Context object.
      */
     function _getCfgRockyHandler(context) {
-        local agentCfg = {
-                            "debug" : {
-                                "logLevel":Logger.getLogLevelStr().toupper()
-                            }
-                         };
-        local descr = {
-                          "trackerId": imp.configparams.deviceid,
-                          "cfgSchemeVersion": CFG_SCHEME_VERSION
-                      };
-        if (_pendingCfg != null) {
-            descr["pendingUpdateId"] <- _pendingCfg.configuration.updateId;
-        }
-        if (_reportedCfg == null) {
-            // only description is returned
-            ::debug("Only description is returned", "@{CLASS_NAME}");
-            context.send(CFG_REST_API_HTTP_CODES.OK, 
-                         http.jsonencode({"description":descr,
-                                          "agentConfiguration":agentCfg}));
+        ::info("GET " + CFG_REST_API_DATA_ENDPOINT + 
+               " request from cloud", "@{CLASS_NAME}");
+
+        // Table with cfg data to return to the cloud
+        local reportToCloud;
+
+        if (_reportedCfg != null) {
+            // Cfg data from the imp-device exists. Assumed it contains:
+            // {
+            //   "description": {
+            //     "cfgTimestamp": <number>
+            //   },
+            //   "configuration": {...}
+            // }
+            reportToCloud = _reportedCfg;
+            reportToCloud.agentConfiguration <- {"debug" : {}};
         } else {
-            descr["cfgTimestamp"] <- _reportedCfg.description.cfgTimestamp;
-            _reportedCfg["description"] <- descr;
-            _reportedCfg["agentConfiguration"] <- agentCfg;
-            // Returns reported configuration
-            ::debug("Return reported configuration", "@{CLASS_NAME}");
-            context.send(CFG_REST_API_HTTP_CODES.OK, http.jsonencode(_reportedCfg));
+            // No cfg data from the imp-device exists.
+            // Add empty "description" and "agentConfiguration" fields.
+            reportToCloud = { "description": {},
+                              "agentConfiguration" : {"debug" : {}} };
+            ::info("No cfg data from imp-device is available", "@{CLASS_NAME}");
+        }            
+
+        // Add imp-agent part of the data:
+        // {
+        //   "description": {
+        //     "trackerId": <string>,
+        //     "cfgSchemeVersion": <string>,
+        //     "pendingUpdateId": <string> // if exists
+        //   },
+        //   "agentConfiguration": {
+        //     "debug": {
+        //       "logLevel": <string>
+        //     }
+        //   }
+        // }
+        reportToCloud.description.trackerId <- imp.configparams.deviceid;
+        reportToCloud.description.cfgSchemeVersion <- CFG_SCHEME_VERSION;
+        if (_pendingCfg != null) {
+            reportToCloud.description.pendingUpdateId <- _pendingCfg.configuration.updateId;
         }
+        reportToCloud.agentConfiguration.debug.logLevel <- Logger.getLogLevelStr().toupper();
+
+        ::debug("Log full table which to be returned to the cloud: " + 
+                http.jsonencode(reportToCloud), "@{CLASS_NAME}");
+
+        // Return the data to the cloud
+        context.send(CFG_REST_API_HTTP_CODES.OK, http.jsonencode(reportToCloud));
     }
 
     /**

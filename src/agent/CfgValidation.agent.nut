@@ -47,6 +47,52 @@ coordValidationRules <- [{"name":"lng",
                           "highLim":90.0}];
 
 /**
+ * Validation of the full or partial input configuration.
+ * 
+ * @param {table} msg - Configuration table.
+ *
+ * @return {null | string} null - validation success, otherwise error string.
+ */
+function validateCfg(msg) {
+    // validate agent configuration
+    if ("agentConfiguration" in msg) {
+        local agentCfg = msg.agentConfiguration;
+        if ("debug" in agentCfg) {
+            local debugParam = agentCfg.debug;
+            local validLogLevRes = _validateLogLevel(debugParam);
+            if (validLogLevRes != null) return validLogLevRes;    
+        }
+    }
+    
+    // validate configuration
+    if ("configuration" in msg) {
+        local conf = msg.configuration;
+        local validIndFieldRes = _validateIndividualField(conf); 
+        if (validIndFieldRes != null) return validIndFieldRes;
+        // validate device log level
+        if ("debug" in conf) {
+            local debugParam = conf.debug;
+            local validLogLevRes = _validateLogLevel(debugParam);
+            if (validLogLevRes != null) return validLogLevRes;
+        }
+        // validate alerts
+        if ("alerts" in conf) {
+            local alerts = conf.alerts;
+            local validAlertsRes = _validateAlerts(alerts); 
+            if (validAlertsRes != null) return validAlertsRes;
+        }
+        // validate location tracking
+        if ("locationTracking" in conf) {
+            local tracking = conf.locationTracking;
+            local validLocTrackRes = _validateLocTracking(tracking);
+            if (validLocTrackRes != null) return validLocTrackRes;
+        }
+    }
+
+    return null;
+}
+
+/**
  * Parameters validation
  *
  * @param {table} rules - The validation rules table.
@@ -64,7 +110,7 @@ coordValidationRules <- [{"name":"lng",
  *
  * @return {null | string} null - validation success, otherwise error string.
  */
-function rulesCheck(rules, cfgGroup) {
+function _rulesCheck(rules, cfgGroup) {
     foreach (rule in rules) {
         local fieldNotExist = true;
         foreach (fieldName, field in cfgGroup) {
@@ -113,52 +159,6 @@ function rulesCheck(rules, cfgGroup) {
 }
 
 /**
- * Validation of the full or partial input configuration.
- * 
- * @param {table} msg - Configuration table.
- *
- * @return {null | string} null - validation success, otherwise error string.
- */
-function validateCfg(msg) {
-    // validate agent configuration
-    if ("agentConfiguration" in msg) {
-        local agentCfg = msg.agentConfiguration;
-        if ("debug" in agentCfg) {
-            local debugParam = agentCfg.debug;
-            local validLogLevRes = validateLogLevel(debugParam);
-            if (validLogLevRes != null) return validLogLevRes;    
-        }
-    }
-    
-    // validate configuration
-    if ("configuration" in msg) {
-        local conf = msg.configuration;
-        local validIndFieldRes = validateIndividualField(conf); 
-        if (validIndFieldRes != null) return validIndFieldRes;
-        // validate device log level
-        if ("debug" in conf) {
-            local debugParam = conf.debug;
-            local validLogLevRes = validateLogLevel(debugParam);
-            if (validLogLevRes != null) return validLogLevRes;
-        }
-        // validate alerts
-        if ("alerts" in conf) {
-            local alerts = conf.alerts;
-            local validAlertsRes = validateAlerts(alerts); 
-            if (validAlertsRes != null) return validAlertsRes;
-        }
-        // validate location tracking
-        if ("locationTracking" in conf) {
-            local tracking = conf.locationTracking;
-            local validLocTrackRes = validateLocTracking(tracking);
-            if (validLocTrackRes != null) return validLocTrackRes;
-        }
-    }
-
-    return null;
-}
-
-/**
  * Check and set agent log level
  *
  * @param {table} logLevels - Table with the agent log level value.
@@ -167,7 +167,7 @@ function validateCfg(msg) {
  *
  * @return {null | string} null - validation success, otherwise error string.
  */
-function validateLogLevel(logLevels) {
+function _validateLogLevel(logLevels) {
     if (!("logLevel" in logLevels)) {
         return ("Unknown log level type");
     }
@@ -190,7 +190,7 @@ function validateLogLevel(logLevels) {
  *
  * @return {null | string} null - Parameters are correct, otherwise error string.
  */
-function validateIndividualField(conf) {
+function _validateIndividualField(conf) {
     local validationRules = [];
     validationRules.append({"name":"connectingPeriod",
                             "required":false,
@@ -207,7 +207,7 @@ function validateIndividualField(conf) {
                             "validationType":"string",
                             "minLen":1,
                             "maxLen":150});
-    local rulesCheckRes = rulesCheck(validationRules, conf);
+    local rulesCheckRes = _rulesCheck(validationRules, conf);
     if (rulesCheckRes != null) return rulesCheckRes;
 
     return null;
@@ -220,11 +220,11 @@ function validateIndividualField(conf) {
  *
  * @return {null | string} null - validation success, otherwise error string.
  */
-function validateAlerts(alerts) {
+function _validateAlerts(alerts) {
     foreach (alertName, alert in alerts) {
         local validationRules = [];
         // check enable field
-        local checkEnableRes = checkEnableField(alert); 
+        local checkEnableRes = _checkEnableField(alert); 
         if (checkEnableRes != null) return checkEnableRes;
         // check other fields
         switch (alertName) {
@@ -263,7 +263,7 @@ function validateAlerts(alerts) {
                 break;
         }
         // rules checking
-        local rulesCheckRes = rulesCheck(validationRules, alert); 
+        local rulesCheckRes = _rulesCheck(validationRules, alert); 
         if (rulesCheckRes != null) return rulesCheckRes;
     }
     // check low < high temperature
@@ -284,7 +284,7 @@ function validateAlerts(alerts) {
  *
  * @return {null | string} null - validation success, otherwise error string.
  */
-function validateLocTracking(locTracking) {
+function _validateLocTracking(locTracking) {
     local rulesCheckRes = null;
     local checkEnableRes = null;
     if ("locReadingPeriod" in locTracking) {
@@ -294,7 +294,7 @@ function validateLocTracking(locTracking) {
                                 "validationType":"float", 
                                 "lowLim":CFG_LOC_READING_SAFEGUARD_MIN, 
                                 "highLim":CFG_LOC_READING_SAFEGUARD_MAX});
-        rulesCheckRes = rulesCheck(validationRules, locTracking);
+        rulesCheckRes = _rulesCheck(validationRules, locTracking);
         if (rulesCheckRes != null) return rulesCheckRes;
     }
     if ("alwaysOn" in locTracking) {
@@ -302,7 +302,7 @@ function validateLocTracking(locTracking) {
         validationRules.append({"name":"alwaysOn",
                                 "required":true,
                                 "validationType":"bool"});
-        rulesCheckRes = rulesCheck(validationRules, locTracking);
+        rulesCheckRes = _rulesCheck(validationRules, locTracking);
         if (rulesCheckRes != null) return rulesCheckRes;
     }
     // validate motion monitoring configuration
@@ -310,7 +310,7 @@ function validateLocTracking(locTracking) {
         local validationRules = [];
         local motionMon = locTracking.motionMonitoring;
         // check enable field
-        checkEnableRes = checkEnableField(motionMon);
+        checkEnableRes = _checkEnableField(motionMon);
         if (checkEnableRes != null) return checkEnableRes;
         validationRules.append({"name":"movementAccMin",
                                 "required":true,
@@ -344,7 +344,7 @@ function validateLocTracking(locTracking) {
                                 "fixedValues":[0.0],
                                 "lowLim":CFG_MOTION_DIST_SAFEGUARD_MIN, 
                                 "highLim":CFG_MOTION_DIST_SAFEGUARD_MAX});
-        rulesCheckRes = rulesCheck(validationRules, motionMon);
+        rulesCheckRes = _rulesCheck(validationRules, motionMon);
         if (rulesCheckRes != null) return rulesCheckRes;
     }
     if ("geofence" in locTracking) {
@@ -352,21 +352,21 @@ function validateLocTracking(locTracking) {
         validationRules.extend(coordValidationRules);
         local geofence = locTracking.geofence;
         // check enable field
-        checkEnableRes = checkEnableField(geofence);
+        checkEnableRes = _checkEnableField(geofence);
         if (checkEnableRes != null) return checkEnableRes;
         validationRules.append({"name":"radius",
                                 "required":true,
                                 "validationType":"float", 
                                 "lowLim":0.0, 
                                 "highLim":CFG_EARTH_RADIUS});
-        rulesCheckRes = rulesCheck(validationRules, geofence);
+        rulesCheckRes = _rulesCheck(validationRules, geofence);
         if (rulesCheckRes != null) return rulesCheckRes;
     }
     if ("repossessionMode" in locTracking) {
         local validationRules = [];
         local repossession = locTracking.repossessionMode;
         // check enable field
-        checkEnableRes = checkEnableField(repossession);
+        checkEnableRes = _checkEnableField(repossession);
         if (checkEnableRes != null) return checkEnableRes;
         validationRules.append({"name":"after",
                                 "required":true,
@@ -374,23 +374,23 @@ function validateLocTracking(locTracking) {
                                 "minLen":1,
                                 "maxLen":150,
                                 "minTimeStamp": CFG_MIN_TIMESTAMP});
-        rulesCheckRes = rulesCheck(validationRules, repossession);
+        rulesCheckRes = _rulesCheck(validationRules, repossession);
         if (rulesCheckRes != null) return rulesCheckRes;
     }
     if ("bleDevices" in locTracking) {
         local validationRules = [];
         local ble = locTracking.bleDevices;
         // check enable field
-        checkEnableRes = checkEnableField(ble); 
+        checkEnableRes = _checkEnableField(ble); 
         if (checkEnableRes) return checkEnableRes;
         if ("generic" in ble) {
             local bleDevices = ble.generic;
-            local validateGenericBLERes = validateGenericBLE(bleDevices);
+            local validateGenericBLERes = _validateGenericBLE(bleDevices);
             if (validateGenericBLERes != null) return validateGenericBLERes;
         }
         if ("iBeacon" in ble) {
             local iBeacons = ble.iBeacon;
-            local validateBeaconRes = validateBeacon(iBeacons);
+            local validateBeaconRes = _validateBeacon(iBeacons);
             if (validateBeaconRes != null) return validateBeaconRes;
         }
     }
@@ -404,7 +404,7 @@ function validateLocTracking(locTracking) {
  *
  * @return {null | string} null - validation success, otherwise error string.
  */
-function checkEnableField(cfgGroup) {
+function _checkEnableField(cfgGroup) {
     if ("enabled" in cfgGroup) {
         if (typeof(cfgGroup.enabled) != "bool") {
             return "Enable field - type mismatch";
@@ -420,7 +420,7 @@ function checkEnableField(cfgGroup) {
  *
  * @return {null | string} null - validation success, otherwise error string.
  */
-function validateGenericBLE(bleDevices) {
+function _validateGenericBLE(bleDevices) {
     const BLE_MAC_ADDR = @"(?:\x\x){5}\x\x";
     foreach (bleDeviveMAC, bleDevive  in bleDevices) {
         local regex = regexp(format(@"^%s$", BLE_MAC_ADDR));
@@ -428,7 +428,7 @@ function validateGenericBLE(bleDevices) {
         if (regexCapture == null) {
             return "Generic BLE device MAC address error";
         }
-        local rulesCheckRes = rulesCheck(coordValidationRules, bleDevive);
+        local rulesCheckRes = _rulesCheck(coordValidationRules, bleDevive);
         if (rulesCheckRes != null) return rulesCheckRes;
     }
     return null;
@@ -441,7 +441,7 @@ function validateGenericBLE(bleDevices) {
  *
  * @return {null | string} null - validation success, otherwise error string.
  */
-function validateBeacon(iBeacons) {
+function _validateBeacon(iBeacons) {
     const IBEACON_UUID = @"(?:\x\x){15}\x\x";
     const IBEACON_MAJOR_MINOR = @"\d{1,5}";
     foreach (iBeaconUUID, iBeacon in iBeacons) {
@@ -469,7 +469,7 @@ function validateBeacon(iBeacons) {
                 if (minorVal.tointeger() > 65535) {
                     return "iBeacon \"minor\" error (more then 65535)";
                 }
-                local rulesCheckRes = rulesCheck(coordValidationRules, minor); 
+                local rulesCheckRes = _rulesCheck(coordValidationRules, minor); 
                 if (rulesCheckRes != null) return rulesCheckRes;
             }
         }
