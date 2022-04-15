@@ -10,6 +10,8 @@ const PMGR_STATS_MAX_LEN = 10;
 const PMGR_MAX_ERROR_LEN = 512;
 // Connection timeout (sec)
 const PMGR_CONNECT_TIMEOUT = 240;
+// Server.flush timeout (sec)
+const PMGR_FLUSH_TIMEOUT = 5;
 
 // Implements useful in production features:
 // - Emergency mode (If an unhandled error occurred, device goes to sleep and periodically connects to the server waiting for a SW update)
@@ -17,6 +19,7 @@ const PMGR_CONNECT_TIMEOUT = 240;
 class ProductionManager {
     _debugOn = false;
     _startAppFunc = null;
+    _isNewDeployment = false;
 
     /**
      * Constructor for Production Manager
@@ -39,17 +42,12 @@ class ProductionManager {
         local userConf = _readUserConf();
         local data = _extractDataFromUserConf(userConf);
 
-        if (data == null) {
-            _startAppFunc();
-            return;
-        }
-
-        if (data.lastError != null) {
+        if (data && data.lastError != null) {
             // TODO: Improve logging!
             _printLastError(data.lastError);
         }
 
-        if (data.errorFlag && data.deploymentID == __EI.DEPLOYMENT_ID) {
+        if (data && data.errorFlag && data.deploymentID == __EI.DEPLOYMENT_ID) {
             if (server.isconnected()) {
                 // No new deployment was detected
                 _sleep();
@@ -59,8 +57,9 @@ class ProductionManager {
                 server.connect(_sleep.bindenv(this), PMGR_CONNECT_TIMEOUT);
             }
             return;
-        } else if (data.deploymentID != __EI.DEPLOYMENT_ID) {
+        } else if (!data || data.deploymentID != __EI.DEPLOYMENT_ID) {
             _info("New deployment detected!");
+            _isNewDeployment = true;
             userConf[PMGR_USER_CONFIG_FIELD] <- _initialUserConfData();
             _storeUserConf(userConf);
         }
@@ -75,7 +74,13 @@ class ProductionManager {
      */
     function enterEmergencyMode(error = null) {
         _setErrorFlag(error);
+        server.flush(PMGR_FLUSH_TIMEOUT);
         server.restart();
+    }
+
+    // TODO: Comment
+    function isNewDeployment() {
+        return _isNewDeployment;
     }
 
     /**

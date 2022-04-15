@@ -35,3 +35,11 @@ const HW_RM_SFL_END_ADDR = 0x100000;
 // Allocation for the SPI Flash File System used by Location Driver
 const HW_LD_SFFS_START_ADDR = 0x200000;
 const HW_LD_SFFS_END_ADDR = 0x240000;
+
+// Allocation for the SPI Flash File System used by Cfg Manager
+const HW_CFGM_SFFS_START_ADDR = 0x300000;
+const HW_CFGM_SFFS_END_ADDR = 0x340000;
+
+// The range to be erased if ERASE_FLASH build-flag is active and a new deployment is detected
+const HW_ERASE_FLASH_START_ADDR = 0x000000;
+const HW_ERASE_FLASH_END_ADDR = 0x340000;

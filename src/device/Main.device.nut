@@ -27,8 +27,9 @@
 @endif
 
 @include once "Hardware.device.nut"
+@include once "Helpers.device.nut"
 @include once "ProductionManager.device.nut"
-@include once "Configuration.device.nut"
+@include once "CfgManager.device.nut"
 @include once "CustomConnectionManager.device.nut"
 @include once "CustomReplayMessenger.device.nut"
 @include once "bg96_gps.device.lib.nut"
@@ -49,10 +50,11 @@
 // Connection Manager configuration constants:
 // Maximum time allowed for the imp to connect to the server before timing out, in seconds
 const APP_CM_CONNECT_TIMEOUT = 180.0;
+// TODO: Reduce these values for the release-version
 // Delay before automatic disconnection if there are no connection consumers, in seconds
-const APP_CM_AUTO_DISC_DELAY = 10.0;
+const APP_CM_AUTO_DISC_DELAY = 1000.0;
 // Maximum time allowed for the imp to be connected to the server, in seconds
-const APP_CM_MAX_CONNECTED_TIME = 300.0;
+const APP_CM_MAX_CONNECTED_TIME = 3000.0;
 
 // Replay Messenger configuration constants:
 // The maximum message send rate,
@@ -68,6 +70,7 @@ const APP_SEND_BUFFER_SIZE = 10240;
 class Application {
     _locationDriver = null;
     _accelDriver = null;
+    _cfgManager = null;
     _motionMon = null;
     _dataProc = null;
     _thermoSensDriver = null;
@@ -76,6 +79,10 @@ class Application {
      * Application Constructor
      */
     constructor() {
+@if ERASE_FLASH
+        pm.isNewDeployment() && _eraseFlash();
+@endif
+
         // Create and intialize Connection Manager
         // NOTE: This needs to be called as early in the code as possible
         // in order to run the application without a connection to the Internet
@@ -110,11 +117,11 @@ class Application {
             // Create and initialize Motion Monitor
             _motionMon = MotionMonitor(_accelDriver, _locationDriver);
             // Create and initialize Data Processor
-            _dataProc = DataProcessor(_motionMon, _accelDriver, _thermoSensDriver, null);
-            // Start Data processor
-            _dataProc.start();
-            // Start Motion monitor
-            _motionMon.start();
+            _dataProc = DataProcessor(_motionMon, _accelDriver, _thermoSensDriver, null, _locationDriver);
+            // Create and initialize Cfg Manager
+            _cfgManager = CfgManager([_motionMon, _dataProc]);
+            // Start Cfg Manager
+            _cfgManager.start();
         }.bindenv(this), function(err) {
             ::error("Replay Messenger initialization error: " + err);
         }.bindenv(this))
@@ -186,6 +193,21 @@ class Application {
         // Resend all messages with the specified names
         local name = message.payload.name;
         return name == APP_RM_MSG_NAME.DATA;
+    }
+
+    // TODO: Comment
+    function _eraseFlash() {
+        ::info(format("Erasing SPI flash from 0x%x to 0x%x...", HW_ERASE_FLASH_START_ADDR, HW_ERASE_FLASH_END_ADDR));
+
+        local spiflash = hardware.spiflash;
+        spiflash.enable();
+
+        for (local addr = HW_ERASE_FLASH_START_ADDR; addr < HW_ERASE_FLASH_END_ADDR; addr += 0x1000) {
+            spiflash.erasesector(addr);
+        }
+
+        spiflash.disable();
+        ::info("Erasing finished!");
     }
 }
 

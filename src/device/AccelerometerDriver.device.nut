@@ -244,19 +244,19 @@ class AccelerometerDriver {
     _shockThr = null
 
     // duration of exceeding the movement acceleration threshold
-    _movementDur = null;
+    _movementAccDur = null;
 
     // current movement acceleration threshold
     _movementCurThr = null;
 
     // maximum value of acceleration threshold for bounce filtering
-    _movementMax = null;
+    _movementAccMax = null;
 
     // minimum value of acceleration threshold for bounce filtering
-    _movementMin = null;
+    _movementAccMin = null;
 
     // maximum time to determine motion detection after the initial movement
-    _motionTimeout = null;
+    _motionTime = null;
 
     // timestamp of the movement
     _motionCurTime = null;
@@ -315,12 +315,12 @@ class AccelerometerDriver {
         _thrVelExceeded = false;
         _shockThr = ACCEL_DEFAULT_SHOCK_THR;
         _movementCurThr = ACCEL_DEFAULT_MOV_MIN;
-        _movementMin = ACCEL_DEFAULT_MOV_MIN;
-        _movementMax = ACCEL_DEFAULT_MOV_MAX;
-        _movementDur = ACCEL_DEFAULT_MOV_DUR;
+        _movementAccMin = ACCEL_DEFAULT_MOV_MIN;
+        _movementAccMax = ACCEL_DEFAULT_MOV_MAX;
+        _movementAccDur = ACCEL_DEFAULT_MOV_DUR;
         _motionCurTime = time();
         _motionVelocity = ACCEL_DEFAULT_MOTION_VEL;
-        _motionTimeout = ACCEL_DEFAULT_MOTION_TIME;
+        _motionTime = ACCEL_DEFAULT_MOTION_TIME;
         _motionDistance = ACCEL_DEFAULT_MOTION_DIST;
 
         _velCur = FloatVector();
@@ -425,13 +425,13 @@ class AccelerometerDriver {
      * @param {table} motionCnd - Table with the motion condition settings.
      *        Optional, all settings have defaults.
      *        The settings:
-     *          "movementMax": {float}    - Movement acceleration maximum threshold, in g.
+     *          "movementAccMax": {float}    - Movement acceleration maximum threshold, in g.
      *                                        Default: ACCEL_DEFAULT_MOV_MAX
-     *          "movementMin": {float}    - Movement acceleration minimum threshold, in g.
+     *          "movementAccMin": {float}    - Movement acceleration minimum threshold, in g.
      *                                        Default: ACCEL_DEFAULT_MOV_MIN
-     *          "movementDur": {float}    - Duration of exceeding movement acceleration threshold, in seconds.
+     *          "movementAccDur": {float}    - Duration of exceeding movement acceleration threshold, in seconds.
      *                                        Default: ACCEL_DEFAULT_MOV_DUR
-     *          "motionTimeout": {float}  - Maximum time to determine motion detection after the initial movement, in seconds.
+     *          "motionTime": {float}  - Maximum time to determine motion detection after the initial movement, in seconds.
      *                                        Default: ACCEL_DEFAULT_MOTION_TIME
      *          "motionVelocity": {float} - Minimum instantaneous velocity  to determine motion detection condition, in meters per second.
      *                                        Default: ACCEL_DEFAULT_MOTION_VEL
@@ -442,50 +442,50 @@ class AccelerometerDriver {
     function detectMotion(motionCb, motionCnd = {}) {
         local motionSettIsCorr = true;
         _movementCurThr = ACCEL_DEFAULT_MOV_MIN;
-        _movementMin = ACCEL_DEFAULT_MOV_MIN;
-        _movementMax = ACCEL_DEFAULT_MOV_MAX;
-        _movementDur = ACCEL_DEFAULT_MOV_DUR;
+        _movementAccMin = ACCEL_DEFAULT_MOV_MIN;
+        _movementAccMax = ACCEL_DEFAULT_MOV_MAX;
+        _movementAccDur = ACCEL_DEFAULT_MOV_DUR;
         _motionVelocity = ACCEL_DEFAULT_MOTION_VEL;
-        _motionTimeout = ACCEL_DEFAULT_MOTION_TIME;
+        _motionTime = ACCEL_DEFAULT_MOTION_TIME;
         _motionDistance = ACCEL_DEFAULT_MOTION_DIST;
         foreach (key, value in motionCnd) {
             if (typeof key == "string") {
-                if (key == "movementMax") {
+                if (key == "movementAccMax") {
                     if (typeof value == "float" && value > 0) {
-                        _movementMax = value;
+                        _movementAccMax = value;
                     } else {
-                        ::error("movementMax incorrect value", "@{CLASS_NAME}");
+                        ::error("movementAccMax incorrect value", "@{CLASS_NAME}");
                         motionSettIsCorr = false;
                         break;
                     }
                 }
 
-                if (key == "movementMin") {
+                if (key == "movementAccMin") {
                     if (typeof value == "float"  && value > 0) {
-                        _movementMin = value;
+                        _movementAccMin = value;
                         _movementCurThr = value;
                     } else {
-                        ::error("movementMin incorrect value", "@{CLASS_NAME}");
+                        ::error("movementAccMin incorrect value", "@{CLASS_NAME}");
                         motionSettIsCorr = false;
                         break;
                     }
                 }
 
-                if (key == "movementDur") {
+                if (key == "movementAccDur") {
                     if (typeof value == "float"  && value > 0) {
-                        _movementDur = value;
+                        _movementAccDur = value;
                     } else {
-                        ::error("movementDur incorrect value", "@{CLASS_NAME}");
+                        ::error("movementAccDur incorrect value", "@{CLASS_NAME}");
                         motionSettIsCorr = false;
                         break;
                     }
                 }
 
-                if (key == "motionTimeout") {
+                if (key == "motionTime") {
                     if (typeof value == "float"  && value > 0) {
-                        _motionTimeout = value;
+                        _motionTime = value;
                     } else {
-                        ::error("motionTimeout incorrect value", "@{CLASS_NAME}");
+                        ::error("motionTime incorrect value", "@{CLASS_NAME}");
                         motionSettIsCorr = false;
                         break;
                     }
@@ -524,7 +524,7 @@ class AccelerometerDriver {
             _accel.configureFifoInterrupts(false);
             _accel.configureInertialInterrupt(true, 
                                               _movementCurThr, 
-                                              (_movementDur*ACCEL_DEFAULT_DATA_RATE).tointeger());
+                                              (_movementAccDur*ACCEL_DEFAULT_DATA_RATE).tointeger());
             ::info("Motion detection enabled", "@{CLASS_NAME}");
         } else {
             _mtnCb = null;
@@ -532,7 +532,7 @@ class AccelerometerDriver {
             _motionState = ACCEL_MOTION_STATE.DISABLED;
             _positionCur.clear();
             _positionPrev.clear();
-            _movementCurThr = _movementMin;
+            _movementCurThr = _movementAccMin;
             _enMtnDetect = false;
             _accel.configureFifoInterrupts(false);
             _accel.configureInertialInterrupt(false);
@@ -701,7 +701,7 @@ class AccelerometerDriver {
         local moving = _positionCur.length();
 
         local diffTm = time() - _motionCurTime;
-        if (diffTm < _motionTimeout) {
+        if (diffTm < _motionTime) {
             if (vel > _motionVelocity) {
                 _thrVelExceeded = true;
             }
@@ -718,16 +718,16 @@ class AccelerometerDriver {
             // if motion not detected increase movement threshold (threshold -> [movMin;movMax])
             _motionState = ACCEL_MOTION_STATE.WAITING;
             _thrVelExceeded = false;
-            if (_movementCurThr < _movementMax) {
+            if (_movementCurThr < _movementAccMax) {
                 _movementCurThr += ACCEL_DEFAULT_MOV_STEP;
-                if (_movementCurThr > _movementMax)
-                    _movementCurThr = _movementMax;
+                if (_movementCurThr > _movementAccMax)
+                    _movementCurThr = _movementAccMax;
             }
             ::debug(format("Motion is NOT confirmed. New movementCurThr %f g", _movementCurThr), "@{CLASS_NAME}")
             _positionCur.clear();
             _positionPrev.clear();
             _accel.configureFifoInterrupts(false);
-            _accel.configureInertialInterrupt(true, _movementCurThr, (_movementDur*ACCEL_DEFAULT_DATA_RATE).tointeger());
+            _accel.configureInertialInterrupt(true, _movementCurThr, (_movementAccDur*ACCEL_DEFAULT_DATA_RATE).tointeger());
         }
     }
 
@@ -742,7 +742,7 @@ class AccelerometerDriver {
             _positionCur.clear();
             _positionPrev.clear();
             // reset movement threshold to minimum value
-            _movementCurThr = _movementMin;
+            _movementCurThr = _movementAccMin;
             _enMtnDetect = false;
             // disable all interrupts
             _accel.configureInertialInterrupt(false);
