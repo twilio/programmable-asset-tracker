@@ -122,12 +122,10 @@ class CfgService {
             //   "configuration": {...}
             // }
             reportToCloud = _reportedCfg;
-            reportToCloud.agentConfiguration <- {"debug" : {}};
         } else {
             // No cfg data from the imp-device exists.
             // Add empty "description" and "agentConfiguration" fields.
-            reportToCloud = { "description": {},
-                              "agentConfiguration" : {"debug" : {}} };
+            reportToCloud = { "description": {} };
             ::info("No cfg data from imp-device is available", "@{CLASS_NAME}");
         }            
 
@@ -144,6 +142,7 @@ class CfgService {
         //     }
         //   }
         // }
+        reportToCloud.agentConfiguration <- {"debug" : {}};
         reportToCloud.description.trackerId <- imp.configparams.deviceid;
         reportToCloud.description.cfgSchemeVersion <- CFG_SCHEME_VERSION;
         if (_pendingCfg != null) {
@@ -187,7 +186,7 @@ class CfgService {
             // Pending cfg is always overwritten by the new cfg update
             _pendingCfg = newCfg.configuration;
             ::info("Cfg update is pending sending to device, updateId: " + 
-                   _pendingCfg.configuration.updateId, "@{CLASS_NAME}");
+                   _pendingCfg.updateId, "@{CLASS_NAME}");
             if (_sendingCfg == null) {
                 // If another sending process is not in progress, 
                 // then start the sending process
@@ -281,7 +280,7 @@ class CfgService {
             }
             // Sending process is completed
             ::info("Cfg update successfully sent to device, updateId: " + 
-                   _sendingCfg.configuration.updateId, "@{CLASS_NAME}");
+                   _sendingCfg.updateId, "@{CLASS_NAME}");
             _sendingCfg = null;
             // Send the next cfg update, if there is any
             _sendCfg();

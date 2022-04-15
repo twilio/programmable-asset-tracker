@@ -22,7 +22,7 @@ const CFG_READING_SAFEGUARD_MAX = 360000.0;
 
 // How often the tracker obtains a location (minimal value), in seconds.
 // TODO: adjust
-const CFG_LOC_READING_SAFEGUARD_MIN = 10;
+const CFG_LOC_READING_SAFEGUARD_MIN = 10.0;
 // How often the tracker obtains a location (maximal value), in seconds.
 // TODO: adjust
 const CFG_LOC_READING_SAFEGUARD_MAX = 360000.0;
@@ -37,28 +37,101 @@ const CFG_SHOCK_ACC_SAFEGUARD_MIN = 0.016;
 const CFG_SHOCK_ACC_SAFEGUARD_MAX = 16.0;
 
 // Minimal distance to determine motion detection condition, in meters.
+// TODO: adjust
 const CFG_MOTION_DIST_SAFEGUARD_MIN = 1.0;
 // Maximal distance to determine motion detection condition, in meters.
+// TODO: adjust
 const CFG_MOTION_DIST_SAFEGUARD_MAX = 1000.0;
 
 // Maximal geofence radius - the Earth radius, in meters.
-const CFG_EARTH_RADIUS = 6371009.0;
+const CFG_GEOFENCE_RADIUS_SAFEGUARD_MIN = 0.0;
+// Maximal geofence radius - the Earth radius, in meters.
+const CFG_GEOFENCE_RADIUS_SAFEGUARD_MAX = 6371009.0;
 
 // Minimal start time of repossesion, Unix timestamp
 // 31.03.2020 18:53:04 - TODO: adjust
 const CFG_MIN_TIMESTAMP = "1585666384";
 
+// Minimal value of Earth longitude, in degrees.
+const CFG_LONGITUDE_SAFEGUARD_MIN = -180.0;
+// Maximal value of Earth longitude, in degrees.
+const CFG_LONGITUDE_SAFEGUARD_MAX = 180.0;
+
+// Minimal value of Earth longitude, in degrees.
+const CFG_LATITUDE_SAFEGUARD_MIN = -90.0;
+// Maximal value of Earth longitude, in degrees.
+const CFG_LATITUDE_SAFEGUARD_MAX = 90.0;
+
+// Minimal length of updateId field.
+// TODO: adjust
+const CFG_UPDATE_ID_LEN_SAFEGUARD_MIN = 1;
+// Maximal length of updateId field.
+// TODO: adjust
+const CFG_UPDATE_ID_LEN_SAFEGUARD_MAX = 50;
+
+// Minimal charge level, in percent.
+const CFG_CHARGE_LEVEL_THR_SAFEGUARD_MIN = 0.0;
+// Maximal charge level, in percent.
+const CFG_CHARGE_LEVEL_THR_SAFEGUARD_MAX = 100.0;
+
+// Minimal temperature value, in degrees Celsius.
+// TODO: adjust
+const CFG_TEMPERATURE_THR_SAFEGUARD_MIN = -45.0;
+// Maximal temperature value, in degrees Celsius.
+// TODO: adjust
+const CFG_TEMPERATURE_THR_SAFEGUARD_MAX = 85.0;
+
+// Minimal temperature hysteresis, in degrees Celsius.
+// TODO: adjust
+const CFG_TEMPERATURE_HYST_SAFEGUARD_MIN = 1.0;
+// Maximal temperature hysteresis, in degrees Celsius.
+// TODO: adjust
+const CFG_TEMPERATURE_HYST_SAFEGUARD_MAX = 10.0;
+
+// Minimal length of updateId field
+// TODO: adjust
+const CFG_AFTER_FIELD_LEN_SAFEGUARD_MIN = 1;
+// Maximal length of updateId field
+// TODO: adjust
+const CFG_AFTER_FIELD_LEN_SAFEGUARD_MAX = 50;
+
+// Minimal motion velocity, in meter per second.
+const CFG_MOTION_VEL_SAFEGUARD_MIN = 0.1;
+// Maximal motion velocity, in meter per second.
+const CFG_MOTION_VEL_SAFEGUARD_MAX = 10.0;
+
+// Minimal motion time value, in seconds.
+const CFG_MOTION_TIME_SAFEGUARD_MIN = 0.01;
+// Maximal motion time value, in seconds.
+const CFG_MOTION_TIME_SAFEGUARD_MAX = 3600.0;
+
+// Minimal motion velocity, in g.
+const CFG_MOVEMENT_ACC_SAFEGUARD_MIN = 0.1;
+// Maximal motion velocity, in g.
+const CFG_MOVEMENT_ACC_SAFEGUARD_MAX = 4.0;
+
+// Minimal movement acceleration duration, in seconds.
+const CFG_MOVEMENT_ACC_DURATION_SAFEGUARD_MIN = 0.01;
+// Maximal movement acceleration duration, in seconds.
+const CFG_MOVEMENT_ACC_DURATION_SAFEGUARD_MAX = 1.27;
+
+// Valid single value of motion distance
+const CFG_MOTION_DIST_FIXED_VAL = 0.0;
+
+// Maximal value of iBeacon minor, major
+const CFG_BEACON_MINOR_MAJOR_VAL_MAX = 65535;
+
 // validation rules for coordinates
 coordValidationRules <- [{"name":"lng",
                           "required":true,
                           "validationType":"float", 
-                          "lowLim":-180.0, 
-                          "highLim":180.0},
+                          "lowLim":CFG_LONGITUDE_SAFEGUARD_MIN, 
+                          "highLim":CFG_LONGITUDE_SAFEGUARD_MAX},
                          {"name":"lat",
                           "required":true,
                           "validationType":"float", 
-                          "lowLim":-90.0, 
-                          "highLim":90.0}];
+                          "lowLim":CFG_LATITUDE_SAFEGUARD_MIN, 
+                          "highLim":CFG_LATITUDE_SAFEGUARD_MAX}];
 
 /**
  * Validation of the full or partial configuration.
@@ -189,7 +262,7 @@ function _validateLogLevel(logLevels) {
     switch (logLevels.logLevel) {
         case "DEBUG":
         case "INFO":
-        case "ERROR":               
+        case "ERROR":
             break;
         default:
             return ("Unknown log level");
@@ -219,8 +292,8 @@ function _validateIndividualField(conf) {
     validationRules.append({"name":"updateId",
                             "required":true,
                             "validationType":"string",
-                            "minLen":1,
-                            "maxLen":150});
+                            "minLen":CFG_UPDATE_ID_LEN_SAFEGUARD_MIN,
+                            "maxLen":CFG_UPDATE_ID_LEN_SAFEGUARD_MAX});
     local rulesCheckRes = _rulesCheck(validationRules, conf);
     if (rulesCheckRes != null) return rulesCheckRes;
 
@@ -247,8 +320,8 @@ function _validateAlerts(alerts) {
                 validationRules.append({"name":"threshold",
                                         "required":true,
                                         "validationType":"float", 
-                                        "lowLim":0.0, 
-                                        "highLim":100.0});
+                                        "lowLim":CFG_CHARGE_LEVEL_THR_SAFEGUARD_MIN, 
+                                        "highLim":CFG_CHARGE_LEVEL_THR_SAFEGUARD_MAX});
                 break;
             case "temperatureLow":
             case "temperatureHigh":
@@ -256,13 +329,13 @@ function _validateAlerts(alerts) {
                 validationRules.append({"name":"threshold",
                                         "required":true,
                                         "validationType":"float", 
-                                        "lowLim":-40.0, 
-                                        "highLim":85.0});
+                                        "lowLim":CFG_TEMPERATURE_THR_SAFEGUARD_MIN, 
+                                        "highLim":CFG_TEMPERATURE_THR_SAFEGUARD_MAX});
                 validationRules.append({"name":"hysteresis",
                                         "required":true,
                                         "validationType":"float", 
-                                        "lowLim":0.0, 
-                                        "highLim":10.0});
+                                        "lowLim":CFG_TEMPERATURE_HYST_SAFEGUARD_MIN,
+                                        "highLim":CFG_TEMPERATURE_HYST_SAFEGUARD_MAX});
                 break;
             case "shockDetected":
                 // LIS2DH12 maximum shock threshold - 16 g
@@ -329,38 +402,48 @@ function _validateLocTracking(locTracking) {
         validationRules.append({"name":"movementAccMin",
                                 "required":true,
                                 "validationType":"float", 
-                                "lowLim":0.1, 
-                                "highLim":4.0});
+                                "lowLim":CFG_MOVEMENT_ACC_SAFEGUARD_MIN, 
+                                "highLim":CFG_MOVEMENT_ACC_SAFEGUARD_MAX});
         validationRules.append({"name":"movementAccMax",
                                 "required":true,
                                 "validationType":"float", 
-                                "lowLim":0.1, 
-                                "highLim":4.0});
+                                "lowLim":CFG_MOVEMENT_ACC_SAFEGUARD_MIN, 
+                                "highLim":CFG_MOVEMENT_ACC_SAFEGUARD_MAX});
         // min 1/ODR (current 100 Hz), max INT1_DURATION - 127/ODR
         validationRules.append({"name":"movementAccDur",
                                 "required":true,
                                 "validationType":"float", 
-                                "lowLim":0.01, 
-                                "highLim":1.27});
+                                "lowLim":CFG_MOVEMENT_ACC_DURATION_SAFEGUARD_MIN, 
+                                "highLim":CFG_MOVEMENT_ACC_DURATION_SAFEGUARD_MAX});
         validationRules.append({"name":"motionTime",
                                 "required":true,
                                 "validationType":"float", 
-                                "lowLim":0.01, 
-                                "highLim":3600.0});
+                                "lowLim":CFG_MOTION_TIME_SAFEGUARD_MIN, 
+                                "highLim":CFG_MOTION_TIME_SAFEGUARD_MAX});
         validationRules.append({"name":"motionVelocity",
                                 "required":true,
                                 "validationType":"float", 
-                                "lowLim":0.1, 
-                                "highLim":10.0});
+                                "lowLim":CFG_MOTION_VEL_SAFEGUARD_MIN, 
+                                "highLim":CFG_MOTION_VEL_SAFEGUARD_MAX});
         validationRules.append({"name":"motionDistance",
                                 "required":true,
                                 "validationType":"float", 
-                                "fixedValues":[0.0],
+                                "fixedValues":[CFG_MOTION_DIST_FIXED_VAL],
                                 "lowLim":CFG_MOTION_DIST_SAFEGUARD_MIN, 
                                 "highLim":CFG_MOTION_DIST_SAFEGUARD_MAX});
         rulesCheckRes = _rulesCheck(validationRules, motionMon);
         if (rulesCheckRes != null) return rulesCheckRes;
+
+        // must be movementAccMin < movementAccMax
+        if ("movementAccMin" in motionMon && 
+            "movementAccMax" in motionMon) {
+            if (motionMon.movementAccMin >= 
+                motionMon.movementAccMax) {
+                return "Movement acceleration range limit error";
+            }
+        }
     }
+
     if ("geofence" in locTracking) {
         local validationRules = [];
         validationRules.extend(coordValidationRules);
@@ -371,8 +454,8 @@ function _validateLocTracking(locTracking) {
         validationRules.append({"name":"radius",
                                 "required":true,
                                 "validationType":"float", 
-                                "lowLim":0.0, 
-                                "highLim":CFG_EARTH_RADIUS});
+                                "lowLim":CFG_GEOFENCE_RADIUS_SAFEGUARD_MIN, 
+                                "highLim":CFG_GEOFENCE_RADIUS_SAFEGUARD_MAX});
         rulesCheckRes = _rulesCheck(validationRules, geofence);
         if (rulesCheckRes != null) return rulesCheckRes;
     }
@@ -385,8 +468,8 @@ function _validateLocTracking(locTracking) {
         validationRules.append({"name":"after",
                                 "required":true,
                                 "validationType":"string", 
-                                "minLen":1,
-                                "maxLen":150,
+                                "minLen":CFG_AFTER_FIELD_LEN_SAFEGUARD_MIN,
+                                "maxLen":CFG_AFTER_FIELD_LEN_SAFEGUARD_MAX,
                                 "minTimeStamp": CFG_MIN_TIMESTAMP});
         rulesCheckRes = _rulesCheck(validationRules, repossession);
         if (rulesCheckRes != null) return rulesCheckRes;
@@ -471,7 +554,7 @@ function _validateBeacon(iBeacons) {
                 return "iBeacon \"major\" error";
             }
             // max 2 bytes (65535)
-            if (majorVal.tointeger() > 65535) {
+            if (majorVal.tointeger() > CFG_BEACON_MINOR_MAJOR_VAL_MAX) {
                 return "iBeacon \"major\" error (more then 65535)";
             }
             foreach (minorVal, minor in major) {
@@ -480,7 +563,7 @@ function _validateBeacon(iBeacons) {
                     return "iBeacon \"minor\" error";
                 }
                 // max 2 bytes (65535)
-                if (minorVal.tointeger() > 65535) {
+                if (minorVal.tointeger() > CFG_BEACON_MINOR_MAJOR_VAL_MAX) {
                     return "iBeacon \"minor\" error (more then 65535)";
                 }
                 local rulesCheckRes = _rulesCheck(coordValidationRules, minor); 
