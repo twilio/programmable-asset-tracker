@@ -1,6 +1,32 @@
 
-// JSON format/scheme version
+// Supported configuration JSON format/scheme version
 const CFG_SCHEME_VERSION = "1.0";
+
+// Configuration safeguard constants:
+
+// TODO: move more numbers from the validation code to constants
+
+// How often the tracker connects to network (minimal value), in seconds.
+// TODO: adjust
+const CFG_CONNECTING_SAFEGUARD_MIN = 10.0;
+// How often the tracker connects to network (maximal value), in seconds.
+// TODO: adjust
+const CFG_CONNECTING_SAFEGUARD_MAX = 360000.0;
+
+// How often the tracker polls various data (minimal value), in seconds.
+// TODO: adjust
+const CFG_READING_SAFEGUARD_MIN = 10.0;
+// How often the tracker polls various data (maximal value), in seconds.
+// TODO: adjust
+const CFG_READING_SAFEGUARD_MAX = 360000.0;
+
+// How often the tracker obtains a location (minimal value), in seconds.
+// TODO: adjust
+const CFG_LOC_READING_SAFEGUARD_MIN = 10;
+// How often the tracker obtains a location (maximal value), in seconds.
+// TODO: adjust
+const CFG_LOC_READING_SAFEGUARD_MAX = 360000.0;
+
 // Minimal shock acceleration alert threshold, in g.
 // 1 LSb = 16 mg @ FS = 2 g
 // 1 LSb = 32 mg @ FS = 4 g
@@ -9,32 +35,20 @@ const CFG_SCHEME_VERSION = "1.0";
 const CFG_SHOCK_ACC_SAFEGUARD_MIN = 0.016;
 // Maximal shock acceleration alert threshold, in g.
 const CFG_SHOCK_ACC_SAFEGUARD_MAX = 16.0;
-// How often the tracker connects to network (minimal value), in seconds.
-// TODO: Adjust safeguards
-const CFG_CONNECTING_SAFEGUARD_MIN = 10.0;
-// How often the tracker connects to network (maximal value), in seconds.
-// TODO: Adjust safeguards
-const CFG_CONNECTING_SAFEGUARD_MAX = 360000.0;
-// How often the tracker polls various data (minimal value), in seconds.
-const CFG_READING_SAFEGUARD_MIN = 10.0;
-// How often the tracker polls various data (maximal value), in seconds.
-const CFG_READING_SAFEGUARD_MAX = 360000.0;
+
 // Minimal distance to determine motion detection condition, in meters.
 const CFG_MOTION_DIST_SAFEGUARD_MIN = 1.0;
-// Minimal distance to determine motion detection condition, in meters.
+// Maximal distance to determine motion detection condition, in meters.
 const CFG_MOTION_DIST_SAFEGUARD_MAX = 1000.0;
-// Mean Earth radius, in meters.
-const CFG_EARTH_RADIUS = 6371009.0;
-// Unix timestamp 31.03.2020 18:53:04 (example)
-const CFG_MIN_TIMESTAMP = "1585666384";
-// Minimal location reading period, in seconds.
-const CFG_LOC_READING_SAFEGUARD_MIN = 0.1;
-// Maximal location reading period, in seconds.
-const CFG_LOC_READING_SAFEGUARD_MAX = 360000.0;
-// Maximal count of sending configuration in queue
-const CFG_MAX_COUNT_SENDING_CFG = 5;
 
-// coordinates validation rules
+// Maximal geofence radius - the Earth radius, in meters.
+const CFG_EARTH_RADIUS = 6371009.0;
+
+// Minimal start time of repossesion, Unix timestamp
+// 31.03.2020 18:53:04 - TODO: adjust
+const CFG_MIN_TIMESTAMP = "1585666384";
+
+// validation rules for coordinates
 coordValidationRules <- [{"name":"lng",
                           "required":true,
                           "validationType":"float", 
@@ -47,7 +61,7 @@ coordValidationRules <- [{"name":"lng",
                           "highLim":90.0}];
 
 /**
- * Validation of the full or partial input configuration.
+ * Validation of the full or partial configuration.
  * 
  * @param {table} msg - Configuration table.
  *
@@ -159,7 +173,7 @@ function _rulesCheck(rules, cfgGroup) {
 }
 
 /**
- * Check and set agent log level
+ * Log level validation
  *
  * @param {table} logLevels - Table with the agent log level value.
  *        The table fields:
@@ -414,7 +428,7 @@ function _checkEnableField(cfgGroup) {
 }
 
 /**
- * Validation of the BLE device configuration.
+ * Validation of the generic BLE device configuration.
  * 
  * @param {table} bleDevices - Generic BLE device configuration table.
  *

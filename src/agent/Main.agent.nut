@@ -15,8 +15,11 @@
 // Main application on Imp-Agent:
 // - Forwards Data messages from Imp-Device to Cloud REST API
 // - Obtains GNSS Assist data for BG96 from server and returns it to Imp-Device
-// - Obtains the location by cell towers info using Google Maps Geolocation API
+// - Obtains the location by cell towers and wifi networks info using Google Maps Geolocation API
 //   and returns it to Imp-Device
+// - Implements REST API for the tracker configuration
+//   -- Sends cfg update request to Imp-Device
+//   -- Stores actual cfg received from from Imp-Device
 
 class Application {
     // Messenger instance
@@ -31,82 +34,15 @@ class Application {
      */
     constructor() {
         ::info("Application Version: " + APP_VERSION);
-        // init logger settings
+        // Initialize logger settings
         _initLoggerSettings();
         // Initialize library for communication with Imp-Device
         _initMsngr();
-        // Init configuration service
+        // Initialize configuration service
         _initCfgService();
     }
 
     // -------------------- PRIVATE METHODS -------------------- //
-
-    /**
-     * Create and initialize Messenger instance
-     */
-    function _initMsngr() {
-        _msngr = Messenger();
-        _msngr.on(APP_RM_MSG_NAME.DATA, _onData.bindenv(this));
-        _msngr.on(APP_RM_MSG_NAME.GNSS_ASSIST, _onGnssAssist.bindenv(this));
-        _msngr.on(APP_RM_MSG_NAME.LOCATION_CELL_WIFI, _onLocationCellAndWiFi.bindenv(this));
-    }
-
-    /**
-     * Handler for Data received from Imp-Device
-     */
-    function _onData(msg, customAck) {
-        ::debug("Data received from imp-device, msgId = " + msg.id);
-        local data = http.jsonencode(msg.data);
-
-        CloudClient.send(data)
-        .then(function(_) {
-            ::info("Data has been successfully sent to the cloud: " + data);
-        }.bindenv(this), function(err) {
-            ::error("Cloud reported an error while receiving data: " + err);
-            ::error("The data caused this error: " + data);
-        }.bindenv(this));
-    }
-
-    /**
-     * Handler for GNSS Assist request received from Imp-Device
-     */
-    function _onGnssAssist(msg, customAck) {
-        local ack = customAck();
-
-        LocationAssistant.getGnssAssistData()
-        .then(function(data) {
-            ::info("Assist data downloaded");
-            ack(data);
-        }.bindenv(this), function(err) {
-            ::error("Error during downloading assist data: " + err);
-            // Send `null` in reply to the request
-            ack(null);
-        }.bindenv(this));
-    }
-
-    /**
-     * Handler for Location By Cell Info and WiFi request received from Imp-Device
-     */
-    function _onLocationCellAndWiFi(msg, customAck) {
-        local ack = customAck();
-
-        LocationAssistant.getLocationByCellInfoAndWiFi(msg.data)
-        .then(function(location) {
-            ::info("Location obtained using Google Geolocation API");
-            ack(location);
-        }.bindenv(this), function(err) {
-            ::error("Error during location obtaining using Google Geolocation API: " + err);
-            ack(null);
-        }.bindenv(this));
-    }
-
-    /**
-     * Create and initialize configuration service instance
-     */
-    function _initCfgService() {
-        _rocky = Rocky();
-        _cfgService = CfgService(_msngr, _rocky);
-    }
 
     /**
      * Initialize Logger by settings from Imp-agent persistent memory
@@ -131,6 +67,83 @@ class Application {
                     " - is not equal to the stored one");
         }
     }
+
+    /**
+     * Create and initialize Messenger instance
+     */
+    function _initMsngr() {
+        _msngr = Messenger();
+        _msngr.on(APP_RM_MSG_NAME.DATA, _onData.bindenv(this));
+        _msngr.on(APP_RM_MSG_NAME.GNSS_ASSIST, _onGnssAssist.bindenv(this));
+        _msngr.on(APP_RM_MSG_NAME.LOCATION_CELL_WIFI, _onLocationCellAndWiFi.bindenv(this));
+    }
+
+    /**
+     * Create and initialize configuration service instance
+     */
+    function _initCfgService() {
+        _rocky = Rocky();
+        _cfgService = CfgService(_msngr, _rocky);
+    }
+
+    /**
+     * Handler for Data received from Imp-Device
+     *
+     * @param {table} msg - Received message payload.
+     * @param customAck - Custom acknowledgment function.
+     */
+    function _onData(msg, customAck) {
+        ::debug("Data received from imp-device, msgId = " + msg.id);
+        local data = http.jsonencode(msg.data);
+
+        CloudClient.send(data)
+        .then(function(_) {
+            ::info("Data has been successfully sent to the cloud: " + data);
+        }.bindenv(this), function(err) {
+            ::error("Cloud reported an error while receiving data: " + err);
+            ::error("The data caused this error: " + data);
+        }.bindenv(this));
+    }
+
+    /**
+     * Handler for GNSS Assist request received from Imp-Device
+     *
+     * @param {table} msg - Received message payload.
+     * @param customAck - Custom acknowledgment function.
+     */
+    function _onGnssAssist(msg, customAck) {
+        local ack = customAck();
+
+        LocationAssistant.getGnssAssistData()
+        .then(function(data) {
+            ::info("Assist data downloaded");
+            ack(data);
+        }.bindenv(this), function(err) {
+            ::error("Error during downloading assist data: " + err);
+            // Send `null` in reply to the request
+            ack(null);
+        }.bindenv(this));
+    }
+
+    /**
+     * Handler for Location By Cell Info and WiFi request received from Imp-Device
+     *
+     * @param {table} msg - Received message payload.
+     * @param customAck - Custom acknowledgment function.
+     */
+    function _onLocationCellAndWiFi(msg, customAck) {
+        local ack = customAck();
+
+        LocationAssistant.getLocationByCellInfoAndWiFi(msg.data)
+        .then(function(location) {
+            ::info("Location obtained using Google Geolocation API");
+            ack(location);
+        }.bindenv(this), function(err) {
+            ::error("Error during location obtaining using Google Geolocation API: " + err);
+            ack(null);
+        }.bindenv(this));
+    }
+
 }
 
 // ---------------------------- THE MAIN CODE ---------------------------- //
