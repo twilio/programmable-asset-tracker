@@ -2,10 +2,9 @@
 // Supported configuration JSON format/scheme version
 const CFG_SCHEME_VERSION = "1.0";
 
-// Configuration safeguard constants:
+// Configuration safeguard/validation constants:
 
-// TODO: move more numbers from the validation code to constants
-
+// "connectingPeriod"
 // How often the tracker connects to network (minimal value), in seconds.
 // TODO: adjust
 const CFG_CONNECTING_SAFEGUARD_MIN = 10.0;
@@ -13,6 +12,7 @@ const CFG_CONNECTING_SAFEGUARD_MIN = 10.0;
 // TODO: adjust
 const CFG_CONNECTING_SAFEGUARD_MAX = 360000.0;
 
+// "readingPeriod"
 // How often the tracker polls various data (minimal value), in seconds.
 // TODO: adjust
 const CFG_READING_SAFEGUARD_MIN = 10.0;
@@ -20,6 +20,7 @@ const CFG_READING_SAFEGUARD_MIN = 10.0;
 // TODO: adjust
 const CFG_READING_SAFEGUARD_MAX = 360000.0;
 
+// "locReadingPeriod"
 // How often the tracker obtains a location (minimal value), in seconds.
 // TODO: adjust
 const CFG_LOC_READING_SAFEGUARD_MIN = 10.0;
@@ -27,6 +28,43 @@ const CFG_LOC_READING_SAFEGUARD_MIN = 10.0;
 // TODO: adjust
 const CFG_LOC_READING_SAFEGUARD_MAX = 360000.0;
 
+// "motionMonitoring":
+
+// "movementAccMin", "movementAccMax"
+// Minimal acceleration for movement detection, in g.
+const CFG_MOVEMENT_ACC_SAFEGUARD_MIN = 0.1;
+// Maximal acceleration for movement detection, in g.
+const CFG_MOVEMENT_ACC_SAFEGUARD_MAX = 4.0;
+
+// "movementAccDur"
+// Minimal movement acceleration duration, in seconds.
+const CFG_MOVEMENT_ACC_DURATION_SAFEGUARD_MIN = 0.01;
+// Maximal movement acceleration duration, in seconds.
+const CFG_MOVEMENT_ACC_DURATION_SAFEGUARD_MAX = 1.27;
+
+// "motionTime"
+// Minimal motion time value, in seconds.
+const CFG_MOTION_TIME_SAFEGUARD_MIN = 1.0;
+// Maximal motion time value, in seconds.
+const CFG_MOTION_TIME_SAFEGUARD_MAX = 3600.0;
+
+// "motionVelocity"
+// Minimal motion velocity, in meter per second.
+const CFG_MOTION_VEL_SAFEGUARD_MIN = 0.1;
+// Maximal motion velocity, in meter per second.
+const CFG_MOTION_VEL_SAFEGUARD_MAX = 20.0;
+
+// "motionDistance"
+// Minimal distance to determine motion detection condition, in meters.
+const CFG_MOTION_DIST_SAFEGUARD_MIN = 0.5;
+// Maximal distance to determine motion detection condition, in meters.
+const CFG_MOTION_DIST_SAFEGUARD_MAX = 1000.0;
+// Valid motion distance value, outside of the range
+const CFG_MOTION_DIST_FIXED_VAL = 0.0;
+
+// "alerts":
+
+// "shockDetected"
 // Minimal shock acceleration alert threshold, in g.
 // 1 LSb = 16 mg @ FS = 2 g
 // 1 LSb = 32 mg @ FS = 4 g
@@ -36,90 +74,54 @@ const CFG_SHOCK_ACC_SAFEGUARD_MIN = 0.016;
 // Maximal shock acceleration alert threshold, in g.
 const CFG_SHOCK_ACC_SAFEGUARD_MAX = 16.0;
 
-// Minimal distance to determine motion detection condition, in meters.
-// TODO: adjust
-const CFG_MOTION_DIST_SAFEGUARD_MIN = 1.0;
-// Maximal distance to determine motion detection condition, in meters.
-// TODO: adjust
-const CFG_MOTION_DIST_SAFEGUARD_MAX = 1000.0;
+// "temperatureLow", "temperatureHigh"
+// Minimal temperature value, in degrees Celsius.
+const CFG_TEMPERATURE_THR_SAFEGUARD_MIN = -90.0;
+// Maximal temperature value, in degrees Celsius.
+const CFG_TEMPERATURE_THR_SAFEGUARD_MAX = 90.0;
+// Minimal temperature hysteresis, in degrees Celsius.
+const CFG_TEMPERATURE_HYST_SAFEGUARD_MIN = 0.1;
+// Maximal temperature hysteresis, in degrees Celsius.
+const CFG_TEMPERATURE_HYST_SAFEGUARD_MAX = 10.0;
 
-// Maximal geofence radius - the Earth radius, in meters.
-const CFG_GEOFENCE_RADIUS_SAFEGUARD_MIN = 0.0;
-// Maximal geofence radius - the Earth radius, in meters.
-const CFG_GEOFENCE_RADIUS_SAFEGUARD_MAX = 6371009.0;
-
-// Minimal start time of repossesion, Unix timestamp
-// 31.03.2020 18:53:04 - TODO: adjust
-const CFG_MIN_TIMESTAMP = "1585666384";
-
-// Minimal value of Earth longitude, in degrees.
-const CFG_LONGITUDE_SAFEGUARD_MIN = -180.0;
-// Maximal value of Earth longitude, in degrees.
-const CFG_LONGITUDE_SAFEGUARD_MAX = 180.0;
-
-// Minimal value of Earth longitude, in degrees.
-const CFG_LATITUDE_SAFEGUARD_MIN = -90.0;
-// Maximal value of Earth longitude, in degrees.
-const CFG_LATITUDE_SAFEGUARD_MAX = 90.0;
-
-// Minimal length of updateId field.
-// TODO: adjust
-const CFG_UPDATE_ID_LEN_SAFEGUARD_MIN = 1;
-// Maximal length of updateId field.
-// TODO: adjust
-const CFG_UPDATE_ID_LEN_SAFEGUARD_MAX = 50;
-
+// "batteryLow"
 // Minimal charge level, in percent.
 const CFG_CHARGE_LEVEL_THR_SAFEGUARD_MIN = 0.0;
 // Maximal charge level, in percent.
 const CFG_CHARGE_LEVEL_THR_SAFEGUARD_MAX = 100.0;
 
-// Minimal temperature value, in degrees Celsius.
-// TODO: adjust
-const CFG_TEMPERATURE_THR_SAFEGUARD_MIN = -45.0;
-// Maximal temperature value, in degrees Celsius.
-// TODO: adjust
-const CFG_TEMPERATURE_THR_SAFEGUARD_MAX = 85.0;
+// other:
 
-// Minimal temperature hysteresis, in degrees Celsius.
-// TODO: adjust
-const CFG_TEMPERATURE_HYST_SAFEGUARD_MIN = 1.0;
-// Maximal temperature hysteresis, in degrees Celsius.
-// TODO: adjust
-const CFG_TEMPERATURE_HYST_SAFEGUARD_MAX = 10.0;
+// "lng"
+// Minimal value of Earth longitude, in degrees.
+const CFG_LONGITUDE_SAFEGUARD_MIN = -180.0;
+// Maximal value of Earth longitude, in degrees.
+const CFG_LONGITUDE_SAFEGUARD_MAX = 180.0;
 
-// Minimal length of updateId field
-// TODO: adjust
-const CFG_AFTER_FIELD_LEN_SAFEGUARD_MIN = 1;
-// Maximal length of updateId field
-// TODO: adjust
-const CFG_AFTER_FIELD_LEN_SAFEGUARD_MAX = 50;
+// "lat"
+// Minimal value of Earth latitude, in degrees.
+const CFG_LATITUDE_SAFEGUARD_MIN = -90.0;
+// Maximal value of Earth latitude, in degrees.
+const CFG_LATITUDE_SAFEGUARD_MAX = 90.0;
 
-// Minimal motion velocity, in meter per second.
-const CFG_MOTION_VEL_SAFEGUARD_MIN = 0.1;
-// Maximal motion velocity, in meter per second.
-const CFG_MOTION_VEL_SAFEGUARD_MAX = 10.0;
+// "radius"
+// Maximal geofence radius - the Earth radius, in meters.
+const CFG_GEOFENCE_RADIUS_SAFEGUARD_MIN = 0.0;
+// Maximal geofence radius - the Earth radius, in meters.
+const CFG_GEOFENCE_RADIUS_SAFEGUARD_MAX = 6371009.0;
 
-// Minimal motion time value, in seconds.
-const CFG_MOTION_TIME_SAFEGUARD_MIN = 0.01;
-// Maximal motion time value, in seconds.
-const CFG_MOTION_TIME_SAFEGUARD_MAX = 3600.0;
-
-// Minimal motion velocity, in g.
-const CFG_MOVEMENT_ACC_SAFEGUARD_MIN = 0.1;
-// Maximal motion velocity, in g.
-const CFG_MOVEMENT_ACC_SAFEGUARD_MAX = 4.0;
-
-// Minimal movement acceleration duration, in seconds.
-const CFG_MOVEMENT_ACC_DURATION_SAFEGUARD_MIN = 0.01;
-// Maximal movement acceleration duration, in seconds.
-const CFG_MOVEMENT_ACC_DURATION_SAFEGUARD_MAX = 1.27;
-
-// Valid single value of motion distance
-const CFG_MOTION_DIST_FIXED_VAL = 0.0;
+// "after"
+// Minimal start time of repossesion, Unix timestamp
+// 31.03.2020 18:53:04 - TODO: adjust
+const CFG_MIN_TIMESTAMP = "1585666384";
 
 // Maximal value of iBeacon minor, major
 const CFG_BEACON_MINOR_MAJOR_VAL_MAX = 65535;
+
+// Minimal length of a string.
+const CFG_STRING_LENGTH_MIN = 1;
+// Maximal length of a string.
+const CFG_STRING_LENGTH_MAX = 50;
 
 // validation rules for coordinates
 coordValidationRules <- [{"name":"lng",
@@ -292,8 +294,8 @@ function _validateIndividualField(conf) {
     validationRules.append({"name":"updateId",
                             "required":true,
                             "validationType":"string",
-                            "minLen":CFG_UPDATE_ID_LEN_SAFEGUARD_MIN,
-                            "maxLen":CFG_UPDATE_ID_LEN_SAFEGUARD_MAX});
+                            "minLen":CFG_STRING_LENGTH_MIN,
+                            "maxLen":CFG_STRING_LENGTH_MAX});
     local rulesCheckRes = _rulesCheck(validationRules, conf);
     if (rulesCheckRes != null) return rulesCheckRes;
 
@@ -468,8 +470,8 @@ function _validateLocTracking(locTracking) {
         validationRules.append({"name":"after",
                                 "required":true,
                                 "validationType":"string", 
-                                "minLen":CFG_AFTER_FIELD_LEN_SAFEGUARD_MIN,
-                                "maxLen":CFG_AFTER_FIELD_LEN_SAFEGUARD_MAX,
+                                "minLen":CFG_STRING_LENGTH_MIN,
+                                "maxLen":CFG_STRING_LENGTH_MAX,
                                 "minTimeStamp": CFG_MIN_TIMESTAMP});
         rulesCheckRes = _rulesCheck(validationRules, repossession);
         if (rulesCheckRes != null) return rulesCheckRes;

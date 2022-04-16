@@ -21,9 +21,9 @@ class CfgService {
     _rocky = null;
     // HTTP Authorization 
     _authHeader = null;
-    // Cfg update which waits for successful delivering to the imp-device
+    // Cfg update ("configuration") which waits for successful delivering to the imp-device
     _pendingCfg = null;
-    // Cfg update which is being sent to the imp-device, 
+    // Cfg update ("configuration") which is being sent to the imp-device, 
     // also behaves as "sending in process" flag
     _sendingCfg = null;
     // Timer to re-check connection with imp-device
@@ -124,7 +124,7 @@ class CfgService {
             reportToCloud = _reportedCfg;
         } else {
             // No cfg data from the imp-device exists.
-            // Add empty "description" and "agentConfiguration" fields.
+            // Add empty "description" fields.
             reportToCloud = { "description": {} };
             ::info("No cfg data from imp-device is available", "@{CLASS_NAME}");
         }            
@@ -142,12 +142,12 @@ class CfgService {
         //     }
         //   }
         // }
-        reportToCloud.agentConfiguration <- {"debug" : {}};
         reportToCloud.description.trackerId <- imp.configparams.deviceid;
         reportToCloud.description.cfgSchemeVersion <- CFG_SCHEME_VERSION;
         if (_pendingCfg != null) {
-            reportToCloud.description.pendingUpdateId <- _pendingCfg.configuration.updateId;
+            reportToCloud.description.pendingUpdateId <- _pendingCfg.updateId;
         }
+        reportToCloud.agentConfiguration <- {"debug" : {}};
         reportToCloud.agentConfiguration.debug.logLevel <- Logger.getLogLevelStr().toupper();
 
         ::debug("Cfg reported to cloud: " + 
