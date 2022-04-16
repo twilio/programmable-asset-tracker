@@ -22,9 +22,6 @@ class MotionMonitor {
     // Location driver object
     _ld = null;
 
-    // New location callback function
-    _newLocCb = null;
-
     // Motion event callback function
     _motionEventCb = null;
 
@@ -43,7 +40,7 @@ class MotionMonitor {
     // Motion stop assumption
     _motionStopAssumption = false;
 
-    // Moton state
+    // Motion state: true (in motion) / false (not in motion) / null (feature disabled)
     _inMotion = null;
 
     // Current location
@@ -73,7 +70,7 @@ class MotionMonitor {
     // enable/disable flag
     _geofenceEnabled = false;
 
-    // in zone or not
+    // Geofence state: true (in zone) / false (out of zone) / null (feature disabled)
     _inGeofenceZone = null;
 
     /**
@@ -119,24 +116,17 @@ class MotionMonitor {
         return Promise.resolve(null);
     }
 
-    /**
-     *  Set new location callback function.
-     *  @param {function | null} locCb - The callback will be called every time the new location is received (null - disables the callback)
-     *                 locCb(loc), where
-     *                 @param {table} loc - Location information
-     *                      The fields:
-     *                          "timestamp": {integer}  - The number of seconds that have elapsed since midnight on 1 January 1970.
-     *                               "type": {string}   - "gnss", "cell", "wifi", "ble"
-     *                           "accuracy": {integer}  - Accuracy in meters
-     *                          "longitude": {float}    - Longitude in degrees
-     *                           "latitude": {float}    - Latitude in degrees
-     */
-    function setNewLocationCb(locCb) {
-        if (typeof locCb == "function" || locCb == null) {
-            _newLocCb = locCb;
-        } else {
-            ::error("Argument not a function or null", "@{CLASS_NAME}");
-        }
+    // TODO: Comment
+    function getStatus() {
+        local res = {
+            "flags": {},
+            "location": clone _curLoc
+        };
+
+        (_inMotion != null) && (res.flags.inMotion <- _inMotion);
+        (_inGeofenceZone != null) && (res.flags.inGeofence <- _inGeofenceZone);
+
+        return res;
     }
 
     /**
@@ -191,21 +181,27 @@ class MotionMonitor {
         local reEnable =  _motionMonitoringEnabled && enabledParam != false && newDetectMotionParams;
         local disable  =  _motionMonitoringEnabled && enabledParam == false;
 
-        // TODO: Should we do something else when enabling/disabling it? Reset everything?
         if (reEnable || enable) {
             ::debug("(Re)enabling motion monitoring..", "@{CLASS_NAME}");
+
             _inMotion = false;
             _motionStopAssumption = false;
             _motionMonitoringEnabled = true;
+
             // Enable (or re-enable) motion detection
             _ad.detectMotion(_onAccelMotionDetected.bindenv(this), _accelDetectMotionParams);
         } else if (disable) {
             ::debug("Disabling motion monitoring..", "@{CLASS_NAME}");
+
             _inMotion = null;
             _motionStopAssumption = false;
             _motionMonitoringEnabled = false;
+
             // Disable motion detection
             _ad.detectMotion(null);
+            // Cancel the timer for location reading because if we don't detect motion, we don't read location
+            // TODO: This will be changed once alwayOn feature is implemented
+            _locReadingTimer && imp.cancelwakeup(_locReadingTimer);
         }
     }
 
@@ -251,13 +247,15 @@ class MotionMonitor {
             // motion stop is confirmed
             _inMotion = false;
             _motionStopAssumption = false;
-            if (_motionEventCb) {
-                _motionEventCb(false);
-            }
+            _motionEventCb && _motionEventCb(false);
         } else {
             // read location and, after that, check if it is the same as the previous one
             _locReading()
             .finally(function(_) {
+                if (!_motionMonitoringEnabled) {
+                    return;
+                }
+
                 _checkMotionStop();
 
                 // Calculate the delay for the timer according to the time spent on location reading and etc.
@@ -286,7 +284,6 @@ class MotionMonitor {
             _locReadingPromise = null;
             _curLoc = loc;
             _curLocFresh = true;
-            _newLocCb && _newLocCb(_curLoc);
             _procGeofence(loc);
         }.bindenv(this), function(_) {
             _locReadingPromise = null;
@@ -319,13 +316,13 @@ class MotionMonitor {
                 // still in motion
                 if (!_inMotion) {
                     _inMotion = true;
-                    _motionEventCb && _motionEventCb(_inMotion);
+                    _motionEventCb && _motionEventCb(true);
                 }
             }
         }
 
         if (!_curLocFresh && !_prevLocFresh) {
-            // the location has not been determined two times in a raw,
+            // the location has not been determined two times in a row,
             // need to double check the motion
             _motionStopAssumption = true;
         }
@@ -346,8 +343,9 @@ class MotionMonitor {
 
             // start reading location
             _locReading();
-            _motionEventCb && _motionEventCb(_inMotion);
+            _motionEventCb && _motionEventCb(true);
 
+            // TODO: What if _locReadingPeriod is less than the time to get the location?
             _locReadingTimer && imp.cancelwakeup(_locReadingTimer);
             _locReadingTimer = imp.wakeup(_locReadingPeriod, _locReadingTimerCb.bindenv(this));
         }

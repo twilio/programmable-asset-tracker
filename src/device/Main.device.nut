@@ -117,7 +117,7 @@ class Application {
             // Create and initialize Motion Monitor
             _motionMon = MotionMonitor(_accelDriver, _locationDriver);
             // Create and initialize Data Processor
-            _dataProc = DataProcessor(_motionMon, _accelDriver, _thermoSensDriver, null, _locationDriver);
+            _dataProc = DataProcessor(_motionMon, _accelDriver, _thermoSensDriver, null);
             // Create and initialize Cfg Manager
             _cfgManager = CfgManager([_motionMon, _dataProc]);
             // Start Cfg Manager

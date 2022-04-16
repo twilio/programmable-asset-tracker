@@ -56,15 +56,6 @@ class DataProcessor {
     // Last temperature value
     _curTemper = DP_INIT_TEMPER_VALUE;
 
-    // Last location
-    _currentLocation = null;
-
-    // Motion state: true (in motion) / false (not in motion) / null (feature disabled)
-    _inMotion = null;
-
-    // Geofence state: true (in zone) / false (out of zone) / null (feature disabled)
-    _inGeofence = null;
-
     // Last battery level
     _curBatteryLev = DP_INIT_BATTERY_LEVEL;
 
@@ -86,20 +77,11 @@ class DataProcessor {
      *  @param {object} accelDriver - Accelerometer driver object.
      *  @param {object} temperDriver - Temperature sensor driver object.
      *  @param {object} batDriver - Battery driver object.
-     *  @param {object} locDriver - Location driver object.
      */
-    constructor(motionMon, accelDriver, temperDriver, batDriver, locDriver) {
+    constructor(motionMon, accelDriver, temperDriver, batDriver) {
         _ad = accelDriver;
         _mm = motionMon;
         _ts = temperDriver;
-
-        _currentLocation = locDriver.lastKnownLocation() || {
-            "timestamp": 0,
-            "type": "gnss",
-            "accuracy": MM_EARTH_RAD,
-            "longitude": INIT_LONGITUDE,
-            "latitude": INIT_LATITUDE
-        };
 
         _allAlerts = {
             // TODO: Do we need alerts like trackerReset, trackerReconfigured?
@@ -129,9 +111,6 @@ class DataProcessor {
     function start(cfg) {
         updateCfg(cfg);
 
-        // TODO: Required? Maybe just ask motionMon for the location every time?
-        // TODO: Replace these 3 callbacks with one? And make a method for asking for motion/geofence/location status?
-        _mm.setNewLocationCb(_onNewLocation.bindenv(this));
         _mm.setMotionEventCb(_onMotionEvent.bindenv(this));
         _mm.setGeofencingEventCb(_onGeofencingEvent.bindenv(this));
 
@@ -141,7 +120,7 @@ class DataProcessor {
     // TODO: Comment
     function updateCfg(cfg) {
         _updCfgAlerts(cfg);
-        _updCfgMotionAndGeofence(cfg);
+        // This call will trigger data reading/sending. So it should be the last one
         _updCfgGeneral(cfg);
 
         return Promise.resolve(null);
@@ -185,35 +164,6 @@ class DataProcessor {
             _batteryState = DP_BATTERY_VOLT_LEVEL.V_IN_RANGE;
             _allAlerts.batteryLow = false;
             mixTables(batteryLowCfg, _alertsSettings.batteryLow);
-        }
-    }
-
-    function _updCfgMotionAndGeofence(cfg) {
-        // TODO: It may be not good that we have to analyze _inMotion/_inGeofence and motionMonitoring/geofence cfg in this module.
-        //       Maybe it's better to redesign this somehow
-
-        // It's assumed that when motion monitoring feature becomes enabled, the device is not in motion.
-        // So, we set _inMotion = false when the feature becomes enabled. The _inMotion status will be sent to the cloud
-        // when the next message will be prepared and sent
-        local motionMonitoringEnabled = getValFromTable(cfg, "locationTracking/motionMonitoring/enabled");
-
-        // TODO: BUG! If _inMotion was true and we reenabled the motion mon, we need to reset it to false
-        if (_inMotion == null && motionMonitoringEnabled == true) {
-            // Motion monitoring has just been enabled
-            _inMotion = false;
-        } else if (_inMotion != null && motionMonitoringEnabled == false) {
-            // Motion monitoring has just been disabled
-            _inMotion = null;
-        }
-
-        // It's assumed that when geofence feature becomes enabled, it's not immediately known if the device is in or out of the zone.
-        // So, we don't set _inGeofence = true/false when the feature becomes enabled. The _inGeofence status will be sent to the cloud
-        // only when it's determined where the device is
-        local geofenceEnabled = getValFromTable(cfg, "locationTracking/geofence/enabled");
-
-        if (_inGeofence != null && geofenceEnabled == false) {
-            // Geofence has just been disabled
-            _inGeofence = null;
         }
     }
 
@@ -275,20 +225,18 @@ class DataProcessor {
         }
         local alertsCount = alerts.len();
 
-        local status = {};
-        (_inMotion != null) && (status.inMotion <- _inMotion);
-        (_inGeofence != null) && (status.inGeofence <- _inGeofence);
+        local status = _mm.getStatus();
 
         _dataMesg = {
             "trackerId": hardware.getdeviceid(),
             "timestamp": time(),
-            "status": status,
+            "status": status.flags,
             "location": {
-                "timestamp": _currentLocation.timestamp,
-                "type": _currentLocation.type,
-                "accuracy": _currentLocation.accuracy,
-                "lng": _currentLocation.longitude,
-                "lat": _currentLocation.latitude
+                "timestamp": status.location.timestamp,
+                "type": status.location.type,
+                "accuracy": status.location.accuracy,
+                "lng": status.location.longitude,
+                "lat": status.location.latitude
             },
             "sensors": {
                 // Send 0 degrees of Celsius if thermosensor error
@@ -327,6 +275,7 @@ class DataProcessor {
         local res = _ts.read();
         if ("error" in res) {
             ::error("Failed to read temperature: " + res.error, "@{CLASS_NAME}");
+            // TODO: Don't generate a temperatureLow alert and don't send temperature to the cloud
             _curTemper = DP_INIT_TEMPER_VALUE;
         } else {
             _curTemper = res.temperature;
@@ -397,24 +346,6 @@ class DataProcessor {
     }
 
     /**
-     *  The handler is called when a new location is received.
-     *  @param {table} loc - Location information.
-     *      The fields:
-     *          "timestamp": {integer}  - Time value
-     *               "type": {string}   - gnss or cell e.g.
-     *           "accuracy": {integer}  - Accuracy in meters
-     *          "longitude": {float}    - Longitude in degrees
-     *           "latitude": {float}    - Latitude in degrees
-     */
-    function _onNewLocation(loc) {
-        if (loc && typeof loc == "table") {
-            _currentLocation = loc;
-        } else {
-            ::error("Error type of location value", "@{CLASS_NAME}");
-        }
-    }
-
-    /**
      *  The handler is called when a new battery level is received.
      *  @param {float} lev - Сharge level in percent.
      */
@@ -443,13 +374,9 @@ class DataProcessor {
     function _onMotionEvent(eventType) {
         if (eventType) {
             _allAlerts.motionStarted = true;
-            _inMotion = true;
-
             ledIndication && ledIndication.indicate(LI_EVENT_TYPE.ALERT_MOTION_STARTED);
         } else {
             _allAlerts.motionStopped = true;
-            _inMotion = false;
-
             ledIndication && ledIndication.indicate(LI_EVENT_TYPE.ALERT_MOTION_STOPPED);
         }
 
@@ -463,10 +390,8 @@ class DataProcessor {
     function _onGeofencingEvent(eventType) {
         if (eventType) {
             _allAlerts.geofenceEntered = true;
-            _inGeofence = true;
         } else {
             _allAlerts.geofenceExited = true;
-            _inGeofence = false;
         }
 
         _dataProc();
