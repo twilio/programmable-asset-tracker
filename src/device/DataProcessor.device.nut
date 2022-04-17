@@ -238,13 +238,12 @@ class DataProcessor {
                 "lng": status.location.longitude,
                 "lat": status.location.latitude
             },
-            "sensors": {
-                // Send 0 degrees of Celsius if thermosensor error
-                "temperature": _curTemper == DP_INIT_TEMPER_VALUE ? 0 : _curTemper
-            },
+            "sensors": {},
             "alerts": alerts
         };
-
+        if (_curTemper != DP_INIT_TEMPER_VALUE) {
+            _dataMesg.sensors.temperature <- _curTemper;
+        }
         ::debug("Message: " + JSONEncoder.encode(_dataMesg), "@{CLASS_NAME}");
 
         if (alertsCount > 0) {
@@ -275,8 +274,9 @@ class DataProcessor {
         local res = _ts.read();
         if ("error" in res) {
             ::error("Failed to read temperature: " + res.error, "@{CLASS_NAME}");
-            // TODO: Don't generate a temperatureLow alert and don't send temperature to the cloud
+            // Don't generate a temperatureLow alert and don't send temperature to the cloud
             _curTemper = DP_INIT_TEMPER_VALUE;
+            return;
         } else {
             _curTemper = res.temperature;
             ::debug("Temperature: " + _curTemper, "@{CLASS_NAME}");
