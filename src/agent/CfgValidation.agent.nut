@@ -56,7 +56,7 @@ const CFG_MOTION_VEL_SAFEGUARD_MAX = 20.0;
 
 // "motionDistance"
 // Minimal distance to determine motion detection condition, in meters.
-const CFG_MOTION_DIST_SAFEGUARD_MIN = 0.5;
+const CFG_MOTION_DIST_SAFEGUARD_MIN = 0.1;
 // Maximal distance to determine motion detection condition, in meters.
 const CFG_MOTION_DIST_SAFEGUARD_MAX = 1000.0;
 // Valid motion distance value, outside of the range
