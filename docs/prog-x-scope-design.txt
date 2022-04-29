@@ -1,4 +1,4 @@
-ver 2022-04-09
+ver 2022-04-29
 
 Prog-X: scope
 ------------------
@@ -344,9 +344,11 @@ JSON format:
                                     // [MOTION_TIME_SAFEGUARD_MIN..MOTION_TIME_SAFEGUARD_MAX]
       "motionVelocity": <number>,   // minimum instantaneous velocity to determine motion detection condition, in meters per second,
                                     // [MOTION_VEL_SAFEGUARD_MIN..MOTION_VEL_SAFEGUARD_MAX]
-      "motionDistance": <number>    // minimum movement distance to determine motion detection condition, in meters,
+      "motionDistance": <number>,   // minimum movement distance to determine motion detection condition, in meters,
                                     // [0, MOTION_DIST_SAFEGUARD_MIN..MOTION_DIST_SAFEGUARD_MAX]
                                     // (if 0, distance is not calculated, ie. not used for motion detection)
+      "motionStopTimeout": <number> // timeout to confirm motion stop, in seconds,
+                                    // [MOTION_STOP_SAFEGUARD_MIN..MOTION_STOP_SAFEGUARD_MAX]
     },
 
     "repossessionMode": {         // location obtaining activation after some date
