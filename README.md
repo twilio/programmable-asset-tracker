@@ -13,7 +13,7 @@ This version supports:
   - [Espressif ESP32 Series WiFi and Bluetooth chipset](https://www.espressif.com/en/products/socs/esp32) with [ESP-AT](https://docs.espressif.com/projects/esp-at/en/latest/esp32/) version [v2.2.0.0_esp32](https://github.com/espressif/esp-at/releases/tag/v2.2.0.0_esp32). Tested with [Mikroe WiFi BLE Click board](https://www.mikroe.com/wifi-ble-click) (ESP32-WROOM-32 module). See [esp32_readme](./esp32/esp32_readme.md)
 - Communication with the Internet (between Imp-Device and Imp-Agent) via cellular network.
 - Default configuration of the asset tracker application is hardcoded in the source file.
-- The configuration can be update in runtime using the [Southbound REST API](./docs/southbound-api.md)
+- The configuration can be updated in runtime using the [Southbound REST API](./docs/southbound-api.md)
 - Motion start detection using Accelerometer.
 - Motion stop detection using Location tracking (+ Accelerometer for confirmation).
 - Periodic Location tracking by:
@@ -36,7 +36,7 @@ This version supports:
   - Geofence Entered
   - Geofence Exited
   - Battery Low
-  - Repossession Mode Activated ???
+  - Repossession Mode Activated
 - Staying offline most of time. Connect to the Internet (from Imp-device to Imp-Agent) when required only. Internet connection is used for:
   - Data/alerts sending
   - GNSS Assist data obtaining
@@ -75,7 +75,8 @@ Should be passed to [Builder](https://github.com/electricimp/Builder/):
 - or using `--use-directives <path_to_json_file>` option, where the json file contains the variables with the values.
 
 Variables:
-- `ERASE_FLASH` - Enable (`1`) / disable (`0`) erasing SPI flash used by the application, once after the new application build is deployed. Optional. Default: **disabled**. Note, it can be used, for example, to delete the application configuration previously saved in the flash.
+- `ERASE_MEMORY` - Enable (`1`) / disable (`0`) erasing persistent memory used by the application, once after the new application build is deployed. Optional. Default: **disabled**. Note, it can be used, for example, to delete the application configuration previously saved in the flash.<br>
+**Note:** Currrently, only SPI flash of the Imp-device is erased by this feature.
 - `LOGGER_LEVEL` - Set logging level ("ERROR", "INFO", "DEBUG") on Imp-Agent/Device which works after the application restart till the application configuration is applied. Optional. Default: **"INFO"**. Note, when the application configuration is applied, the logging level is set according to the configuration. The logging level can be changed in runtime by updating the configuration.
 - `UART_LOGGING` - Enable (`1`) / disable (`0`) [UART logging](#uart-logging) on Imp-Device. Optional. Default: **enabled**
 - `LED_INDICATION` - Enable (`1`) / disable (`0`) [LED indication](#led-indication) of events. Optional. Default: **enabled**
