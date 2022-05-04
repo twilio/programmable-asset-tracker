@@ -41,6 +41,7 @@ This version supports:
   - Data/alerts sending
   - GNSS Assist data obtaining
   - Location obtaining by cellular towers and WiFi networks information
+  - Reporting the actual device configuration
 - If no/bad cellular network, saving messages in the flash and re-sending them later.
 - Sending data/alerts from Imp-Agent to a cloud with the predefined [Northbound REST API](./docs/northbound-api.md)
 - Emergency (recovery) mode.
