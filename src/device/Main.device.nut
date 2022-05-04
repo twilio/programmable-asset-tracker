@@ -14,6 +14,10 @@
 #require "UbxMsgParser.lib.nut:2.0.1"
 #require "UBloxAssistNow.device.lib.nut:0.1.0"
 
+@if MAX17055 || !defined(MAX17055)
+#require "MAX17055.device.lib.nut:1.0.2"
+@endif
+
 @include once "../shared/Version.shared.nut"
 @include once "../shared/Constants.shared.nut"
 @include once "../shared/Logger/Logger.shared.nut"
@@ -36,25 +40,21 @@
 @include once "BG96CellInfo.device.nut"
 @include once "ESP32Driver.device.nut"
 @include once "AccelerometerDriver.device.nut"
+@include once "BatteryMonitor.device.nut"
+@include once "LocationMonitor.device.nut"
 @include once "MotionMonitor.device.nut"
 @include once "DataProcessor.device.nut"
-
-@if BG96_GNSS
-@include once "LocationDriverBG96.device.nut"
-@else
 @include once "LocationDriver.device.nut"
-@endif
 
 // Main application on Imp-Device: does the main logic of the application
 
 // Connection Manager configuration constants:
 // Maximum time allowed for the imp to connect to the server before timing out, in seconds
 const APP_CM_CONNECT_TIMEOUT = 180.0;
-// TODO: Reduce these values for the release-version
 // Delay before automatic disconnection if there are no connection consumers, in seconds
-const APP_CM_AUTO_DISC_DELAY = 1000.0;
+const APP_CM_AUTO_DISC_DELAY = 10.0;
 // Maximum time allowed for the imp to be connected to the server, in seconds
-const APP_CM_MAX_CONNECTED_TIME = 3000.0;
+const APP_CM_MAX_CONNECTED_TIME = 300.0;
 
 // Replay Messenger configuration constants:
 // The maximum message send rate,
@@ -71,6 +71,8 @@ class Application {
     _locationDriver = null;
     _accelDriver = null;
     _cfgManager = null;
+    _batteryMon = null;
+    _locationMon = null;
     _motionMon = null;
     _dataProc = null;
     _thermoSensDriver = null;
@@ -79,7 +81,7 @@ class Application {
      * Application Constructor
      */
     constructor() {
-@if ERASE_FLASH
+@if ERASE_MEMORY
         pm.isNewDeployment() && _eraseFlash();
 @endif
 
@@ -104,29 +106,35 @@ class Application {
         // Create and intialize Replay Messenger
         _initReplayMessenger()
         .then(function(_) {
+            HW_SHARED_I2C.configure(CLOCK_SPEED_400_KHZ);
+
+            _batteryMon = BatteryMonitor(HW_SHARED_I2C);
+            return _batteryMon.init();
+        }.bindenv(this))
+        .then(function(_) {
             // Create and initialize Location Driver
             _locationDriver = LocationDriver();
 
             // Create and initialize Accelerometer Driver
-            _accelDriver = AccelerometerDriver(HW_ACCEL_I2C, HW_ACCEL_INT_PIN);
+            _accelDriver = AccelerometerDriver(HW_SHARED_I2C, HW_ACCEL_INT_PIN);
 
             // Create and initialize Thermosensor Driver
-            _thermoSensDriver = HTS221(HW_TEMPHUM_SENSOR_I2C);
+            _thermoSensDriver = HTS221(HW_SHARED_I2C);
             _thermoSensDriver.setMode(HTS221_MODE.ONE_SHOT);
 
+            // Create and initialize Location Monitor
+            _locationMon = LocationMonitor(_locationDriver);
             // Create and initialize Motion Monitor
-            _motionMon = MotionMonitor(_accelDriver, _locationDriver);
+            _motionMon = MotionMonitor(_accelDriver, _locationMon);
             // Create and initialize Data Processor
-            _dataProc = DataProcessor(_motionMon, _accelDriver, _thermoSensDriver, null);
+            _dataProc = DataProcessor(_locationMon, _motionMon, _accelDriver, _thermoSensDriver, _batteryMon);
             // Create and initialize Cfg Manager
-            _cfgManager = CfgManager([_motionMon, _dataProc]);
+            _cfgManager = CfgManager([_locationMon, _motionMon, _dataProc]);
             // Start Cfg Manager
             _cfgManager.start();
-        }.bindenv(this), function(err) {
-            ::error("Replay Messenger initialization error: " + err);
         }.bindenv(this))
         .fail(function(err) {
-            ::error("Error during initialization of business logic modules: " + err);
+            ::error("Error during initialization: " + err);
 
             // TODO: Reboot after a delay? Or enter the emergency mode?
         }.bindenv(this));

@@ -231,12 +231,6 @@ class AccelerometerDriver {
     // pin connected to accelerometer int1 (interrupt check)
     _intPin = null;
 
-    // accelerometer I2C address
-    _addr = null;
-
-    // I2C is connected to
-    _i2c  = null;
-
     // accelerometer object
     _accel = null;
 
@@ -336,13 +330,10 @@ class AccelerometerDriver {
 
         _motionState = ACCEL_MOTION_STATE.DISABLED;
 
-        _i2c = i2c;
-        _addr = addr;
         _intPin = intPin;
 
         try {
-            _i2c.configure(CLOCK_SPEED_400_KHZ);
-            _accel = LIS3DH(_i2c, _addr);
+            _accel = LIS3DH(i2c, addr);
             _accel.reset();
             local range = _accel.setRange(ACCEL_RANGE);
             ::info(format("Accelerometer range +-%d g", range), "@{CLASS_NAME}");
@@ -356,6 +347,7 @@ class AccelerometerDriver {
             _accel.configureFifo(true, LIS3DH_FIFO_STREAM_TO_FIFO_MODE);
             _accel.getInterruptTable();
             _accel.configureInterruptLatching(false);
+            // TODO: Disable the pin when it's not in use to save power?
             _intPin.configure(DIGITAL_IN_WAKEUP, _checkInt.bindenv(this));
             _accel._getReg(LIS2DH12_REFERENCE);
             ::debug("Accelerometer configured", "@{CLASS_NAME}");
@@ -417,8 +409,7 @@ class AccelerometerDriver {
     /**
      * Enables or disables a one-time motion detection.
      * If enabled, the specified callback is called only once when the motion condition is detected,
-     * after that the detection is automatically disabled and
-     * (if needed) should be explicitly re-enabled again.
+     * after that the detection is automatically disabled and (if needed) should be explicitly re-enabled again.
      * @param {function} motionCb - Callback to be called once when the motion condition is detected.
      *        The callback has no parameters. If null or not a function, the motion detection is disabled.
      *        Otherwise, the motion detection is (re-)enabled for the provided motion condition.

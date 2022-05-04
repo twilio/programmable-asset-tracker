@@ -62,6 +62,7 @@ class LocationDriver {
      * Constructor for Location Driver
      */
     constructor() {
+        // TODO: Disable UART when it's not in use to save power
         _ubxDriver = UBloxM8N(HW_UBLOX_UART);
         local ubxSettings = {
             "baudRate"     : LD_UBLOX_UART_BAUDRATE,
@@ -100,6 +101,7 @@ class LocationDriver {
     // NOTE: This class only stores a reference to the object with BLE devices.
     // If this object is changed outside this class, this class will have the updated version of the object
     function configureBLEDevices(enabled = null, knownBLEDevices = null) {
+        // TODO: Convert all letters to small
         knownBLEDevices && (_knownBLEDevices = knownBLEDevices);
 
         if (enabled && !_knownBLEDevices) {
@@ -305,7 +307,6 @@ class LocationDriver {
      * - rejects with an error if the operation failed
      */
     function _getLocationBLEDevices() {
-        ::debug("Getting location using BLE devices..", "@{CLASS_NAME}");
         // Default accuracy
         const LD_BLE_BEACON_DEFAULT_ACCURACY = 10;
 
@@ -313,6 +314,8 @@ class LocationDriver {
             // Reject with null to indicate that the feature is disabled
             return Promise.reject(null);
         }
+
+        ::debug("Getting location using BLE devices..", "@{CLASS_NAME}");
 
         local knownGeneric = _knownBLEDevices.generic;
         local knownIBeacons = _knownBLEDevices.iBeacon;
@@ -355,6 +358,7 @@ class LocationDriver {
 
             ::info("Got location using BLE devices", "@{CLASS_NAME}");
             ::debug("The closest BLE device with known location: " + closestDevice.address, "@{CLASS_NAME}");
+            ::debug(recognized[closestDevice], "@{CLASS_NAME}");
 
             return {
                 "timestamp": time(),
@@ -495,7 +499,8 @@ class LocationDriver {
         data.seek(packetStartIdx + LD_IBEACON_PREFIX.len());
 
         return {
-            "uuid": data.readblob(16).tostring(),
+            // Get a string like "74d2515660e6444ca177a96e67ecfc5f" without "0x" prefix
+            "uuid": utilities.blobToHexString(data.readblob(16)).slice(2),
             // We convert them to strings here just for convenience - these values are strings in the table (JSON) of known BLE devices
             "major": ((data.readn('b') << 8) | data.readn('b')).tostring(),
             "minor": ((data.readn('b') << 8) | data.readn('b')).tostring(),
@@ -808,7 +813,7 @@ class LocationDriver {
     }
 
     // TODO: Comment
-    function _erase(fileName = CFGM_CFG_FILE_NAME) {
+    function _erase(fileName) {
         try {
             // Erase the existing file if any
             _storage.fileExists(fileName) && _storage.eraseFile(fileName);

@@ -10,85 +10,92 @@
 // curl -u test:test -k --data '@cfg.json' -H "content-type: application/json" -X PATCH https://agent.electricimp.com/D7u-IqX1x6j1/cfg
 // get configuration example:
 // curl -u test:test -k -X GET https://agent.electricimp.com/D7u-IqX1x6j1/cfg
-// set agent debug level:
-// curl -u test:test -k --data '{"debug":{"agentLogLevel":"DEBUG"}}' -H "content-type: application/json" -X PATCH https://agent.electricimp.com/D7u-IqX1x6j1/cfg
 
 // cfg.json example:
 // {
-// "configuration": {
-// "updateId": "123567878990",
-// "locationTracking": {
-//     "locReadingPeriod": 300.0,
-//     "alwaysOn": false,
-//     "motionMonitoring": {
-//       "enabled": true,
-//       "movementAccMin": 0.1,
-//       "movementAccMax": 0.4,
-//       "movementAccDur": 0.6,
-//       "motionTime": 10.0,
-//       "motionVelocity": 5.0,
-//       "motionDistance": 0.0
-//     },
-//     "repossessionMode": {
-//       "enabled": true,
-//       "after": "1648841000"
-//     },
-//     "bleDevices": {
+//   "configuration":
+//   {
+//     "updateId": "1111",
+
+//     "locationTracking": {
+
+//       "locReadingPeriod": 180.0,
+
+//       "alwaysOn": false,
+
+//       "motionMonitoring": {
 //         "enabled": true,
+//         "movementAccMin": 0.15,
+//         "movementAccMax": 0.30,
+//         "movementAccDur": 0.25,
+//         "motionTime": 5.0,
+//         "motionVelocity": 0.25,
+//         "motionDistance": 3.0,
+
+//         "motionStopTimeout": 10.0
+//       },
+
+//       "repossessionMode": {
+//         "enabled": true,
+//         "after": 1667598736
+//       },
+
+//       "bleDevices": {
+//         "enabled": false,
 //         "generic": {
-//         "6f928a04e179": {
-//           "lng": 10.0,
-//           "lat": 23.0 
+
+//         },
+//         "iBeacon": {
+
 //         }
 //       },
-//       "iBeacon": {
-//         "646be3e46e4e4e25ad0177a28f3df4bd": {
-//           "15655": {
-//             "2": {
-//               "lng": 11.0,
-//               "lat": 24.0
-//             }
-//           }
-//         }
+
+//       "geofence": {
+//         "enabled": false,
+//         "lng": 0.0,
+//         "lat": 0.0,
+//         "radius": 0.0
 //       }
 //     },
-//     "geofence": {
-//       "enabled": true,
-//       "lng": 27.0,
-//       "lat": 28.0,
-//       "radius": 2500.0
-//     }
-// },
-// "connectingPeriod": 100.0,
-// "readingPeriod": 3600.0,
-// "alerts": {
-//     "shockDetected" : {
-//       "enabled": true,
-//       "threshold": 8.0
+
+//     "connectingPeriod": 180.0,
+
+//     "readingPeriod": 60.0,
+
+//     "alerts": {
+
+//       "shockDetected" : {
+//         "enabled": true,
+//         "threshold": 8.0
+//       },
+
+//       "temperatureLow": {
+//         "enabled": true,
+//         "threshold": 10.0,
+//         "hysteresis": 1.0
+//       },
+
+//       "temperatureHigh": {
+//         "enabled": true,
+//         "threshold": 25.0,
+//         "hysteresis": 1.0
+//       },
+
+//       "batteryLow": {
+//         "enabled": false,
+//         "threshold": 12.0
+//       },
+
+//       "tamperingDetected": {
+//         "enabled": false
+//       }
 //     },
-//     "temperatureLow": {
-//       "enabled": true,
-//       "threshold": 10.0,
-//       "hysteresis": 1.0
-//     },
-//     "temperatureHigh": {
-//       "enabled": true,
-//       "threshold": 30.0,
-//       "hysteresis": 1.0
-//     },
-//     "batteryLow": {
-//       "enabled": true,
-//       "threshold": 10.0
-//     },
-//     "tamperingDetected": {
-//       "enabled": true
+
+//     "debug": {
+//       "logLevel": "DEBUG"
 //     }
 //   },
-// "debug": {
-//     "logLevel": "INFO"
-//   }
-// },
-// "agentConfiguration": {
+//   "agentConfiguration": {
 //     "debug": {
 //       "logLevel": "INFO"
 //     }

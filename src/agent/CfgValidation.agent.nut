@@ -62,6 +62,12 @@ const CFG_MOTION_DIST_SAFEGUARD_MAX = 1000.0;
 // Valid motion distance value, outside of the range
 const CFG_MOTION_DIST_FIXED_VAL = 0.0;
 
+// "motionStopTimeout"
+// Minimal timeout to confirm motion stop, in seconds.
+const CFG_MOTION_STOP_SAFEGUARD_MIN = 10.0;
+// Maximal timeout to confirm motion stop, in seconds.
+const CFG_MOTION_STOP_SAFEGUARD_MAX = 3600.0;
+
 // "alerts":
 
 // "shockDetected"
@@ -113,10 +119,10 @@ const CFG_GEOFENCE_RADIUS_SAFEGUARD_MAX = 6371009.0;
 // "after"
 // Minimal start time of repossesion, Unix timestamp
 // 31.03.2020 12:53:04 - TODO: adjust
-const CFG_MIN_TIMESTAMP = "1585666384";
+const CFG_MIN_TIMESTAMP = 1585666384;
 // Maximal start time of repossesion, Unix timestamp
 // 17.04.2035 18:48:49 - TODO: adjust
-const CFG_MAX_TIMESTAMP = "2060448529";
+const CFG_MAX_TIMESTAMP = 2060448529;
 
 // Maximal value of iBeacon minor, major
 const CFG_BEACON_MINOR_MAJOR_VAL_MAX = 65535;
@@ -129,20 +135,20 @@ const CFG_STRING_LENGTH_MAX = 50;
 // validation rules for coordinates
 coordValidationRules <- [{"name":"lng",
                           "required":false,
-                          "validationType":"float", 
-                          "lowLim":CFG_LONGITUDE_SAFEGUARD_MIN, 
+                          "validationType":"float",
+                          "lowLim":CFG_LONGITUDE_SAFEGUARD_MIN,
                           "highLim":CFG_LONGITUDE_SAFEGUARD_MAX,
                           "dependencies":["lat"]},
                          {"name":"lat",
                           "required":false,
-                          "validationType":"float", 
-                          "lowLim":CFG_LATITUDE_SAFEGUARD_MIN, 
+                          "validationType":"float",
+                          "lowLim":CFG_LATITUDE_SAFEGUARD_MIN,
                           "highLim":CFG_LATITUDE_SAFEGUARD_MAX,
                           "dependencies":["lng"]}];
 
 /**
  * Validation of the full or partial configuration.
- * 
+ *
  * @param {table} msg - Configuration table.
  *
  * @return {null | string} null - validation success, otherwise error string.
@@ -157,11 +163,11 @@ function validateCfg(msg) {
             if (validLogLevRes != null) return validLogLevRes;
         }
     }
-    
+
     // validate configuration
     if ("configuration" in msg) {
         local conf = msg.configuration;
-        local validIndFieldRes = _validateIndividualField(conf); 
+        local validIndFieldRes = _validateIndividualField(conf);
         if (validIndFieldRes != null) return validIndFieldRes;
         // validate device log level
         if ("debug" in conf) {
@@ -172,7 +178,7 @@ function validateCfg(msg) {
         // validate alerts
         if ("alerts" in conf) {
             local alerts = conf.alerts;
-            local validAlertsRes = _validateAlerts(alerts); 
+            local validAlertsRes = _validateAlerts(alerts);
             if (validAlertsRes != null) return validAlertsRes;
         }
         // validate location tracking
@@ -283,6 +289,7 @@ function _rulesCheck(rules, cfgGroup) {
  * @return {null | string} null - validation success, otherwise error string.
  */
 function _validateLogLevel(logLevels) {
+    // TODO: It's allowed to not pass the logLevel field
     if (!("logLevel" in logLevels)) {
         return ("Unknown log level type");
     }
@@ -307,15 +314,16 @@ function _validateLogLevel(logLevels) {
  */
 function _validateIndividualField(conf) {
     local validationRules = [];
+    // TODO: Integer values must be allowed
     validationRules.append({"name":"connectingPeriod",
                             "required":false,
-                            "validationType":"float", 
-                            "lowLim":CFG_CONNECTING_SAFEGUARD_MIN, 
+                            "validationType":"float",
+                            "lowLim":CFG_CONNECTING_SAFEGUARD_MIN,
                             "highLim":CFG_CONNECTING_SAFEGUARD_MAX});
     validationRules.append({"name":"readingPeriod",
                             "required":false,
-                            "validationType":"float", 
-                            "lowLim":CFG_READING_SAFEGUARD_MIN, 
+                            "validationType":"float",
+                            "lowLim":CFG_READING_SAFEGUARD_MIN,
                             "highLim":CFG_READING_SAFEGUARD_MAX});
     validationRules.append({"name":"updateId",
                             "required":true,
@@ -339,16 +347,16 @@ function _validateAlerts(alerts) {
     foreach (alertName, alert in alerts) {
         local validationRules = [];
         // check enable field
-        local checkEnableRes = _checkEnableField(alert); 
+        local checkEnableRes = _checkEnableField(alert);
         if (checkEnableRes != null) return checkEnableRes;
         // check other fields
         switch (alertName) {
-            case "batteryLow": 
+            case "batteryLow":
                 // charge level [0;100] %
                 validationRules.append({"name":"threshold",
                                         "required":false,
-                                        "validationType":"float", 
-                                        "lowLim":CFG_CHARGE_LEVEL_THR_SAFEGUARD_MIN, 
+                                        "validationType":"float",
+                                        "lowLim":CFG_CHARGE_LEVEL_THR_SAFEGUARD_MIN,
                                         "highLim":CFG_CHARGE_LEVEL_THR_SAFEGUARD_MAX});
                 break;
             case "temperatureLow":
@@ -356,12 +364,12 @@ function _validateAlerts(alerts) {
                 // industrial temperature range
                 validationRules.append({"name":"threshold",
                                         "required":false,
-                                        "validationType":"float", 
-                                        "lowLim":CFG_TEMPERATURE_THR_SAFEGUARD_MIN, 
+                                        "validationType":"float",
+                                        "lowLim":CFG_TEMPERATURE_THR_SAFEGUARD_MIN,
                                         "highLim":CFG_TEMPERATURE_THR_SAFEGUARD_MAX});
                 validationRules.append({"name":"hysteresis",
                                         "required":false,
-                                        "validationType":"float", 
+                                        "validationType":"float",
                                         "lowLim":CFG_TEMPERATURE_HYST_SAFEGUARD_MIN,
                                         "highLim":CFG_TEMPERATURE_HYST_SAFEGUARD_MAX});
                 break;
@@ -369,8 +377,8 @@ function _validateAlerts(alerts) {
                 // LIS2DH12 maximum shock threshold - 16 g
                 validationRules.append({"name":"threshold",
                                         "required":false,
-                                        "validationType":"float", 
-                                        "lowLim":CFG_SHOCK_ACC_SAFEGUARD_MIN, 
+                                        "validationType":"float",
+                                        "lowLim":CFG_SHOCK_ACC_SAFEGUARD_MIN,
                                         "highLim":CFG_SHOCK_ACC_SAFEGUARD_MAX});
                 break;
             case "tamperingDetected":
@@ -378,15 +386,15 @@ function _validateAlerts(alerts) {
                 break;
         }
         // rules checking
-        local rulesCheckRes = _rulesCheck(validationRules, alert); 
+        local rulesCheckRes = _rulesCheck(validationRules, alert);
         if (rulesCheckRes != null) return rulesCheckRes;
     }
     // check low < high temperature
-    if ("temperatureLow" in alerts && 
+    if ("temperatureLow" in alerts &&
         "temperatureHigh" in alerts) {
         if ("threshold" in alerts.temperatureLow &&
             "threshold" in alerts.temperatureHigh) {
-            if (alerts.temperatureLow.threshold >= 
+            if (alerts.temperatureLow.threshold >=
                 alerts.temperatureHigh.threshold) {
                 return "Temperature low threshold >= high threshold";
             }
@@ -397,7 +405,7 @@ function _validateAlerts(alerts) {
 
 /**
  * Validation of the location tracking configuration block.
- * 
+ *
  * @param {table} locTracking - Location tracking configuration table.
  *
  * @return {null | string} null - validation success, otherwise error string.
@@ -409,8 +417,8 @@ function _validateLocTracking(locTracking) {
         local validationRules = [];
         validationRules.append({"name":"locReadingPeriod",
                                 "required":false,
-                                "validationType":"float", 
-                                "lowLim":CFG_LOC_READING_SAFEGUARD_MIN, 
+                                "validationType":"float",
+                                "lowLim":CFG_LOC_READING_SAFEGUARD_MIN,
                                 "highLim":CFG_LOC_READING_SAFEGUARD_MAX});
         rulesCheckRes = _rulesCheck(validationRules, locTracking);
         if (rulesCheckRes != null) return rulesCheckRes;
@@ -432,45 +440,50 @@ function _validateLocTracking(locTracking) {
         if (checkEnableRes != null) return checkEnableRes;
         validationRules.append({"name":"movementAccMin",
                                 "required":false,
-                                "validationType":"float", 
-                                "lowLim":CFG_MOVEMENT_ACC_SAFEGUARD_MIN, 
+                                "validationType":"float",
+                                "lowLim":CFG_MOVEMENT_ACC_SAFEGUARD_MIN,
                                 "highLim":CFG_MOVEMENT_ACC_SAFEGUARD_MAX,
                                 "dependencies":["movementAccMax"]});
         validationRules.append({"name":"movementAccMax",
                                 "required":false,
-                                "validationType":"float", 
-                                "lowLim":CFG_MOVEMENT_ACC_SAFEGUARD_MIN, 
+                                "validationType":"float",
+                                "lowLim":CFG_MOVEMENT_ACC_SAFEGUARD_MIN,
                                 "highLim":CFG_MOVEMENT_ACC_SAFEGUARD_MAX,
                                 "dependencies":["movementAccMin"]});
         // min 1/ODR (current 100 Hz), max INT1_DURATION - 127/ODR
         validationRules.append({"name":"movementAccDur",
                                 "required":false,
-                                "validationType":"float", 
-                                "lowLim":CFG_MOVEMENT_ACC_DURATION_SAFEGUARD_MIN, 
+                                "validationType":"float",
+                                "lowLim":CFG_MOVEMENT_ACC_DURATION_SAFEGUARD_MIN,
                                 "highLim":CFG_MOVEMENT_ACC_DURATION_SAFEGUARD_MAX});
         validationRules.append({"name":"motionTime",
                                 "required":false,
-                                "validationType":"float", 
-                                "lowLim":CFG_MOTION_TIME_SAFEGUARD_MIN, 
+                                "validationType":"float",
+                                "lowLim":CFG_MOTION_TIME_SAFEGUARD_MIN,
                                 "highLim":CFG_MOTION_TIME_SAFEGUARD_MAX});
         validationRules.append({"name":"motionVelocity",
                                 "required":false,
-                                "validationType":"float", 
-                                "lowLim":CFG_MOTION_VEL_SAFEGUARD_MIN, 
+                                "validationType":"float",
+                                "lowLim":CFG_MOTION_VEL_SAFEGUARD_MIN,
                                 "highLim":CFG_MOTION_VEL_SAFEGUARD_MAX});
         validationRules.append({"name":"motionDistance",
                                 "required":false,
-                                "validationType":"float", 
+                                "validationType":"float",
                                 "fixedValues":[CFG_MOTION_DIST_FIXED_VAL],
-                                "lowLim":CFG_MOTION_DIST_SAFEGUARD_MIN, 
+                                "lowLim":CFG_MOTION_DIST_SAFEGUARD_MIN,
                                 "highLim":CFG_MOTION_DIST_SAFEGUARD_MAX});
+        validationRules.append({"name":"motionStopTimeout",
+                                "required":false,
+                                "validationType":"float",
+                                "lowLim":CFG_MOTION_STOP_SAFEGUARD_MIN,
+                                "highLim":CFG_MOTION_STOP_SAFEGUARD_MAX});
         rulesCheckRes = _rulesCheck(validationRules, motionMon);
         if (rulesCheckRes != null) return rulesCheckRes;
 
-        // must be movementAccMin < movementAccMax
-        if ("movementAccMin" in motionMon && 
+        // must be movementAccMin <= movementAccMax
+        if ("movementAccMin" in motionMon &&
             "movementAccMax" in motionMon) {
-            if (motionMon.movementAccMin >= 
+            if (motionMon.movementAccMin >
                 motionMon.movementAccMax) {
                 return "Movement acceleration range limit error";
             }
@@ -485,20 +498,20 @@ function _validateLocTracking(locTracking) {
         if (checkEnableRes != null) return checkEnableRes;
         validationRules.append({"name":"lng",
                                 "required":false,
-                                "validationType":"float", 
-                                "lowLim":CFG_LONGITUDE_SAFEGUARD_MIN, 
+                                "validationType":"float",
+                                "lowLim":CFG_LONGITUDE_SAFEGUARD_MIN,
                                 "highLim":CFG_LONGITUDE_SAFEGUARD_MAX,
                                 "dependencies":["lat", "radius"]});
         validationRules.append({"name":"lat",
                                 "required":false,
-                                "validationType":"float", 
-                                "lowLim":CFG_LATITUDE_SAFEGUARD_MIN, 
+                                "validationType":"float",
+                                "lowLim":CFG_LATITUDE_SAFEGUARD_MIN,
                                 "highLim":CFG_LATITUDE_SAFEGUARD_MAX,
                                 "dependencies":["lng", "radius"]});
         validationRules.append({"name":"radius",
                                 "required":false,
-                                "validationType":"float", 
-                                "lowLim":CFG_GEOFENCE_RADIUS_SAFEGUARD_MIN, 
+                                "validationType":"float",
+                                "lowLim":CFG_GEOFENCE_RADIUS_SAFEGUARD_MIN,
                                 "highLim":CFG_GEOFENCE_RADIUS_SAFEGUARD_MAX,
                                 "dependencies":["lng","lat"]});
         rulesCheckRes = _rulesCheck(validationRules, geofence);
@@ -512,11 +525,9 @@ function _validateLocTracking(locTracking) {
         if (checkEnableRes != null) return checkEnableRes;
         validationRules.append({"name":"after",
                                 "required":false,
-                                "validationType":"string", 
-                                "minLen":CFG_STRING_LENGTH_MIN,
-                                "maxLen":CFG_STRING_LENGTH_MAX,
-                                "minTimeStamp": CFG_MIN_TIMESTAMP,
-                                "maxTimeStamp": CFG_MAX_TIMESTAMP});
+                                "validationType":"integer",
+                                "lowLim": CFG_MIN_TIMESTAMP,
+                                "maxLim": CFG_MAX_TIMESTAMP});
         rulesCheckRes = _rulesCheck(validationRules, repossession);
         if (rulesCheckRes != null) return rulesCheckRes;
     }
@@ -524,7 +535,7 @@ function _validateLocTracking(locTracking) {
         local validationRules = [];
         local ble = locTracking.bleDevices;
         // check enable field
-        checkEnableRes = _checkEnableField(ble); 
+        checkEnableRes = _checkEnableField(ble);
         if (checkEnableRes) return checkEnableRes;
         if ("generic" in ble) {
             local bleDevices = ble.generic;
@@ -558,7 +569,7 @@ function _checkEnableField(cfgGroup) {
 
 /**
  * Validation of the generic BLE device configuration.
- * 
+ *
  * @param {table} bleDevices - Generic BLE device configuration table.
  *
  * @return {null | string} null - validation success, otherwise error string.
@@ -579,7 +590,7 @@ function _validateGenericBLE(bleDevices) {
 
 /**
  * Validation of the iBeacon configuration.
- * 
+ *
  * @param {table} iBeacons - iBeacon configuration table.
  *
  * @return {null | string} null - validation success, otherwise error string.
@@ -612,7 +623,7 @@ function _validateBeacon(iBeacons) {
                 if (minorVal.tointeger() > CFG_BEACON_MINOR_MAJOR_VAL_MAX) {
                     return "iBeacon \"minor\" error (more then 65535)";
                 }
-                local rulesCheckRes = _rulesCheck(coordValidationRules, minor); 
+                local rulesCheckRes = _rulesCheck(coordValidationRules, minor);
                 if (rulesCheckRes != null) return rulesCheckRes;
             }
         }

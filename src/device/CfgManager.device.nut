@@ -1,10 +1,9 @@
 @set CLASS_NAME = "CfgManager" // Class name for logging
 
-// TODO: Replace with an enum?
-// TODO: Comment
-const CFGM_CFG_FILE_NAME = "cfg";
-// TODO: Comment
-const CFGM_DEBUG_FILE_NAME = "debug";
+// File names used by Cfg Manager
+enum CFGM_FILE_NAMES {
+    CFG = "cfg"
+}
 
 
 // TODO: Comment
@@ -17,8 +16,6 @@ class CfgManager {
     _processingCfg = null;
     // TODO: Comment
     _actualCfg = null;
-    // TODO: Comment
-    _actualDebugCfg = null;
 
     // TODO: Comment
     constructor(modules) {
@@ -31,15 +28,10 @@ class CfgManager {
 
     // TODO: Comment
     function start() {
-        // TODO: Hold the connection?
+        // Let's keep the connection to be able to report the configuration once it is deployed
+        cm.keepConnection("@{CLASS_NAME}", true);
 
         rm.on(APP_RM_MSG_NAME.CFG, _onCfgUpdate.bindenv(this));
-
-        // Erase the debug cfg if a new deployment detected
-        pm.isNewDeployment() && _eraseCfg(CFGM_DEBUG_FILE_NAME);
-        // Apply the debug settings (if any)
-        _actualDebugCfg = _loadCfg(CFGM_DEBUG_FILE_NAME) || {};
-        _applyDebugCfg(_actualDebugCfg);
 
         local defaultCfgUsed = false;
         local cfg = _loadCfg() || (defaultCfgUsed = true) && _defaultCfg();
@@ -48,6 +40,8 @@ class CfgManager {
         try {
             ::info(format("Deploying the %s configuration with updateId: %s",
                           defaultCfgUsed ? "default" : "saved", cfg.updateId), "@{CLASS_NAME}");
+
+            _applyDebugSettings(cfg);
 
             foreach (module in _modules) {
                 promises.push(module.start(cfg));
@@ -74,22 +68,20 @@ class CfgManager {
 
                 // Erase both the main cfg and the debug one
                 _eraseCfg();
-                _eraseCfg(CFGM_DEBUG_FILE_NAME);
                 // This will reboot the imp. This call doesn't return!
                 _reboot();
             }
         }.bindenv(this))
         .finally(function(_) {
+            cm.keepConnection("@{CLASS_NAME}", false);
             _processingCfg = null;
         }.bindenv(this));
     }
 
     // TODO: Comment
     function _onCfgUpdate(msg, customAck) {
-        // TODO: Hold the connection?
-
-        // Cfg update may contain "debug" field at the top level.
-        // This field contains settings for debug features and is handled separately from the rest of the cfg update
+        // Let's keep the connection to be able to report the configuration once it is deployed
+        cm.keepConnection("@{CLASS_NAME}", true);
 
         local cfgUpdate = msg.data;
         local updateId = cfgUpdate.updateId;
@@ -106,10 +98,8 @@ class CfgManager {
                 return Promise.resolve(null);
             }
 
-            // Apply the debug settings (if any) and remove them from the data received
-            ("debug" in cfgUpdate) && _onDebugCfgUpdate(delete cfgUpdate.debug);
-
             _diff(cfgUpdate, _actualCfg);
+            _applyDebugSettings(cfgUpdate);
 
             local promises = [];
 
@@ -138,33 +128,24 @@ class CfgManager {
             _reboot();
         }.bindenv(this))
         .finally(function(_) {
+            cm.keepConnection("@{CLASS_NAME}", false);
             _processingCfg = null;
         }.bindenv(this));
     }
 
     // TODO: Comment
-    function _onDebugCfgUpdate(debugCfgUpdate) {
-        ::info("Debug cfg update received", "@{CLASS_NAME}");
-
-        _diff(debugCfgUpdate, _actualDebugCfg);
-
-        if (debugCfgUpdate.len() == 0) {
-            ::debug("The debug cfg update has no changes to the actual debug cfg", "@{CLASS_NAME}");
+    function _applyDebugSettings(cfg) {
+        if (!("debug" in cfg)) {
             return;
         }
 
-        _applyDebugCfg(debugCfgUpdate);
-        _applyDiff(debugCfgUpdate, _actualDebugCfg);
-        _saveCfg(_actualDebugCfg, CFGM_DEBUG_FILE_NAME);
-    }
+        local debugSettings = cfg.debug;
 
-    // TODO: Comment
-    function _applyDebugCfg(debugCfg) {
-        ::debug("Applying the debug cfg..", "@{CLASS_NAME}");
+        ::debug("Applying debug settings..", "@{CLASS_NAME}");
 
-        if (debugCfg && "logLevel" in debugCfg) {
-            ::info("Setting log level: " + debugCfg.logLevel, "@{CLASS_NAME}");
-            Logger.setLogLevelStr(debugCfg.logLevel);
+        if ("logLevel" in cfg) {
+            ::info("Setting log level: " + debugSettings.logLevel, "@{CLASS_NAME}");
+            Logger.setLogLevelStr(debugSettings.logLevel);
         }
     }
 
@@ -179,13 +160,12 @@ class CfgManager {
             }
         };
 
-        cfgReport.configuration.debug <- _tableFullCopy(_actualDebugCfg);
         rm.send(APP_RM_MSG_NAME.CFG, cfgReport, RM_IMPORTANCE_HIGH);
     }
 
     // TODO: Comment
     function _tableFullCopy(tbl) {
-        // TODO: This is a quick workaround. May need to be improved!
+        // TODO: This may be suboptimal. May need to be improved
         return Serializer.deserialize(Serializer.serialize(tbl));
     }
 
@@ -261,7 +241,7 @@ class CfgManager {
     // -------------------- STORAGE METHODS -------------------- //
 
     // TODO: Comment
-    function _saveCfg(cfg = null, fileName = CFGM_CFG_FILE_NAME) {
+    function _saveCfg(cfg = null, fileName = CFGM_FILE_NAMES.CFG) {
         ::debug("Saving cfg (fileName = " + fileName + ")..", "@{CLASS_NAME}");
 
         cfg = cfg || _actualCfg;
@@ -278,7 +258,7 @@ class CfgManager {
     }
 
     // TODO: Comment
-    function _loadCfg(fileName = CFGM_CFG_FILE_NAME) {
+    function _loadCfg(fileName = CFGM_FILE_NAMES.CFG) {
         try {
             if (_storage.fileExists(fileName)) {
                 local file = _storage.open(fileName, "r");
@@ -294,7 +274,7 @@ class CfgManager {
     }
 
     // TODO: Comment
-    function _eraseCfg(fileName = CFGM_CFG_FILE_NAME) {
+    function _eraseCfg(fileName = CFGM_FILE_NAMES.CFG) {
         try {
             // Erase the existing file if any
             _storage.fileExists(fileName) && _storage.eraseFile(fileName);

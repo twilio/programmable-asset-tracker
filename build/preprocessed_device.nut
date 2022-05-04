@@ -1,4 +1,6 @@
-//line 1 "/home/we/Develop/Squirrel/prog-x/src/device/Main.device.nut"
+//line 5 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/not_for_uploading/my_main.device.nut"
+
+//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
 #require "Serializer.class.nut:1.0.0"
 #require "JSONParser.class.nut:1.0.1"
 #require "JSONEncoder.class.nut:2.0.0"
@@ -15,17 +17,20 @@
 #require "UbxMsgParser.lib.nut:2.0.1"
 #require "UBloxAssistNow.device.lib.nut:0.1.0"
 
-//line 1 "../shared/Version.shared.nut"
+#require "MAX17055.device.lib.nut:1.0.2"
+
+//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/shared/Version.shared.nut"
 // Application Version
-const APP_VERSION = "1.3.0";
-//line 1 "../shared/Constants.shared.nut"
+const APP_VERSION = "2.0.0";
+//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/shared/Constants.shared.nut"
 // Constants common for the imp-agent and the imp-device
 
 // ReplayMessenger message names
 enum APP_RM_MSG_NAME {
     DATA = "data",
     GNSS_ASSIST = "gnssAssist",
-    LOCATION_CELL_WIFI = "locationCellAndWiFi"
+    LOCATION_CELL_WIFI = "locationCellAndWiFi",
+    CFG = "cfg"
 }
 
 // Init latitude value (North Pole)
@@ -33,7 +38,7 @@ const INIT_LATITUDE = 90.0;
 
 // Init longitude value (Greenwich)
 const INIT_LONGITUDE = 0.0;
-//line 1 "../shared/Logger/Logger.shared.nut"
+//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/shared/Logger/Logger.shared.nut"
 // Logger for "DEBUG", "INFO" and "ERROR" information.
 // Prints out information to the standard impcentral log ("server.log").
 // The supported data types: string, table. Other types may be printed out incorrectly.
@@ -139,6 +144,16 @@ Logger <- {
      */
     function setLogLevelStr(level = "info") {
         (null != level) && (_logLevel = _logLevelStrToEnum(level));
+    },
+
+    /**
+     * Get current log level in string format.
+     * Supported strings: "error", "info", "debug" - case insensitive.
+     *
+     * @return {string} - Log level string ["error", "info", "debug"]
+     */
+    function getLogLevelStr() {
+        return _logLevelEnumToStr(_logLevel);
     },
 
     /**
@@ -345,6 +360,33 @@ Logger <- {
                 break;
         }
         return lgrLvl;
+    },
+
+    /**
+     * Converts log level to string.
+     * Supported strings: "error", "info", "debug", "unknown".
+     *
+     * @param {enum} [level] - Log level enum value
+     *
+     * @return {string} - Log level case insensitive string ["error", "info", "debug", "unknown"]
+     */
+    function _logLevelEnumToStr(level) {
+        local lgrLvlStr;
+        switch (level) {
+            case LGR_LOG_LEVEL.ERROR:
+                lgrLvlStr = "error";
+                break;
+            case LGR_LOG_LEVEL.INFO:
+                lgrLvlStr = "info";
+                break;
+            case LGR_LOG_LEVEL.DEBUG:
+                lgrLvlStr = "debug";
+                break;
+            default:
+                lgrLvlStr = "unknown";
+                break;
+        }
+        return lgrLvlStr;
     }
 }
 
@@ -356,9 +398,9 @@ Logger <- {
 
 Logger.setLogLevelStr("INFO");
 
-//line 20 "/home/we/Develop/Squirrel/prog-x/src/device/Main.device.nut"
+//line 24 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
 
-//line 1 "../shared/Logger/stream/Logger.IOutputStream.shared.nut"
+//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/shared/Logger/stream/Logger.IOutputStream.shared.nut"
 /**
  * Logger output stream interface
  */
@@ -369,7 +411,7 @@ Logger.IOutputStream <- class {
     function close() { throw "The Close method must be implemented in an inherited class" }
 };
 
-//line 2 "../shared/Logger/stream/UartOutputStream.device.nut"
+//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/shared/Logger/stream/UartOutputStream.device.nut"
 
 /**
  * UART Output Stream.
@@ -403,9 +445,9 @@ class UartOutputStream extends Logger.IOutputStream {
         return server.log(data);
     }
 }
-//line 24 "/home/we/Develop/Squirrel/prog-x/src/device/Main.device.nut"
+//line 28 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
 
-//line 2 "LedIndication.device.nut"
+//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/LedIndication.device.nut"
 
 // Duration of a signal, in seconds
 const LI_SIGNAL_DURATION = 1.0;
@@ -485,15 +527,70 @@ class LedIndication {
     }
 }
 
-//line 28 "/home/we/Develop/Squirrel/prog-x/src/device/Main.device.nut"
+//line 32 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
 
-//line 1 "Hardware.device.nut"
-// Temperature-humidity sensor's I2C bus
-// NOTE: This I2C bus is used by the accelerometer as well. And it's configured by the accelerometer
-HW_TEMPHUM_SENSOR_I2C <- hardware.i2cLM;
-// Accelerometer's I2C bus
-// NOTE: This I2C bus is used by the temperature-humidity sensor as well. But it's configured by the accelerometer
-HW_ACCEL_I2C <- hardware.i2cLM;
+//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Hardware.device.nut"
+// TODO: Comment
+class PowerSafeI2C {
+    _i2c = null;
+    _clockSpeed = null;
+    _enabled = false;
+    _disableTimer = null;
+
+    // TODO: Comment
+    constructor(i2c) {
+        _i2c = i2c;
+    }
+
+    // TODO: Comment
+    function configure(clockSpeed) {
+        _clockSpeed = clockSpeed;
+        _enabled = true;
+    }
+
+    // TODO: Comment
+    function disable() {
+        _i2c.disable();
+        _enabled = false;
+    }
+
+    // TODO: Comment
+    function read(deviceAddress, registerAddress, numberOfBytes) {
+        _beforeUse();
+        // If the bus is not enabled/configured, this will return null and set the read error code to -13
+        return _i2c.read(deviceAddress, registerAddress, numberOfBytes);
+    }
+
+    // TODO: Comment
+    function readerror() {
+        return _i2c.readerror();
+    }
+
+    // TODO: Comment
+    function write(deviceAddress, registerPlusData) {
+        _beforeUse();
+        // If the bus is not enabled/configured, this will return -13
+        return _i2c.write(deviceAddress, registerPlusData);
+    }
+
+    // TODO: Comment
+    function _beforeUse() {
+        const HW_PSI2C_DISABLE_DELAY = 5;
+
+        // Don't configure i2c bus if the configure() method hasn't been called before
+        _enabled && _i2c.configure(_clockSpeed);
+
+        _disableTimer && imp.cancelwakeup(_disableTimer);
+        _disableTimer = imp.wakeup(HW_PSI2C_DISABLE_DELAY, (@() _i2c.disable()).bindenv(this));
+    }
+}
+
+// I2C bus used by:
+// - Battery fuel gauge
+// - Temperature-humidity sensor
+// - Accelerometer
+HW_SHARED_I2C <- PowerSafeI2C(hardware.i2cLM);
+
 // Accelerometer's interrupt pin
 HW_ACCEL_INT_PIN <- hardware.pinW;
 
@@ -525,7 +622,70 @@ const HW_RM_SFL_END_ADDR = 0x100000;
 // Allocation for the SPI Flash File System used by Location Driver
 const HW_LD_SFFS_START_ADDR = 0x200000;
 const HW_LD_SFFS_END_ADDR = 0x240000;
-//line 2 "ProductionManager.device.nut"
+
+// Allocation for the SPI Flash File System used by Cfg Manager
+const HW_CFGM_SFFS_START_ADDR = 0x300000;
+const HW_CFGM_SFFS_END_ADDR = 0x340000;
+
+// The range to be erased if ERASE_FLASH build-flag is active and a new deployment is detected
+const HW_ERASE_FLASH_START_ADDR = 0x000000;
+const HW_ERASE_FLASH_END_ADDR = 0x340000;
+//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Helpers.device.nut"
+
+// TODO: Comment
+function getValFromTable(tbl, path, defaultVal = null) {
+    local pathSplit = split(path, "/");
+    local curValue = tbl;
+
+    for (local i = 0; i < pathSplit.len(); i++) {
+        if (typeof(curValue) == "table" && pathSplit[i] in curValue) {
+            curValue = curValue[pathSplit[i]];
+        } else {
+            return defaultVal;
+        }
+    }
+
+    return curValue;
+}
+
+// TODO: Comment
+function getValsFromTable(tbl, keys) {
+    if (tbl == null) {
+        return {};
+    }
+
+    local res = {};
+
+    foreach (key in keys) {
+        (key in tbl) && (res[key] <- tbl[key]);
+    }
+
+    return res;
+}
+
+// TODO: Comment
+// Returns null if the object passed has zero length
+function nullEmpty(obj) {
+    if (obj == null || obj.len() == 0) {
+        return null;
+    }
+
+    return obj;
+}
+
+// TODO: Comment
+function mixTables(src, dst) {
+    if (src == null) {
+        return dst;
+    }
+
+    foreach (k, v in src) {
+        dst[k] <- v;
+    }
+
+    return dst;
+}
+//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/ProductionManager.device.nut"
 
 // ProductionManager's user config field
 const PMGR_USER_CONFIG_FIELD = "ProductionManager";
@@ -537,6 +697,8 @@ const PMGR_STATS_MAX_LEN = 10;
 const PMGR_MAX_ERROR_LEN = 512;
 // Connection timeout (sec)
 const PMGR_CONNECT_TIMEOUT = 240;
+// Server.flush timeout (sec)
+const PMGR_FLUSH_TIMEOUT = 5;
 
 // Implements useful in production features:
 // - Emergency mode (If an unhandled error occurred, device goes to sleep and periodically connects to the server waiting for a SW update)
@@ -544,6 +706,7 @@ const PMGR_CONNECT_TIMEOUT = 240;
 class ProductionManager {
     _debugOn = false;
     _startAppFunc = null;
+    _isNewDeployment = false;
 
     /**
      * Constructor for Production Manager
@@ -566,17 +729,13 @@ class ProductionManager {
         local userConf = _readUserConf();
         local data = _extractDataFromUserConf(userConf);
 
-        if (data == null) {
-            _startAppFunc();
-            return;
-        }
-
-        if (data.lastError != null) {
+        if (data && data.lastError != null) {
             // TODO: Improve logging!
+            // TODO: Should the send timeout policy be set before we print anything?
             _printLastError(data.lastError);
         }
 
-        if (data.errorFlag && data.deploymentID == __EI.DEPLOYMENT_ID) {
+        if (data && data.errorFlag && data.deploymentID == __EI.DEPLOYMENT_ID) {
             if (server.isconnected()) {
                 // No new deployment was detected
                 _sleep();
@@ -586,8 +745,9 @@ class ProductionManager {
                 server.connect(_sleep.bindenv(this), PMGR_CONNECT_TIMEOUT);
             }
             return;
-        } else if (data.deploymentID != __EI.DEPLOYMENT_ID) {
+        } else if (!data || data.deploymentID != __EI.DEPLOYMENT_ID) {
             _info("New deployment detected!");
+            _isNewDeployment = true;
             userConf[PMGR_USER_CONFIG_FIELD] <- _initialUserConfData();
             _storeUserConf(userConf);
         }
@@ -602,7 +762,13 @@ class ProductionManager {
      */
     function enterEmergencyMode(error = null) {
         _setErrorFlag(error);
+        server.flush(PMGR_FLUSH_TIMEOUT);
         server.restart();
+    }
+
+    // TODO: Comment
+    function isNewDeployment() {
+        return _isNewDeployment;
     }
 
     /**
@@ -787,84 +953,379 @@ class ProductionManager {
     }
 }
 
-//line 1 "Configuration.device.nut"
-// Configuration settings for imp-device
+//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/CfgManager.device.nut"
 
-// Data reading period, in seconds
-const DEFAULT_DATA_READING_PERIOD = 20.0;
+// File names used by Cfg Manager
+enum CFGM_FILE_NAMES {
+    CFG = "cfg"
+}
 
-// Data sending period, in seconds
-const DEFAULT_DATA_SENDING_PERIOD = 60.0;
 
-// Alert settings:
+// TODO: Comment
+class CfgManager {
+    // Array of modules to be configured
+    _modules = null;
+    // SPIFlashFileSystem storage for configuration
+    _storage = null;
+    // Promise or null
+    _processingCfg = null;
+    // TODO: Comment
+    _actualCfg = null;
 
-// Temperature high alert threshold, in Celsius
-const DEFAULT_TEMPERATURE_HIGH =  25.0;
-// Temperature low alert threshold, in Celsius
-const DEFAULT_TEMPERATURE_LOW = 10.0;
+    // TODO: Comment
+    constructor(modules) {
+        _modules = modules;
 
-// Battery low alert threshold, in %
-const DEFAULT_BATTERY_LOW = 7.0; // not supported
+        // Create storage
+        _storage = SPIFlashFileSystem(HW_CFGM_SFFS_START_ADDR, HW_CFGM_SFFS_END_ADDR);
+        _storage.init();
+    }
 
-// Shock acceleration alert threshold, in g
-// IMPORTANT: This value affects the measurement range and accuracy of the accelerometer:
-// the larger the range - the lower the accuracy.
-// This can affect the effectiveness of the MOVEMENT_ACCELERATION_MIN constant.
-// For example: if SHOCK_THRESHOLD > 4.0 g, then MOVEMENT_ACCELERATION_MIN should be > 0.1 g
-const DEFAULT_SHOCK_THRESHOLD = 8.0;
+    // TODO: Comment
+    function start() {
+        // Let's keep the connection to be able to report the configuration once it is deployed
+        cm.keepConnection("CfgManager", true);
 
-// Location tracking settings:
+        rm.on(APP_RM_MSG_NAME.CFG, _onCfgUpdate.bindenv(this));
 
-// Location reading period, in seconds
-const DEFAULT_LOCATION_READING_PERIOD = 180.0;
+        local defaultCfgUsed = false;
+        local cfg = _loadCfg() || (defaultCfgUsed = true) && _defaultCfg();
+        local promises = [];
 
-// Motion start detection settings:
+        try {
+            ::info(format("Deploying the %s configuration with updateId: %s",
+                          defaultCfgUsed ? "default" : "saved", cfg.updateId), "CfgManager");
 
-// Movement acceleration threshold range [min..max]:
-// - minimum (starting) level, in g
-const DEFAULT_MOVEMENT_ACCELERATION_MIN = 0.2;
-// - maximum level, in g
-const DEFAULT_MOVEMENT_ACCELERATION_MAX = 0.4;
-// Duration of exceeding movement acceleration threshold, in seconds
-const DEFAULT_MOVEMENT_ACCELERATION_DURATION = 0.25;
-// Maximum time to determine motion detection after the initial movement, in seconds
-const DEFAULT_MOTION_TIME = 15.0;
-// Minimum instantaneous velocity to determine motion detection condition, in meters per second
-const DEFAULT_MOTION_VELOCITY = 0.5;
-// Minimal movement distance to determine motion detection condition, in meters.
-// If 0, distance is not calculated (not used for motion detection)
-const DEFAULT_MOTION_DISTANCE = 5.0;
+            _applyDebugSettings(cfg);
 
-// Geofence zone:
-// NOTE: The current settings are fake/example only.
-
-// Geofence zone center latitude, in degrees, [-90..90]
-const DEFAULT_GEOFENCE_CENTER_LAT = 1.0;
-// Geofence zone center longitude, in degrees, [-180..180]
-const DEFAULT_GEOFENCE_CENTER_LNG = 2.0;
-// Geofence zone radius, in meters, [0..EARTH_RADIUS]
-const DEFAULT_GEOFENCE_RADIUS = 1.0;
-
-// BLE devices and their locations
-// NOTE: The current settings are fake/example only.
-DEFAULT_BLE_DEVICES <- {
-    // This key may contain an empty table but it must be present
-    "generic": {
-        "656684e1b306": {
-            "lat": 1,
-            "lng": 2
+            foreach (module in _modules) {
+                promises.push(module.start(cfg));
+            }
+        } catch (err) {
+            promises.push(Promise.reject(err));
         }
-    },
-    // This key may contain an empty table but it must be present
-    "iBeacon": {
-        "\x01\x12\x23\x34\x45\x56\x67\x78\x89\x9a\xab\xbc\xcd\xde\xef\xf0": {
-            [1800] = {
-                [1286] = { "lat": 10, "lng": 20 }
+
+        _processingCfg = Promise.all(promises)
+        .then(function(_) {
+            ::info("The configuration has been successfully deployed", "CfgManager");
+            _actualCfg = cfg;
+
+            // Send the actual cfg to the agent
+            _reportCfg();
+        }.bindenv(this), function(err) {
+            ::error("Couldn't deploy the configuration: " + err, "CfgManager");
+
+            if (defaultCfgUsed) {
+                // This will raise the error flag and reboot the imp. This call doesn't return!
+                pm.enterEmergencyMode();
+            } else {
+                ::debug(cfg, "CfgManager");
+
+                // Erase both the main cfg and the debug one
+                _eraseCfg();
+                // This will reboot the imp. This call doesn't return!
+                _reboot();
+            }
+        }.bindenv(this))
+        .finally(function(_) {
+            cm.keepConnection("CfgManager", false);
+            _processingCfg = null;
+        }.bindenv(this));
+    }
+
+    // TODO: Comment
+    function _onCfgUpdate(msg, customAck) {
+        // Let's keep the connection to be able to report the configuration once it is deployed
+        cm.keepConnection("CfgManager", true);
+
+        local cfgUpdate = msg.data;
+        local updateId = cfgUpdate.updateId;
+
+        ::info("Configuration update received: " + updateId, "CfgManager");
+
+        _processingCfg = (_processingCfg || Promise.resolve(null))
+        .then(function(_) {
+            ::debug("Starting processing " + updateId + " cfg update..", "CfgManager");
+
+            if (updateId == _actualCfg.updateId) {
+                ::info("Configuration update has the same updateId as the actual cfg", "CfgManager");
+                // Resolve with null to indicate that the update hasn't been deployed due to no sense
+                return Promise.resolve(null);
+            }
+
+            _diff(cfgUpdate, _actualCfg);
+            _applyDebugSettings(cfgUpdate);
+
+            local promises = [];
+
+            foreach (module in _modules) {
+                promises.push(module.updateCfg(cfgUpdate));
+            }
+
+            return Promise.all(promises);
+        }.bindenv(this))
+        .then(function(result) {
+            if (result == null) {
+                // No cfg deploy has been done
+                return;
+            }
+
+            ::info("The configuration update has been successfully deployed", "CfgManager");
+
+            // Apply the update (diff) to the actual cfg
+            _applyDiff(cfgUpdate, _actualCfg);
+            // Save the actual cfg in the storage
+            _saveCfg();
+            // Send the actual cfg to the agent
+            _reportCfg();
+        }.bindenv(this), function(err) {
+            ::error("Couldn't deploy the configuration update: " + err, "CfgManager");
+            _reboot();
+        }.bindenv(this))
+        .finally(function(_) {
+            cm.keepConnection("CfgManager", false);
+            _processingCfg = null;
+        }.bindenv(this));
+    }
+
+    // TODO: Comment
+    function _applyDebugSettings(cfg) {
+        if (!("debug" in cfg)) {
+            return;
+        }
+
+        local debugSettings = cfg.debug;
+
+        ::debug("Applying debug settings..", "CfgManager");
+
+        if ("logLevel" in cfg) {
+            ::info("Setting log level: " + debugSettings.logLevel, "CfgManager");
+            Logger.setLogLevelStr(debugSettings.logLevel);
+        }
+    }
+
+    // TODO: Comment
+    function _reportCfg() {
+        ::debug("Reporting cfg..", "CfgManager");
+
+        local cfgReport = {
+            "configuration": _tableFullCopy(_actualCfg)
+            "description": {
+                "cfgTimestamp": time()
+            }
+        };
+
+        rm.send(APP_RM_MSG_NAME.CFG, cfgReport, RM_IMPORTANCE_HIGH);
+    }
+
+    // TODO: Comment
+    function _tableFullCopy(tbl) {
+        // TODO: This may be suboptimal. May need to be improved
+        return Serializer.deserialize(Serializer.serialize(tbl));
+    }
+
+    // TODO: Comment
+    function _reboot() {
+        const CFGM_FLUSH_TIMEOUT = 5;
+
+        server.flush(CFGM_FLUSH_TIMEOUT);
+        server.restart();
+    }
+
+    // TODO: Comment
+    function _diff(cfgUpdate, actualCfg, path = "") {
+        // The list of the paths which should be handled in a special way when making or applying a diff.
+        // When making a diff, we just don't touch these paths (and their sub-paths) in the cfg update - leave them as is.
+        // When applying a diff, we just fully replace these paths (their values) in the actual cfg with the values from the diff.
+        // Every path must be prefixed with "^" and postfixed with "$". Every segment of a path must be prefixed with "/".
+        // NOTE: It's assumed that "^", "/" and "$" are not used in keys of a configuration
+        const CFGM_DIFF_SPECIAL_PATHS = @"^/locationTracking/bleDevices/generic$
+                                          ^/locationTracking/bleDevices/iBeacon$";
+
+        local keysToRemove = [];
+
+        foreach (k, v in cfgUpdate) {
+            // The full path which includes the key currently considered
+            local fullPath = path + "/" + k;
+            // Check if this path should be skipped
+            if (!(k in actualCfg) || CFGM_DIFF_SPECIAL_PATHS.find("^" + fullPath + "$") != null) {
+                continue;
+            }
+
+            // We assume that configuration can only contain nested tables, not arrays
+            if (type(v) == "table") {
+                // Make a diff from a nested table
+                _diff(v, actualCfg[k], fullPath);
+                // If the table is empty after making a diff, we just remove it as it doesn't make sense anymore
+                (v.len() == 0) && keysToRemove.push(k);
+            } else if (v == actualCfg[k]) {
+                keysToRemove.push(k);
+            }
+        }
+
+        foreach (k in keysToRemove) {
+            delete cfgUpdate[k];
+        }
+    }
+
+    // TODO: Comment
+    function _applyDiff(diff, actualCfg, path = "") {
+        foreach (k, v in diff) {
+            // The full path which includes the key currently considered
+            local fullPath = path + "/" + k;
+            // Check if this path should be fully replaced in the actual cfg
+            local fullyReplace = !(k in actualCfg) || CFGM_DIFF_SPECIAL_PATHS.find("^" + fullPath + "$") != null;
+
+            // We assume that configuration can only contain nested tables, not arrays
+            if (type(v) == "table" && !fullyReplace) {
+                // Make a diff from a nested table
+                _applyDiff(v, actualCfg[k], fullPath);
+            } else {
+                actualCfg[k] <- v;
             }
         }
     }
-};
-//line 2 "CustomConnectionManager.device.nut"
+
+    // TODO: Comment
+    function _defaultCfg() {
+        local cfg =
+//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/DefaultConfiguration.device.nut"
+{
+  "updateId": "myDefaultCfg",
+
+  "locationTracking": {
+
+    "locReadingPeriod": 180.0   // how often the tracker reads location when location obtaining is activated, in seconds
+
+    "alwaysOn": false,          // true - location obtaining is always activated
+
+    "motionMonitoring": {
+      "enabled": true,          // true - motion monitoring is enabled
+      "movementAccMin": 0.2,    // minimum (starting) acceleration threshold for movement detection, in g
+      "movementAccMax": 0.4,    // maximum  acceleration threshold for movement detection, in g
+      "movementAccDur": 0.25,   // duration of exceeding movement acceleration threshold, in seconds
+      "motionTime": 15.0,       // maximum time to confirm motion detection after the initial movement, in seconds
+      "motionVelocity": 0.5,    // minimum instantaneous velocity to confirm motion detection condition, in meters per second
+      "motionDistance": 5.0,    // minimum movement distance to determine motion detection condition, in meters
+                                // (if 0, distance is not calculated, ie. not used for motion confirmation)
+      "motionStopTimeout": 10.0 // timeout to confirm motion stop, in seconds
+    },
+
+    "repossessionMode": {
+      "enabled": true,          // true - repossession mode is enabled
+      "after": 1667598736       // (05.11.2022 00:52:16) UNIX timestamp after which location obtaining is activated
+    },
+
+    "bleDevices": {
+      "enabled": false,         // true - location obtaining using BLE devices is enabled
+      "generic": {              // set of generic devices
+
+      },
+      "iBeacon": {              // set of iBeacon devices
+
+      }
+    },
+
+    "geofence": {               // geofence zone
+      "enabled": false,         // true - geofence is enabled
+      "lng": 0.0,               // center longitude, in degrees
+      "lat": 0.0,               // center latitude, in degrees
+      "radius": 0.0             // radius, in meters
+    }
+  },
+
+  "connectingPeriod": 180.0,    // how often the tracker connects to network, in seconds
+
+  "readingPeriod": 60.0,        // how often the tracker polls various data, in seconds
+
+  "alerts": {
+
+    "shockDetected" : {         // one-time shock acceleration
+      "enabled": true,          // true - alert is enabled
+      "threshold": 8.0          // shock acceleration alert threshold, in g
+      // IMPORTANT: This value affects the measurement range and accuracy of the accelerometer:
+      // the larger the range - the lower the accuracy.
+      // This can affect the effectiveness of "movementAccMin".
+      // For example: if "threshold" > 4.0 g, then "movementAccMin" should be > 0.1 g
+    },
+
+    "temperatureLow": {         // temperature crosses the lower limit (becomes below the threshold)
+      "enabled": true,          // true - alert is enabled
+      "threshold": 10.0,        // temperature low alert threshold, in Celsius
+      "hysteresis": 1.0         // "hysteresis" to avoid alerts "bounce", in Celsius
+    },
+
+    "temperatureHigh": {        // temperature crosses the upper limit (becomes above the threshold)
+      "enabled": true,          // true - alert is enabled
+      "threshold": 25.0,        // temperature high alert threshold, in Celsius
+      "hysteresis": 1.0         // "hysteresis" to avoid alerts "bounce", in Celsius
+    },
+
+    "batteryLow": {             // battery level crosses the lower limit (becomes below the threshold)
+      "enabled": false,         // true - alert is enabled
+      "threshold": 12.0         // battery low alert threshold, in %
+    },
+
+    "tamperingDetected": {      // Not supported!
+      "enabled": false          // true - alert is enabled
+    }
+  },
+
+  "debug": {                    // debug settings
+    "logLevel": "DEBUG"         // logging level on Imp-Device ("ERROR", "INFO", "DEBUG")
+  }
+}
+//line 238 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/CfgManager.device.nut"
+        return cfg;
+    }
+
+    // -------------------- STORAGE METHODS -------------------- //
+
+    // TODO: Comment
+    function _saveCfg(cfg = null, fileName = CFGM_FILE_NAMES.CFG) {
+        ::debug("Saving cfg (fileName = " + fileName + ")..", "CfgManager");
+
+        cfg = cfg || _actualCfg;
+
+        _eraseCfg(fileName);
+
+        try {
+            local file = _storage.open(fileName, "w");
+            file.write(Serializer.serialize(cfg));
+            file.close();
+        } catch (err) {
+            ::error(format("Couldn't save cfg (file name = %s): %s", fileName, err), "CfgManager");
+        }
+    }
+
+    // TODO: Comment
+    function _loadCfg(fileName = CFGM_FILE_NAMES.CFG) {
+        try {
+            if (_storage.fileExists(fileName)) {
+                local file = _storage.open(fileName, "r");
+                local data = file.read();
+                file.close();
+                return Serializer.deserialize(data);
+            }
+        } catch (err) {
+            ::error(format("Couldn't load cfg (file name = %s): %s", fileName, err), "CfgManager");
+        }
+
+        return null;
+    }
+
+    // TODO: Comment
+    function _eraseCfg(fileName = CFGM_FILE_NAMES.CFG) {
+        try {
+            // Erase the existing file if any
+            _storage.fileExists(fileName) && _storage.eraseFile(fileName);
+        } catch (err) {
+            ::error(format("Couldn't erase cfg (file name = %s): %s", fileName, err), "CfgManager");
+        }
+    }
+}
+
+//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/CustomConnectionManager.device.nut"
 
 // Customized ConnectionManager library
 class CustomConnectionManager extends ConnectionManager {
@@ -1043,7 +1504,7 @@ class CustomConnectionManager extends ConnectionManager {
     }
 }
 
-//line 2 "CustomReplayMessenger.device.nut"
+//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/CustomReplayMessenger.device.nut"
 
 // Customized ReplayMessenger library
 
@@ -1483,7 +1944,7 @@ class CustomReplayMessenger extends ReplayMessenger {
     }
 }
 
-//line 1 "bg96_gps.device.lib.nut"
+//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/bg96_gps.device.lib.nut"
 /*
  * BG96_GPS library
  * Copyright 2020 Twilio
@@ -2079,7 +2540,7 @@ BG96_GPS <- {
         }
     }
 }
-//line 2 "BG96CellInfo.device.nut"
+//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/BG96CellInfo.device.nut"
 
 // Required BG96 AT Commands
 enum AT_COMMAND {
@@ -2408,7 +2869,7 @@ class BG96CellInfo {
     }
 }
 
-//line 2 "ESP32Driver.device.nut"
+//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/ESP32Driver.device.nut"
 
 // Enum for BLE scan enable
 enum ESP32_BLE_SCAN {
@@ -3066,7 +3527,7 @@ class ESP32Driver {
     }
 }
 
-//line 2 "AccelerometerDriver.device.nut"
+//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/AccelerometerDriver.device.nut"
 
 // Accelerometer Driver class:
 // - utilizes LIS2DH12 accelerometer connected via I2C
@@ -3299,12 +3760,6 @@ class AccelerometerDriver {
     // pin connected to accelerometer int1 (interrupt check)
     _intPin = null;
 
-    // accelerometer I2C address
-    _addr = null;
-
-    // I2C is connected to
-    _i2c  = null;
-
     // accelerometer object
     _accel = null;
 
@@ -3312,19 +3767,19 @@ class AccelerometerDriver {
     _shockThr = null
 
     // duration of exceeding the movement acceleration threshold
-    _movementDur = null;
+    _movementAccDur = null;
 
     // current movement acceleration threshold
     _movementCurThr = null;
 
     // maximum value of acceleration threshold for bounce filtering
-    _movementMax = null;
+    _movementAccMax = null;
 
     // minimum value of acceleration threshold for bounce filtering
-    _movementMin = null;
+    _movementAccMin = null;
 
     // maximum time to determine motion detection after the initial movement
-    _motionTimeout = null;
+    _motionTime = null;
 
     // timestamp of the movement
     _motionCurTime = null;
@@ -3383,12 +3838,12 @@ class AccelerometerDriver {
         _thrVelExceeded = false;
         _shockThr = ACCEL_DEFAULT_SHOCK_THR;
         _movementCurThr = ACCEL_DEFAULT_MOV_MIN;
-        _movementMin = ACCEL_DEFAULT_MOV_MIN;
-        _movementMax = ACCEL_DEFAULT_MOV_MAX;
-        _movementDur = ACCEL_DEFAULT_MOV_DUR;
+        _movementAccMin = ACCEL_DEFAULT_MOV_MIN;
+        _movementAccMax = ACCEL_DEFAULT_MOV_MAX;
+        _movementAccDur = ACCEL_DEFAULT_MOV_DUR;
         _motionCurTime = time();
         _motionVelocity = ACCEL_DEFAULT_MOTION_VEL;
-        _motionTimeout = ACCEL_DEFAULT_MOTION_TIME;
+        _motionTime = ACCEL_DEFAULT_MOTION_TIME;
         _motionDistance = ACCEL_DEFAULT_MOTION_DIST;
 
         _velCur = FloatVector();
@@ -3404,13 +3859,10 @@ class AccelerometerDriver {
 
         _motionState = ACCEL_MOTION_STATE.DISABLED;
 
-        _i2c = i2c;
-        _addr = addr;
         _intPin = intPin;
 
         try {
-            _i2c.configure(CLOCK_SPEED_400_KHZ);
-            _accel = LIS3DH(_i2c, _addr);
+            _accel = LIS3DH(i2c, addr);
             _accel.reset();
             local range = _accel.setRange(ACCEL_RANGE);
             ::info(format("Accelerometer range +-%d g", range), "AccelerometerDriver");
@@ -3424,6 +3876,7 @@ class AccelerometerDriver {
             _accel.configureFifo(true, LIS3DH_FIFO_STREAM_TO_FIFO_MODE);
             _accel.getInterruptTable();
             _accel.configureInterruptLatching(false);
+            // TODO: Disable the pin when it's not in use to save power?
             _intPin.configure(DIGITAL_IN_WAKEUP, _checkInt.bindenv(this));
             _accel._getReg(LIS2DH12_REFERENCE);
             ::debug("Accelerometer configured", "AccelerometerDriver");
@@ -3485,21 +3938,20 @@ class AccelerometerDriver {
     /**
      * Enables or disables a one-time motion detection.
      * If enabled, the specified callback is called only once when the motion condition is detected,
-     * after that the detection is automatically disabled and
-     * (if needed) should be explicitly re-enabled again.
+     * after that the detection is automatically disabled and (if needed) should be explicitly re-enabled again.
      * @param {function} motionCb - Callback to be called once when the motion condition is detected.
      *        The callback has no parameters. If null or not a function, the motion detection is disabled.
      *        Otherwise, the motion detection is (re-)enabled for the provided motion condition.
      * @param {table} motionCnd - Table with the motion condition settings.
      *        Optional, all settings have defaults.
      *        The settings:
-     *          "movementMax": {float}    - Movement acceleration maximum threshold, in g.
+     *          "movementAccMax": {float}    - Movement acceleration maximum threshold, in g.
      *                                        Default: ACCEL_DEFAULT_MOV_MAX
-     *          "movementMin": {float}    - Movement acceleration minimum threshold, in g.
+     *          "movementAccMin": {float}    - Movement acceleration minimum threshold, in g.
      *                                        Default: ACCEL_DEFAULT_MOV_MIN
-     *          "movementDur": {float}    - Duration of exceeding movement acceleration threshold, in seconds.
+     *          "movementAccDur": {float}    - Duration of exceeding movement acceleration threshold, in seconds.
      *                                        Default: ACCEL_DEFAULT_MOV_DUR
-     *          "motionTimeout": {float}  - Maximum time to determine motion detection after the initial movement, in seconds.
+     *          "motionTime": {float}  - Maximum time to determine motion detection after the initial movement, in seconds.
      *                                        Default: ACCEL_DEFAULT_MOTION_TIME
      *          "motionVelocity": {float} - Minimum instantaneous velocity  to determine motion detection condition, in meters per second.
      *                                        Default: ACCEL_DEFAULT_MOTION_VEL
@@ -3510,50 +3962,50 @@ class AccelerometerDriver {
     function detectMotion(motionCb, motionCnd = {}) {
         local motionSettIsCorr = true;
         _movementCurThr = ACCEL_DEFAULT_MOV_MIN;
-        _movementMin = ACCEL_DEFAULT_MOV_MIN;
-        _movementMax = ACCEL_DEFAULT_MOV_MAX;
-        _movementDur = ACCEL_DEFAULT_MOV_DUR;
+        _movementAccMin = ACCEL_DEFAULT_MOV_MIN;
+        _movementAccMax = ACCEL_DEFAULT_MOV_MAX;
+        _movementAccDur = ACCEL_DEFAULT_MOV_DUR;
         _motionVelocity = ACCEL_DEFAULT_MOTION_VEL;
-        _motionTimeout = ACCEL_DEFAULT_MOTION_TIME;
+        _motionTime = ACCEL_DEFAULT_MOTION_TIME;
         _motionDistance = ACCEL_DEFAULT_MOTION_DIST;
         foreach (key, value in motionCnd) {
             if (typeof key == "string") {
-                if (key == "movementMax") {
+                if (key == "movementAccMax") {
                     if (typeof value == "float" && value > 0) {
-                        _movementMax = value;
+                        _movementAccMax = value;
                     } else {
-                        ::error("movementMax incorrect value", "AccelerometerDriver");
+                        ::error("movementAccMax incorrect value", "AccelerometerDriver");
                         motionSettIsCorr = false;
                         break;
                     }
                 }
 
-                if (key == "movementMin") {
+                if (key == "movementAccMin") {
                     if (typeof value == "float"  && value > 0) {
-                        _movementMin = value;
+                        _movementAccMin = value;
                         _movementCurThr = value;
                     } else {
-                        ::error("movementMin incorrect value", "AccelerometerDriver");
+                        ::error("movementAccMin incorrect value", "AccelerometerDriver");
                         motionSettIsCorr = false;
                         break;
                     }
                 }
 
-                if (key == "movementDur") {
+                if (key == "movementAccDur") {
                     if (typeof value == "float"  && value > 0) {
-                        _movementDur = value;
+                        _movementAccDur = value;
                     } else {
-                        ::error("movementDur incorrect value", "AccelerometerDriver");
+                        ::error("movementAccDur incorrect value", "AccelerometerDriver");
                         motionSettIsCorr = false;
                         break;
                     }
                 }
 
-                if (key == "motionTimeout") {
+                if (key == "motionTime") {
                     if (typeof value == "float"  && value > 0) {
-                        _motionTimeout = value;
+                        _motionTime = value;
                     } else {
-                        ::error("motionTimeout incorrect value", "AccelerometerDriver");
+                        ::error("motionTime incorrect value", "AccelerometerDriver");
                         motionSettIsCorr = false;
                         break;
                     }
@@ -3592,7 +4044,7 @@ class AccelerometerDriver {
             _accel.configureFifoInterrupts(false);
             _accel.configureInertialInterrupt(true, 
                                               _movementCurThr, 
-                                              (_movementDur*ACCEL_DEFAULT_DATA_RATE).tointeger());
+                                              (_movementAccDur*ACCEL_DEFAULT_DATA_RATE).tointeger());
             ::info("Motion detection enabled", "AccelerometerDriver");
         } else {
             _mtnCb = null;
@@ -3600,7 +4052,7 @@ class AccelerometerDriver {
             _motionState = ACCEL_MOTION_STATE.DISABLED;
             _positionCur.clear();
             _positionPrev.clear();
-            _movementCurThr = _movementMin;
+            _movementCurThr = _movementAccMin;
             _enMtnDetect = false;
             _accel.configureFifoInterrupts(false);
             _accel.configureInertialInterrupt(false);
@@ -3769,7 +4221,7 @@ class AccelerometerDriver {
         local moving = _positionCur.length();
 
         local diffTm = time() - _motionCurTime;
-        if (diffTm < _motionTimeout) {
+        if (diffTm < _motionTime) {
             if (vel > _motionVelocity) {
                 _thrVelExceeded = true;
             }
@@ -3786,16 +4238,16 @@ class AccelerometerDriver {
             // if motion not detected increase movement threshold (threshold -> [movMin;movMax])
             _motionState = ACCEL_MOTION_STATE.WAITING;
             _thrVelExceeded = false;
-            if (_movementCurThr < _movementMax) {
+            if (_movementCurThr < _movementAccMax) {
                 _movementCurThr += ACCEL_DEFAULT_MOV_STEP;
-                if (_movementCurThr > _movementMax)
-                    _movementCurThr = _movementMax;
+                if (_movementCurThr > _movementAccMax)
+                    _movementCurThr = _movementAccMax;
             }
             ::debug(format("Motion is NOT confirmed. New movementCurThr %f g", _movementCurThr), "AccelerometerDriver")
             _positionCur.clear();
             _positionPrev.clear();
             _accel.configureFifoInterrupts(false);
-            _accel.configureInertialInterrupt(true, _movementCurThr, (_movementDur*ACCEL_DEFAULT_DATA_RATE).tointeger());
+            _accel.configureInertialInterrupt(true, _movementCurThr, (_movementAccDur*ACCEL_DEFAULT_DATA_RATE).tointeger());
         }
     }
 
@@ -3810,7 +4262,7 @@ class AccelerometerDriver {
             _positionCur.clear();
             _positionPrev.clear();
             // reset movement threshold to minimum value
-            _movementCurThr = _movementMin;
+            _movementCurThr = _movementAccMin;
             _enMtnDetect = false;
             // disable all interrupts
             _accel.configureInertialInterrupt(false);
@@ -3856,38 +4308,69 @@ class AccelerometerDriver {
     }
 }
 
-//line 2 "MotionMonitor.device.nut"
+//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/BatteryMonitor.device.nut"
+
+// Measures the battery level
+class BatteryMonitor {
+    _fg = null;
+
+    constructor(i2c) {
+        if ("MAX17055" in getroottable()) {
+            _fg = MAX17055(i2c);
+        }
+    }
+
+    // Initializes the driver and starts measuring battery in order to determine the battery state
+    function init() {
+        ::info("BatteryMonitor initialization", "BatteryMonitor");
+
+        if (!_fg) {
+            ::info("MAX17055 is not used - no battery measurements will be made", "BatteryMonitor");
+            return Promise.resolve(null);
+        }
+
+        local settings = {
+            "desCap"       : 3500, // mAh
+            "senseRes"     : 0.01, // ohms
+            "chrgTerm"     : 256,   // mA
+            "emptyVTarget" : 3.3,  // V
+            "recoveryV"    : 3.88, // V
+            "chrgV"        : MAX17055_V_CHRG_4_2,
+            "battType"     : MAX17055_BATT_TYPE.LiCoO2
+        };
+
+        return Promise(function(resolve, reject) {
+            local onDone = function(err) {
+                err ? reject(err) : resolve(err);
+            }.bindenv(this);
+
+            _fg.init(settings, onDone);
+        }.bindenv(this));
+    }
+
+    // The result is a table { "capacity": <cap>, "percent": <pct> }
+    function measureBattery() {
+        if (!_fg) {
+            throw "No fuel gauge used";
+        }
+
+        return _fg.getStateOfCharge().percent;
+    }
+}
+
+//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/LocationMonitor.device.nut"
 
 // Mean earth radius in meters (https://en.wikipedia.org/wiki/Great-circle_distance)
 const MM_EARTH_RAD = 6371009;
 
-// min longitude
-const MM_MIN_LNG = -180.0;
-// max latitude
-const MM_MAX_LNG = 180.0;
-// min latitude
-const MM_MIN_LAT = -90.0;
-// max latitude
-const MM_MAX_LAT = 90.0;
-
 // Motion Monitor class.
 // Starts and stops motion monitoring.
-class MotionMonitor {
-
-    // Accelerometer driver object
-    _ad = null;
-
+class LocationMonitor {
     // Location driver object
     _ld = null;
 
-    // New location callback function
-    _newLocCb = null;
-
-    // Motion event callback function
-    _motionEventCb = null;
-
-    // Geofencing event callback function
-    _geofencingEventCb = null;
+    // Location callback function
+    _locationCb = null;
 
     // Location reading timer period
     _locReadingPeriod = null;
@@ -3898,179 +4381,103 @@ class MotionMonitor {
     // Promise of the location reading process or null
     _locReadingPromise = null;
 
-    // Motion stop assumption
-    _motionStopAssumption = null;
+    // If true, activate unconditional periodic location reading
+    _alwaysReadLocation = false;
 
-    // Moton state
-    _inMotion = null;
+    // Geofence settings, state, callback(s), timer(s) and etc.
+    _geofence = null;
 
-    // Current location
-    _curLoc = null;
-
-    // Sign of the current location relevance
-    _curLocFresh = null;
-
-    // Previous location
-    _prevLoc = null;
-
-    // Sign of the previous location relevance
-    _prevLocFresh = null;
-
-    // Movement acceleration threshold range: maximum level
-    _movementMax = null;
-
-    // Movement acceleration threshold range: minimum (starting) level
-    _movementMin = null;
-
-    // Duration of exceeding movement acceleration threshold
-    _movementDur = null;
-
-    // Maximum time to determine motion detection after the initial movement
-    _motionTimeout = null;
-
-    // Minimal instantaneous velocity to determine motion detection condition
-    _motionVelocity = null;
-
-    // Minimal movement distance to determine motion detection condition
-    _motionDistance = null;
-
-    // geofence zone center location
-    _geofenceCenter = null;
-
-    // geofence zone radius
-    _geofenceRadius = null;
-
-    // enable/disable flag
-    _geofenceIsEnable = null;
-
-    // in zone or not
-    _inGeofenceZone = null;
+    // Repossession mode settings, state, callback(s), timer(s) and etc.
+    _repossession = null;
 
     /**
      *  Constructor for Motion Monitor class.
-     *  @param {object} accelDriver - Accelerometer driver object.
      *  @param {object} locDriver - Location driver object.
      */
-    constructor(accelDriver, locDriver) {
-        _ad = accelDriver;
+    constructor(locDriver) {
         _ld = locDriver;
 
-        _geofenceIsEnable = false;
-        _geofenceRadius = DEFAULT_GEOFENCE_RADIUS;
-        _motionStopAssumption = false;
-        _inMotion = false;
-        _curLocFresh = false;
-        _prevLocFresh = false;
-        _curLoc = {"timestamp": 0,
-                   "type": "gnss",
-                   "accuracy": MM_EARTH_RAD,
-                   "longitude": INIT_LONGITUDE,
-                   "latitude": INIT_LATITUDE};
-        _prevLoc = {"timestamp": 0,
-                    "type": "gnss",
-                    "accuracy": MM_EARTH_RAD,
-                    "longitude": INIT_LONGITUDE,
-                    "latitude": INIT_LATITUDE};
-        _geofenceCenter = {"longitude": DEFAULT_GEOFENCE_CENTER_LNG,
-                            "latitude": DEFAULT_GEOFENCE_CENTER_LAT};
-        _locReadingPeriod = DEFAULT_LOCATION_READING_PERIOD;
-        _movementMax = DEFAULT_MOVEMENT_ACCELERATION_MAX;
-        _movementMin = DEFAULT_MOVEMENT_ACCELERATION_MIN;
-        _movementDur = DEFAULT_MOVEMENT_ACCELERATION_DURATION;
-        _motionTimeout = DEFAULT_MOTION_TIME;
-        _motionVelocity = DEFAULT_MOTION_VELOCITY;
-        _motionDistance = DEFAULT_MOTION_DISTANCE;
+        // This table will be augmented by several fields from the configuration: "enabled" and "after"
+        _repossession = {
+            // A flag indicating if the repossession mode is activated
+            "activated": false,
+            // A timer to activate the repossession mode after the time specified in the configuration
+            "timer": null,
+            // Repossession event callback function
+            "eventCb": null
+        };
+
+        // This table will be augmented by several fields from the configuration: "enabled", "lng", "lat" and "radius"
+        _geofence = {
+            // Geofencing state: true (in zone) / false (out of zone) / null (unknown)
+            "inZone": null,
+            // Geofencing event callback function
+            "eventCb": null
+        };
     }
 
     /**
-     *   Start motion monitoring.
-     *   @param {table} motionMonSettings - Table with the settings.
-     *        Optional, all settings have defaults.
-     *        If a setting is missed, it is reset to default.
-     *        The settings:
-     *          "locReadingPeriod": {float} - Location reading period, in seconds.
-     *                                          Default: DEFAULT_LOCATION_READING_PERIOD
-     *          "movementMax": {float}    - Movement acceleration maximum threshold, in g.
-     *                                        Default: DEFAULT_MOVEMENT_ACCELERATION_MAX
-     *          "movementMin": {float}    - Movement acceleration minimum threshold, in g.
-     *                                        Default: DEFAULT_MOVEMENT_ACCELERATION_MIN
-     *          "movementDur": {float}    - Duration of exceeding movement acceleration threshold, in seconds.
-     *                                        Default: DEFAULT_MOVEMENT_ACCELERATION_DURATION
-     *          "motionTimeout": {float}  - Maximum time to determine motion detection after the initial movement, in seconds.
-     *                                        Default: DEFAULT_MOTION_TIME
-     *          "motionVelocity": {float} - Minimum instantaneous velocity  to determine motion detection condition, in meters per second.
-     *                                        Default: DEFAULT_MOTION_VELOCITY
-     *          "motionDistance": {float} - Minimal movement distance to determine motion detection condition, in meters.
-     *                                      If 0, distance is not calculated (not used for motion detection).
-     *                                        Default: DEFAULT_MOTION_DISTANCE
+     *  Start motion monitoring.
+     *  @param {table} cfg - Table with the full configuration.
+     *                       For details, please, see the documentation
+     *
+     * @return {Promise} that:
+     * - resolves if the operation succeeded
+     * - rejects if the operation failed
      */
-    function start(motionMonSettings = {}) {
-        _locReadingPeriod = DEFAULT_LOCATION_READING_PERIOD;
-        _movementMax = DEFAULT_MOVEMENT_ACCELERATION_MAX;
-        _movementMin = DEFAULT_MOVEMENT_ACCELERATION_MIN;
-        _movementDur = DEFAULT_MOVEMENT_ACCELERATION_DURATION;
-        _motionTimeout = DEFAULT_MOTION_TIME;
-        _motionVelocity = DEFAULT_MOTION_VELOCITY;
-        _motionDistance = DEFAULT_MOTION_DISTANCE;
-
-        // check and set the settings
-        _checkMotionMonSettings(motionMonSettings);
+    function start(cfg) {
+        updateCfg(cfg);
 
         // get current location
-        _locReading();
+        _readLocation();
 
-        // initial state after start: not in motion
-        _motionStopAssumption = false;
-        _inMotion = false;
-
-        // detect motion start
-        _ad.detectMotion(_onAccelMotionDetected.bindenv(this), {"movementMax"      : _movementMax,
-                                                                "movementMin"      : _movementMin,
-                                                                "movementDur"      : _movementDur,
-                                                                "motionTimeout"    : _motionTimeout,
-                                                                "motionVelocity"   : _motionVelocity,
-                                                                "motionDistance"   : _motionDistance});
+        return Promise.resolve(null);
     }
 
-    /**
-     *   Stop motion monitoring.
-     */
-    function stop() {
-        _locReadingTimer && imp.cancelwakeup(_locReadingTimer);
+    // TODO: Comment
+    function updateCfg(cfg) {
+        _updCfgGeneral(cfg);
+        _updCfgBLEDevices(cfg);
+        _updCfgGeofence(cfg);
+        _updCfgRepossession(cfg);
+
+        return Promise.resolve(null);
     }
 
-    /**
-     *  Set new location callback function.
-     *  @param {function | null} locCb - The callback will be called every time the new location is received (null - disables the callback)
-     *                 locCb(loc), where
-     *                 @param {table} loc - Location information
-     *                      The fields:
-     *                          "timestamp": {integer}  - The number of seconds that have elapsed since midnight on 1 January 1970.
-     *                               "type": {string}   - "gnss", "cell", "wifi", "ble"
-     *                           "accuracy": {integer}  - Accuracy in meters
-     *                          "longitude": {float}    - Longitude in degrees
-     *                           "latitude": {float}    - Latitude in degrees
-     */
-    function setNewLocationCb(locCb) {
-        if (typeof locCb == "function" || locCb == null) {
-            _newLocCb = locCb;
-        } else {
-            ::error("Argument not a function or null", "MotionMonitor");
-        }
+    // TODO: Comment
+    function getStatus() {
+        local location = _ld.lastKnownLocation() || {
+            "timestamp": 0,
+            "type": "gnss",
+            "accuracy": MM_EARTH_RAD,
+            "longitude": INIT_LONGITUDE,
+            "latitude": INIT_LATITUDE
+        };
+
+        local res = {
+            "flags": {},
+            "location": location
+        };
+
+        (_geofence.inZone != null) && (res.flags.inGeofence <- _geofence.inZone);
+        _repossession.enabled && (res.flags.repossession <- _repossession.activated);
+
+        return res;
     }
 
-    /**
-     *  Set motion event callback function.
-     *  @param {function | null} motionEventCb - The callback will be called every time the new motion event is detected (null - disables the callback)
-     *                 motionEventCb(ev), where
-     *                 @param {bool} ev - true: motion started, false: motion stopped
-     */
-    function setMotionEventCb(motionEventCb) {
-        if (typeof motionEventCb == "function" || motionEventCb == null) {
-            _motionEventCb = motionEventCb;
-        } else {
-            ::error("Argument not a function or null", "MotionMonitor");
-        }
+    // TODO: Comment
+    function setLocationCb(locationCb) {
+        _locationCb = locationCb;
+        // This will either:
+        // - Run periodic location reading (if a callback has just been set) OR
+        // - Cancel the timer for periodic location reading (if the callback has just been
+        //   unset and the other conditions don't require to read the location periodically)
+        _managePeriodicLocReading(true);
+    }
+
+    // TODO Comment
+    function setRepossessionEventCb(repossessionEventCb) {
+        _repossession.eventCb = repossessionEventCb;
     }
 
     /**
@@ -4080,319 +4487,7 @@ class MotionMonitor {
      *                 @param {bool} ev - true: geofence entered, false: geofence exited
      */
     function setGeofencingEventCb(geofencingEventCb) {
-        if (typeof geofencingEventCb == "function" || geofencingEventCb == null) {
-            _geofencingEventCb = geofencingEventCb;
-        } else {
-            ::error("Argument not a function or null", "MotionMonitor");
-        }
-    }
-
-    /**
-     *  Enable/disable and set settings for geofencing.
-     *  @param {table} settings - Table with the center coordinates of geofence zone, radius.
-     *      The settings include:
-     *          "enabled"   : {bool}  - Enable/disable, true - geofence is enabled.
-     *          "lng"       : {float} - Center longitude, in degrees.
-     *          "lat"       : {float} - Center latitude, in degrees.
-     *          "radius"    : {float} - Radius, in meters. (value must exceed the accuracy of the coordinate)
-     */
-    function configureGeofence(settings) {
-        // reset in zone flag
-        _inGeofenceZone = null;
-        if (settings != null && typeof settings == "table") {
-            _geofenceIsEnable = false;
-            if ("enabled" in settings) {
-                if (typeof settings.enabled == "bool") {
-                    ::info("Geofence is " + (settings.enabled ? "enabled" : "disabled"), "MotionMonitor");
-                    _geofenceIsEnable = settings.enabled;
-                }
-            }
-            _geofenceRadius = DEFAULT_GEOFENCE_RADIUS;
-            if ("radius" in settings) {
-                if (typeof settings.radius == "float" && 
-                    settings.radius >= 0) {
-                    ::info("Geofence radius: " + settings.radius, "MotionMonitor");
-                    _geofenceRadius = settings.radius > MM_EARTH_RAD ? MM_EARTH_RAD : settings.radius;
-                }
-            }
-            _geofenceCenter = {"longitude": DEFAULT_GEOFENCE_CENTER_LNG,
-                               "latitude" : DEFAULT_GEOFENCE_CENTER_LAT};
-            if ("lng" in settings && "lat" in settings) {
-                if (typeof settings.lat == "float") {
-                    ::info("Geofence latitude: " + settings.lat, "MotionMonitor");
-                    _geofenceCenter.latitude = settings.lat;
-                    if (_geofenceCenter.latitude < MM_MIN_LAT) {
-                        ::error("Geofence latitude not in range [-90;90]: " + settings.lat, "MotionMonitor");
-                        _geofenceCenter.latitude = MM_MIN_LAT;
-                    }
-                    if (_geofenceCenter.latitude > MM_MAX_LAT) {
-                        ::error("Geofence latitude not in range [-90;90]: " + settings.lat, "MotionMonitor");
-                        _geofenceCenter.latitude = MM_MAX_LAT;
-                    }
-                    ::info("Geofence longitude: " + settings.lng, "MotionMonitor");
-                    _geofenceCenter.longitude = settings.lng;
-                    if (_geofenceCenter.longitude < MM_MIN_LNG) {
-                        ::error("Geofence longitude not in range [-180;180]: " + settings.lng, "MotionMonitor");
-                        _geofenceCenter.longitude = MM_MIN_LAT;
-                    }
-                    if (_geofenceCenter.longitude > MM_MAX_LAT) {
-                        ::error("Geofence longitude not in range [-180;180]: " + settings.lng, "MotionMonitor");
-                        _geofenceCenter.longitude = MM_MAX_LAT;
-                    }
-                }
-            }
-        }
-    }
-
-    // -------------------- PRIVATE METHODS -------------------- //
-
-    /**
-     * Check settings element.
-     * Returns the specified value if the check fails.
-     *
-     * @param {float} val - Value of settings element.
-     * @param {float} defVal - Default value of settings element.
-     * @param {bool} flCheckSignEq - Flag for sign check.
-     *
-     * @return {float} If success - value, else - default value.
-     */
-    function _checkVal(val, defVal, flCheckSignEq = true) {
-        if (typeof val == "float") {
-            if (flCheckSignEq) {
-                if (val >= 0.0) {
-                    return val;
-                }
-            } else {
-                if (val > 0.0) {
-                    return val;
-                }
-            }
-        } else {
-            ::error("Incorrect type of settings parameter", "MotionMonitor");
-        }
-
-        return defVal;
-    }
-
-    /**
-     *  Check and set settings.
-     *  Sets default values for incorrect settings.
-     *
-     *   @param {table} motionMonSettings - Table with the settings.
-     *        Optional, all settings have defaults.
-     *        The settings:
-     *          "locReadingPeriod": {float} - Location reading period, in seconds.
-     *                                          Default: DEFAULT_LOCATION_READING_PERIOD
-     *          "movementMax": {float}    - Movement acceleration maximum threshold, in g.
-     *                                        Default: DEFAULT_MOVEMENT_ACCELERATION_MAX
-     *          "movementMin": {float}    - Movement acceleration minimum threshold, in g.
-     *                                        Default: DEFAULT_MOVEMENT_ACCELERATION_MIN
-     *          "movementDur": {float}    - Duration of exceeding movement acceleration threshold, in seconds.
-     *                                        Default: DEFAULT_MOVEMENT_ACCELERATION_DURATION
-     *          "motionTimeout": {float}  - Maximum time to determine motion detection after the initial movement, in seconds.
-     *                                        Default: DEFAULT_MOTION_TIME
-     *          "motionVelocity": {float} - Minimum instantaneous velocity  to determine motion detection condition, in meters per second.
-     *                                        Default: DEFAULT_MOTION_VELOCITY
-     *          "motionDistance": {float} - Minimal movement distance to determine motion detection condition, in meters.
-     *                                      If 0, distance is not calculated (not used for motion detection).
-     *                                        Default: DEFAULT_MOTION_DISTANCE
-     */
-    function _checkMotionMonSettings(motionMonSettings) {
-        foreach (key, value in motionMonSettings) {
-            if (typeof key == "string") {
-                switch(key){
-                    case "locReadingPeriod":
-                        _locReadingPeriod = _checkVal(value, DEFAULT_LOCATION_READING_PERIOD);
-                        break;
-                    case "movementMax":
-                        _movementMax = _checkVal(value, DEFAULT_MOVEMENT_ACCELERATION_MAX, false);
-                        break;
-                    case "movementMin":
-                        _movementMin = _checkVal(value, DEFAULT_MOVEMENT_ACCELERATION_MIN, false);
-                        break;
-                    case "movementDur":
-                        _movementDur = _checkVal(value, DEFAULT_MOVEMENT_ACCELERATION_DURATION, false);
-                        break;
-                    case "motionTimeout":
-                        _motionTimeout = _checkVal(value, DEFAULT_MOTION_TIME, false);
-                        break;
-                    case "motionVelocity":
-                        _motionVelocity = _checkVal(value, DEFAULT_MOTION_VELOCITY);
-                        break;
-                    case "motionDistance":
-                        _motionDistance = _checkVal(value, DEFAULT_MOTION_DISTANCE);
-                        break;
-                    default:
-                        ::error("Incorrect key name", "MotionMonitor");
-                        break;
-                }
-            } else {
-                ::error("Incorrect motion condition settings", "MotionMonitor");
-            }
-        }
-    }
-
-    /**
-     *  Location reading timer callback function.
-     */
-    function _locReadingTimerCb() {
-        local start = hardware.millis();
-
-        if (_motionStopAssumption) {
-            // no movement during location reading period =>
-            // motion stop is confirmed
-            _inMotion = false;
-            _motionStopAssumption = false;
-            if (_motionEventCb) {
-                _motionEventCb(_inMotion);
-            }
-        } else {
-            // read location and, after that, check if it is the same as the previous one
-            _locReading()
-            .finally(function(_) {
-                _checkMotionStop();
-
-                // Calculate the delay for the timer according to the time spent on location reading and etc.
-                local delay = _locReadingPeriod - (hardware.millis() - start) / 1000.0;
-                _locReadingTimer && imp.cancelwakeup(_locReadingTimer);
-                _locReadingTimer = imp.wakeup(delay, _locReadingTimerCb.bindenv(this));
-            }.bindenv(this));
-        }
-    }
-
-    /**
-     *  Try to determine the current location
-     */
-    function _locReading() {
-        if (_locReadingPromise) {
-            return _locReadingPromise;
-        }
-
-        _prevLoc = _curLoc;
-        _prevLocFresh = _curLocFresh;
-
-        ::debug("Getting location..", "MotionMonitor");
-
-        return _locReadingPromise = _ld.getLocation()
-        .then(function(loc) {
-            _locReadingPromise = null;
-            _curLoc = loc;
-            _curLocFresh = true;
-            _newLocCb && _newLocCb(_curLoc);
-            _procGeofence(loc);
-        }.bindenv(this), function(_) {
-            _locReadingPromise = null;
-
-            // the current location becomes non-fresh
-            _curLoc = _prevLoc;
-            _curLocFresh = false;
-        }.bindenv(this));
-    }
-
-    /**
-     *  Check if the motion is stopped
-     */
-    function _checkMotionStop() {
-        if (_curLocFresh) {
-
-            local dist = 0;
-            if (_curLoc && _prevLoc) {
-                // calculate distance between two locations
-                dist = _greatCircleDistance(_curLoc, _prevLoc);
-            } else {
-                ::error("Location is null", "MotionMonitor");
-            }
-            ::debug("Distance: " + dist, "MotionMonitor");
-
-            // check if the distance is less than 2 radius of accuracy
-            if (dist < 2*_curLoc.accuracy) {
-                // maybe motion is stopped, need to double check
-                _motionStopAssumption = true;
-            } else {
-                // still in motion
-                if (!_inMotion) {
-                    _inMotion = true;
-                    _motionEventCb && _motionEventCb(_inMotion);
-                }
-            }
-        }
-
-        if (!_curLocFresh && !_prevLocFresh) {
-            // the location has not been determined two times in a raw,
-            // need to double check the motion
-            _motionStopAssumption = true;
-        }
-
-        if(_motionStopAssumption) {
-            // enable motion detection by accelerometer to double check the motion
-            _ad.detectMotion(_onAccelMotionDetected.bindenv(this), {"movementMax"      : _movementMax,
-                                                                    "movementMin"      : _movementMin,
-                                                                    "movementDur"      : _movementDur,
-                                                                    "motionTimeout"    : _motionTimeout,
-                                                                    "motionVelocity"   : _motionVelocity,
-                                                                    "motionDistance"   : _motionDistance});
-        }
-    }
-
-    /**
-     *  The handler is called when the motion is detected by accelerometer
-     */
-    function _onAccelMotionDetected() {
-        _motionStopAssumption = false;
-        if (!_inMotion) {
-            _inMotion = true;
-
-            // start reading location
-            _locReading();
-            _motionEventCb && _motionEventCb(_inMotion);
-
-            _locReadingTimer && imp.cancelwakeup(_locReadingTimer);
-            _locReadingTimer = imp.wakeup(_locReadingPeriod, _locReadingTimerCb.bindenv(this));
-        }
-    }
-
-    /**
-     *  Zone border crossing check.
-     *  
-     *   @param {table} curLocation - Table with the current location.
-     *        The table must include parts:
-     *          "accuracy" : {integer}  - Accuracy, in meters.
-     *          "longitude": {float}    - Longitude, in degrees.
-     *          "latitude" : {float}    - Latitude, in degrees.  
-     */
-    function _procGeofence(curLocation) {
-        //              _____GeofenceZone
-        //             /      \
-        //            /__     R\    dist           __Location
-        //           |/\ \  .---|-----------------/- \
-        //           |\__/      |                 \_\/accuracy (radius)
-        //            \ Location/
-        //             \______ /
-        //            in zone                     not in zone
-        // (location with accuracy radius      (location with accuracy radius
-        //  entirely in geofence zone)          entirely not in geofence zone)
-        // TODO: location after reboot/reconfigure - not in geofence zone
-        if (_geofenceIsEnable) {
-            local dist = _greatCircleDistance(_geofenceCenter, curLocation);
-            ::debug("Geofence distance: " + dist, "MotionMonitor");
-            if (dist > _geofenceRadius) {
-                local distWithoutAccurace = dist - curLocation.accuracy;
-                if (distWithoutAccurace > 0 && distWithoutAccurace > _geofenceRadius) {
-                    if (_inGeofenceZone == null || _inGeofenceZone == true) {
-                        _geofencingEventCb && _geofencingEventCb(false);
-                        _inGeofenceZone = false;
-                    }
-                }
-            } else {
-                local distWithAccurace = dist + curLocation.accuracy;
-                if (distWithAccurace <= _geofenceRadius) {
-                    if (_inGeofenceZone == null || _inGeofenceZone == false) {
-                        _geofencingEventCb && _geofencingEventCb(true);
-                        _inGeofenceZone = true;
-                    }
-                }
-            }
-        }
+        _geofence.eventCb = geofencingEventCb;
     }
 
     /**
@@ -4406,10 +4501,10 @@ class MotionMonitor {
      *        The location must include parts:
      *          "longitude": {float} - Longitude, in degrees.
      *          "latitude":  {float} - Latitude, in degrees.
-     *  
+     *
      *   @return {float} If success - value, else - default value (0).
      */
-    function _greatCircleDistance(locationFirstPoint, locationSecondPoint) {
+    function greatCircleDistance(locationFirstPoint, locationSecondPoint) {
         local dist = 0;
 
         if (locationFirstPoint != null || locationSecondPoint != null) {
@@ -4418,14 +4513,14 @@ class MotionMonitor {
                 "latitude" in locationFirstPoint &&
                 "latitude" in locationSecondPoint) {
                 // https://en.wikipedia.org/wiki/Great-circle_distance
-                local deltaLat = math.fabs(locationFirstPoint.latitude - 
+                local deltaLat = math.fabs(locationFirstPoint.latitude -
                                            locationSecondPoint.latitude)*PI/180.0;
-                local deltaLong = math.fabs(locationFirstPoint.longitude - 
+                local deltaLong = math.fabs(locationFirstPoint.longitude -
                                             locationSecondPoint.longitude)*PI/180.0;
-                //  -180___180 
+                //  -180___180
                 //     / | \
                 //west|  |  |east   selection of the shortest arc
-                //     \_|_/ 
+                //     \_|_/
                 // Earth 0 longitude
                 if (deltaLong > PI) {
                     deltaLong = 2*PI - deltaLong;
@@ -4441,43 +4536,423 @@ class MotionMonitor {
             }
         }
 
-        return dist
+        return dist;
+    }
+
+    // -------------------- PRIVATE METHODS -------------------- //
+
+    // TODO: Comment
+    function _updCfgGeneral(cfg) {
+        local readingPeriod = getValFromTable(cfg, "locationTracking/locReadingPeriod");
+        _alwaysReadLocation = getValFromTable(cfg, "locationTracking/alwaysOn", _alwaysReadLocation);
+        _locReadingPeriod = readingPeriod != null ? readingPeriod : _locReadingPeriod;
+
+        // This will either:
+        // - Run periodic location reading (if it's not running but the new settings require
+        //   this or if the reading period has been changed) OR
+        // - Cancel the timer for periodic location reading (if the new settings and the other conditions don't require this) OR
+        // - Do nothing (if periodic location reading is already running
+        //   (and still should be) and the reading period hasn't been changed)
+        _managePeriodicLocReading(readingPeriod != null);
+    }
+
+    // TODO: Comment
+    function _updCfgBLEDevices(cfg) {
+        local bleDevicesCfg = getValFromTable(cfg, "locationTracking/bleDevices");
+        local enabled = getValFromTable(bleDevicesCfg, "enabled");
+        local knownBLEDevices = nullEmpty(getValsFromTable(bleDevicesCfg, ["generic", "iBeacon"]));
+
+        _ld.configureBLEDevices(enabled, knownBLEDevices);
+    }
+
+    // TODO: Comment
+    function _updCfgGeofence(cfg) {
+        // There can be the following fields: "enabled", "lng", "lat" and "radius"
+        local geofenceCfg = getValFromTable(cfg, "locationTracking/geofence");
+
+        // If there is some change, let's reset _geofence.inZone as we now don't know if we are in the zone
+        if (geofenceCfg) {
+            _geofence.inZone = null;
+        }
+
+        _geofence = mixTables(geofenceCfg, _geofence);
+    }
+
+    // TODO: Comment
+    function _updCfgRepossession(cfg) {
+        // There can be the following fields: "enabled" and "after"
+        local repossessionCfg = getValFromTable(cfg, "locationTracking/repossessionMode");
+
+        if (repossessionCfg) {
+            // repossessionCfg is not null - this means, we have some updates in parameters
+            mixTables(repossessionCfg, _repossession);
+
+            // Let's deactivate everything since the settings changed
+            _repossession.activated = false;
+            _repossession.timer && imp.cancelwakeup(_repossession.timer);
+
+            // And re-activate again if needed
+            if (_repossession.enabled) {
+                ::debug("Enabling repossession mode..", "LocationMonitor");
+
+                local activateRepossession = function() {
+                    ::debug("Repossession mode activated!", "LocationMonitor");
+
+                    _repossession.activated = true;
+                    _repossession.eventCb && _repossession.eventCb();
+                    _readLocation();
+                }.bindenv(this);
+
+                // If "after" is less than the current time, this timer will fire immediately
+                _repossession.timer = imp.wakeup(_repossession.after - time(), activateRepossession);
+            }
+
+            // This will either:
+            // - Cancel the timer for periodic location reading (if the new settings and the other conditions don't require this) OR
+            // - Do nothing (if periodic location reading is already running and still should be)
+            _managePeriodicLocReading();
+        }
+    }
+
+    // TODO: Comment
+    function _managePeriodicLocReading(reset = false) {
+        if (_shouldReadPeriodically()) {
+            // If the location reading timer is not currently set or if we should "reset" the periodic location reading,
+            // let's call _readLocation right now. This will cancel the existing timer (if any) and request the location
+            // (if it's not being obtained right now)
+            (!_locReadingTimer || reset) && _readLocation();
+        } else {
+            _locReadingTimer && imp.cancelwakeup(_locReadingTimer);
+            _locReadingTimer = null;
+        }
+    }
+
+    // TODO: Comment
+    function _shouldReadPeriodically() {
+        return _alwaysReadLocation || _locationCb || _repossession.activated;
+    }
+
+    /**
+     *  Try to determine the current location
+     */
+    function _readLocation() {
+        if (_locReadingPromise) {
+            return;
+        }
+
+        local start = hardware.millis();
+
+        _locReadingTimer && imp.cancelwakeup(_locReadingTimer);
+        _locReadingTimer = null;
+
+        ::debug("Getting location..", "LocationMonitor");
+
+        _locReadingPromise = _ld.getLocation()
+        .then(function(loc) {
+            _locationCb && _locationCb(loc);
+            _procGeofence(loc);
+        }.bindenv(this), function(_) {
+            _locationCb && _locationCb(null);
+        }.bindenv(this))
+        .finally(function(_) {
+            _locReadingPromise = null;
+
+            if (_shouldReadPeriodically()) {
+                // Calculate the delay for the timer according to the time spent on location reading
+                local delay = _locReadingPeriod - (hardware.millis() - start) / 1000.0;
+                ::debug(format("Setting the timer for location reading in %d sec", delay), "LocationMonitor");
+                _locReadingTimer = imp.wakeup(delay, _readLocation.bindenv(this));
+            }
+        }.bindenv(this));
+    }
+
+    /**
+     *  Zone border crossing check.
+     *
+     *   @param {table} curLocation - Table with the current location.
+     *        The table must include parts:
+     *          "accuracy" : {integer}  - Accuracy, in meters.
+     *          "longitude": {float}    - Longitude, in degrees.
+     *          "latitude" : {float}    - Latitude, in degrees.
+     */
+    function _procGeofence(curLocation) {
+        //              _____GeofenceZone
+        //             /      \
+        //            /__     R\    dist           __Location
+        //           |/\ \  .---|-----------------/- \
+        //           |\__/      |                 \_\/accuracy (radius)
+        //            \ Location/
+        //             \______ /
+        //            in zone                     not in zone
+        // (location with accuracy radius      (location with accuracy radius
+        //  entirely in geofence zone)          entirely not in geofence zone)
+        // TODO: location after reboot/reconfigure - not in geofence zone
+        if (_geofence.enabled) {
+            local center = { "latitude": _geofence.lat, "longitude": _geofence.lng };
+            local dist = greatCircleDistance(center, curLocation);
+            ::debug("Geofence distance: " + dist, "LocationMonitor");
+            if (dist > _geofence.radius) {
+                local distWithoutAccurace = dist - curLocation.accuracy;
+                if (distWithoutAccurace > 0 && distWithoutAccurace > _geofence.radius) {
+                    if (_geofence.inZone != false) {
+                        _geofence.eventCb && _geofence.eventCb(false);
+                        _geofence.inZone = false;
+                    }
+                }
+            } else {
+                local distWithAccurace = dist + curLocation.accuracy;
+                if (distWithAccurace <= _geofence.radius) {
+                    if (_geofence.inZone != true) {
+                        _geofence.eventCb && _geofence.eventCb(true);
+                        _geofence.inZone = false;
+                    }
+                }
+            }
+        }
     }
 }
 
-//line 2 "DataProcessor.device.nut"
+//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/MotionMonitor.device.nut"
+
+// Mean earth radius in meters (https://en.wikipedia.org/wiki/Great-circle_distance)
+const MM_EARTH_RAD = 6371009;
+
+// Motion Monitor class.
+// Starts and stops motion monitoring.
+class MotionMonitor {
+    // Accelerometer driver object
+    _ad = null;
+
+    // Location Monitor object
+    _lm = null;
+
+    // Motion event callback function
+    _motionEventCb = null;
+
+    // Motion stop assumption
+    _motionStopAssumption = false;
+
+    // Motion state: true (in motion) / false (not in motion) / null (feature disabled)
+    _inMotion = null;
+
+    // Current location
+    _curLoc = null;
+
+    // Sign of the current location relevance
+    // True (relevant) / false (not relevant) / null (haven't yet got a location or a failure)
+    _curLocFresh = null;
+
+    // Previous location
+    _prevLoc = null;
+
+    // Sign of the previous location relevance
+    // True (relevant) / false (not relevant) / null (haven't yet got a location or a failure)
+    _prevLocFresh = null;
+
+    // TODO: Comment
+    _motionStopTimeout = null;
+
+    // TODO: Comment
+    _confirmMotionStopTimer = null;
+
+    // TODO: Comment
+    _motionMonitoringEnabled = false;
+
+    // TODO: Comment
+    _accelDetectMotionParams = null;
+
+    /**
+     *  Constructor for Motion Monitor class.
+     *  @param {object} accelDriver - Accelerometer driver object.
+     *  @param {object} locMonitor - Location Monitor object.
+     */
+    constructor(accelDriver, locMonitor) {
+        _ad = accelDriver;
+        _lm = locMonitor;
+    }
+
+    /**
+     *  Start motion monitoring.
+     *  @param {table} cfg - Table with the full configuration.
+     *                       For details, please, see the documentation
+     *
+     * @return {Promise} that:
+     * - resolves if the operation succeeded
+     * - rejects if the operation failed
+     */
+    function start(cfg) {
+        _curLoc = _lm.getStatus().location;
+        _prevLoc = clone _curLoc;
+
+        return updateCfg(cfg);
+    }
+
+    // TODO: Comment
+    function updateCfg(cfg) {
+        local detectMotionParamNames = ["movementAccMin", "movementAccMax", "movementAccDur",
+                                        "motionTime", "motionVelocity", "motionDistance"];
+
+        local motionMonitoringCfg = getValFromTable(cfg, "locationTracking/motionMonitoring");
+        local newDetectMotionParams = nullEmpty(getValsFromTable(motionMonitoringCfg, detectMotionParamNames));
+        // Can be: true/false/null
+        local enabledParam = getValFromTable(motionMonitoringCfg, "enabled");
+
+        _accelDetectMotionParams = mixTables(newDetectMotionParams, _accelDetectMotionParams || {});
+        _motionStopTimeout = getValFromTable(motionMonitoringCfg, "motionStopTimeout", _motionStopTimeout);
+
+        local enable   = !_motionMonitoringEnabled && enabledParam == true;
+        local reEnable =  _motionMonitoringEnabled && enabledParam != false && newDetectMotionParams;
+        local disable  =  _motionMonitoringEnabled && enabledParam == false;
+
+        if (reEnable || enable) {
+            ::debug("(Re)enabling motion monitoring..", "MotionMonitor");
+
+            _inMotion = false;
+            _motionStopAssumption = false;
+            _motionMonitoringEnabled = true;
+
+            // Enable (or re-enable) motion detection
+            _ad.detectMotion(_onAccelMotionDetected.bindenv(this), _accelDetectMotionParams);
+        } else if (disable) {
+            ::debug("Disabling motion monitoring..", "MotionMonitor");
+
+            _inMotion = null;
+            _motionStopAssumption = false;
+            _motionMonitoringEnabled = false;
+
+            // Disable motion detection
+            _ad.detectMotion(null);
+            // Cancel the timer as we don't check for motion anymore
+            _confirmMotionStopTimer && imp.cancelwakeup(_confirmMotionStopTimer);
+        }
+
+        return Promise.resolve(null);
+    }
+
+    // TODO: Comment
+    function getStatus() {
+        local res = {
+            "flags": {}
+        };
+
+        (_inMotion != null) && (res.flags.inMotion <- _inMotion);
+
+        return res;
+    }
+
+    /**
+     *  Set motion event callback function.
+     *  @param {function | null} motionEventCb - The callback will be called every time the new motion event is detected (null - disables the callback)
+     *                 motionEventCb(ev), where
+     *                 @param {bool} ev - true: motion started, false: motion stopped
+     */
+    function setMotionEventCb(motionEventCb) {
+        _motionEventCb = motionEventCb;
+    }
+
+    // -------------------- PRIVATE METHODS -------------------- //
+
+    /**
+     *  Motion stop confirmation timer callback function
+     */
+    function _confirmMotionStop() {
+        if (_motionStopAssumption) {
+            // No movement during motion stop confirmation period => motion stop is confirmed
+            _inMotion = false;
+            _motionStopAssumption = false;
+            _motionEventCb && _motionEventCb(false);
+
+            // Clear these variables so that next time we need to get the location, at least,
+            // two times before checking if the motion is stopped
+            _curLocFresh = _prevLocFresh = null;
+        } else {
+            // Since we are still in motion, we need to get new locations
+            _lm.setLocationCb(_onLocation.bindenv(this));
+        }
+    }
+
+    // TODO: Comment
+    function _onLocation(location) {
+        _prevLoc = _curLoc;
+        _prevLocFresh = _curLocFresh;
+
+        if (location) {
+            _curLoc = location;
+            _curLocFresh = true;
+        } else {
+            // the current location becomes non-fresh
+            _curLocFresh = false;
+        }
+
+        // Once we have got two locations or failures, let's check if the motion stopped
+        (_prevLocFresh != null) && _checkMotionStop();
+    }
+
+    /**
+     *  Check if the motion is stopped
+     */
+    function _checkMotionStop() {
+        if (_curLocFresh) {
+            // Calculate distance between two locations
+            local dist = _lm.greatCircleDistance(_curLoc, _prevLoc);
+
+            ::debug("Distance: " + dist, "MotionMonitor");
+
+            // Check if the distance is less than 2 radius of accuracy.
+            // Maybe motion is stopped but need to double check
+            _motionStopAssumption = dist < 2*_curLoc.accuracy;
+        } else if (!_prevLocFresh) {
+            // The location has not been determined two times in a row,
+            // need to double check the motion
+            _motionStopAssumption = true;
+        }
+
+        if (_motionStopAssumption) {
+            // We don't need new locations anymore
+            _lm.setLocationCb(null);
+            // Enable motion detection by accelerometer to double check the motion
+            _ad.detectMotion(_onAccelMotionDetected.bindenv(this), _accelDetectMotionParams);
+            // Set a timer for motion stop confirmation timeout
+            _confirmMotionStopTimer = imp.wakeup(_motionStopTimeout, _confirmMotionStop.bindenv(this));
+        }
+    }
+
+    /**
+     *  The handler is called when the motion is detected by accelerometer
+     */
+    function _onAccelMotionDetected() {
+        _motionStopAssumption = false;
+        if (!_inMotion) {
+            _inMotion = true;
+
+            // Start getting new locations to check if we are actually moving
+            _lm.setLocationCb(_onLocation.bindenv(this));
+            _motionEventCb && _motionEventCb(true);
+        }
+    }
+}
+
+//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/DataProcessor.device.nut"
 
 // Temperature state enum
 enum DP_TEMPERATURE_LEVEL {
-    T_BELOW_RANGE,
-    T_IN_RANGE,
-    T_HIGHER_RANGE
+    LOW,
+    NORMAL,
+    HIGH
 };
 
 // Battery voltage state enum
-enum DP_BATTERY_VOLT_LEVEL {
-    V_IN_RANGE,
-    V_NOT_IN_RANGE
+enum DP_BATTERY_LEVEL {
+    NORMAL,
+    LOW
 };
 
-// Temperature hysteresis
-const DP_TEMPER_HYST = 1.0;
-
-// Init impossible temperature value
-const DP_INIT_TEMPER_VALUE = -300.0;
-
-// Init battery level
-const DP_INIT_BATTERY_LEVEL = 0;
-
 // Battery level hysteresis
-const DP_BATTERY_LEV_HYST = 2.0;
+const DP_BATTERY_LEVEL_HYST = 4.0;
 
 // Data Processor class.
 // Processes data, saves and sends messages
 class DataProcessor {
-
-    // Array of alert names
-    _alertNames = null;
 
     // Data reading timer period
     _dataReadingPeriod = null;
@@ -4491,216 +4966,152 @@ class DataProcessor {
     // Data sending timer handler
     _dataSendingTimer = null;
 
-    // Result message
-    _dataMesg = null;
-
     // Thermosensor driver object
     _ts = null;
 
+    // Battery driver object
+    _bd = null;
+
     // Accelerometer driver object
     _ad = null;
+
+    // Location Monitor object
+    _lm = null;
 
     // Motion Monitor driver object
     _mm = null;
 
     // Last temperature value
-    _curTemper = null;
-
-    // Last location
-    _currentLocation = null;
-
-    // Moton state
-    _inMotion = null;
+    _temperature = null;
 
     // Last battery level
-    _curBatteryLev = null;
-
-    // Battery low threshold
-    _batteryLowThr = null;
-
-    // Temperature high alert threshold variable
-    _temperatureHighAlertThr = null;
-
-    // Temperature low alert threshold variable
-    _temperatureLowAlertThr = null;
+    _batteryLevel = null;
 
     // Array of alerts
     _allAlerts = null;
 
-    // Shock threshold value
-    _shockThreshold = null;
-
     // state battery (voltage in permissible range or not)
-    _batteryState = null;
+    _batteryState = DP_BATTERY_LEVEL.NORMAL;
 
     // temperature state (temperature in permissible range or not)
-    _temperatureState = null;
+    _temperatureState = DP_TEMPERATURE_LEVEL.NORMAL;
+
+    // Settings of shock, temperature and battery alerts
+    _alertsSettings = null;
 
     /**
      *  Constructor for Data Processor class.
+     *  @param {object} locationMon - Location monitor object.
      *  @param {object} motionMon - Motion monitor object.
      *  @param {object} accelDriver - Accelerometer driver object.
      *  @param {object} temperDriver - Temperature sensor driver object.
      *  @param {object} batDriver - Battery driver object.
      */
-    constructor(motionMon, accelDriver, temperDriver, batDriver) {
+    constructor(locationMon, motionMon, accelDriver, temperDriver, batDriver) {
         _ad = accelDriver;
+        _lm = locationMon;
         _mm = motionMon;
         _ts = temperDriver;
-        _currentLocation = {"timestamp": 0,
-                            "type": "gnss",
-                            "accuracy": MM_EARTH_RAD,
-                            "longitude": INIT_LONGITUDE,
-                            "latitude": INIT_LATITUDE};
-        _curBatteryLev = DP_INIT_BATTERY_LEVEL;
-        _curTemper = DP_INIT_TEMPER_VALUE;
-        _batteryState = DP_BATTERY_VOLT_LEVEL.V_IN_RANGE;
-        _temperatureState = DP_TEMPERATURE_LEVEL.T_IN_RANGE;
-        _inMotion = false;
-        _allAlerts = { "shockDetected"      : false,
-                       "motionStarted"      : false,
-                       "motionStopped"      : false,
-                       "geofenceEntered"    : false,
-                       "geofenceExited"     : false,
-                       "temperatureHigh"    : false,
-                       "temperatureLow"     : false,
-                       "batteryLow"         : false};
-        _temperatureHighAlertThr = DEFAULT_TEMPERATURE_HIGH;
-        _temperatureLowAlertThr = DEFAULT_TEMPERATURE_LOW;
-        _dataReadingPeriod = DEFAULT_DATA_READING_PERIOD;
-        _dataSendingPeriod = DEFAULT_DATA_SENDING_PERIOD;
-        _batteryLowThr = DEFAULT_BATTERY_LOW;
-        _shockThreshold = DEFAULT_SHOCK_THRESHOLD;
+        _bd = batDriver;
+
+        _allAlerts = {
+            // TODO: Do we need alerts like trackerReset, trackerReconfigured?
+            "shockDetected"         : false,
+            "motionStarted"         : false,
+            "motionStopped"         : false,
+            "geofenceEntered"       : false,
+            "geofenceExited"        : false,
+            "repossessionActivated" : false,
+            "temperatureHigh"       : false,
+            "temperatureLow"        : false,
+            "batteryLow"            : false
+        };
+
+        _alertsSettings = {
+            "shockDetected"   : {},
+            "temperatureHigh" : {},
+            "temperatureLow"  : {},
+            "batteryLow"      : {}
+        };
     }
 
     /**
      *  Start data processing.
-     *   @param {table} dataProcSettings - Table with the settings.
-     *        Optional, all settings have defaults.
-     *        If a setting is missed, it is reset to default.
-     *        The settings:
-     *          "temperatureHighAlertThr": {float} - Temperature high alert threshold, in Celsius.
-     *                                          Default: DEFAULT_TEMPERATURE_HIGH
-     *           "temperatureLowAlertThr": {float} - Temperature low alert threshold, in Celsius.
-     *                                          Default: DEFAULT_TEMPERATURE_LOW
-     *                "dataReadingPeriod": {float} - Data reading period, in seconds.
-     *                                          Default: DEFAULT_DATA_READING_PERIOD
-     *                "dataSendingPeriod": {float} - Data sending period, in seconds.
-     *                                          Default: DEFAULT_DATA_SENDING_PERIOD
-     *                    "batteryLowThr": {float} - Battery low alert threshold
-     *                                          Default: DEFAULT_BATTERY_LOW
-     *                   "shockThreshold": {float} - Shock acceleration threshold, in g.
-     *                                      Default: DEFAULT_SHOCK_THRESHOLD
+     *  @param {table} cfg - Table with the full configuration.
+     *                       For details, please, see the documentation
+     *
+     * @return {Promise} that:
+     * - resolves if the operation succeeded
+     * - rejects if the operation failed
      */
-    function start(dataProcSettings = {}) {
-        _temperatureHighAlertThr = DEFAULT_TEMPERATURE_HIGH;
-        _temperatureLowAlertThr = DEFAULT_TEMPERATURE_LOW;
-        _dataReadingPeriod = DEFAULT_DATA_READING_PERIOD;
-        _dataSendingPeriod = DEFAULT_DATA_SENDING_PERIOD;
-        _batteryLowThr = DEFAULT_BATTERY_LOW;
-        _shockThreshold = DEFAULT_SHOCK_THRESHOLD;
+    function start(cfg) {
+        updateCfg(cfg);
 
-        _checkDataProcSettings(dataProcSettings);
+        _lm.setGeofencingEventCb(_onGeofencingEvent.bindenv(this));
+        _lm.setRepossessionEventCb(_onRepossessionEvent.bindenv(this));
+        _mm.setMotionEventCb(_onMotionEvent.bindenv(this));
 
-        if (_ad) {
-            _ad.enableShockDetection(_onShockDetectedEvent.bindenv(this),
-                                     {"shockThreshold" : _shockThreshold});
-        } else {
-            ::info("Accelerometer driver object is null", "DataProcessor");
-        }
+        return Promise.resolve(null);
+    }
 
-        if (_mm) {
-            _mm.setNewLocationCb(_onNewLocation.bindenv(this));
-            _mm.setMotionEventCb(_onMotionEvent.bindenv(this));
-            _mm.setGeofencingEventCb(_onGeofencingEvent.bindenv(this));
-        } else {
-            ::info("Motion monitor object is null", "DataProcessor");
-        }
+    // TODO: Comment
+    function updateCfg(cfg) {
+        _updCfgAlerts(cfg);
+        // This call will trigger data reading/sending. So it should be the last one
+        _updCfgGeneral(cfg);
 
-        // starts periodic data reading and sending
-        _dataReadingTimer = imp.wakeup(_dataReadingPeriod,
-                                       _dataProcTimerCb.bindenv(this));
-        _dataSendingTimer = imp.wakeup(_dataSendingPeriod,
-                                       _dataSendTimerCb.bindenv(this));
+        return Promise.resolve(null);
     }
 
     // -------------------- PRIVATE METHODS -------------------- //
 
-    /**
-     * Check settings element.
-     * Returns the specified value if the check fails.
-     *
-     * @param {float} val - Value of settings element.
-     * @param {float} defVal - Default value of settings element.
-     * @param {bool} flCheckSign - Flag for sign check.
-     *
-     * @return {float} If success - value, else - default value.
-     */
-    function _checkVal(val, defVal, flCheckSign = false) {
-        if (typeof val == "float") {
-            if (flCheckSign) {
-                if (val > 0.0) {
-                    return val;
-                }
-            } else {
-                return val;
-            }
-        } else {
-            ::error("Incorrect type of settings parameter", "DataProcessor");
+    // TODO: Comment
+    function _updCfgGeneral(cfg) {
+        if ("readingPeriod" in cfg || "connectingPeriod" in cfg) {
+            _dataReadingPeriod = getValFromTable(cfg, "readingPeriod", _dataReadingPeriod);
+            _dataSendingPeriod = getValFromTable(cfg, "connectingPeriod", _dataSendingPeriod);
+            // Let's immediately call data reading function and send the data because reading/sending periods changed.
+            // This will also reset the reading and sending timers
+            _dataProc();
+            _dataSend();
         }
-
-        return defVal;
     }
 
-    /**
-     *  Check and set settings.
-     *  Sets default values for incorrect settings.
-     *
-     *   @param {table} dataProcSettings - Table with the settings.
-     *        Optional, all settings have defaults.
-     *        The settings:
-     *          "temperatureHighAlertThr": {float} - Temperature high alert threshold, in Celsius.
-     *                                          Default: DEFAULT_TEMPERATURE_HIGH
-     *           "temperatureLowAlertThr": {float} - Temperature low alert threshold, in Celsius.
-     *                                          Default: DEFAULT_TEMPERATURE_LOW
-     *                "dataReadingPeriod": {float} - Data reading period, in seconds.
-     *                                          Default: DEFAULT_DATA_READING_PERIOD
-     *                "dataSendingPeriod": {float} - Data sending period, in seconds.
-     *                                          Default: DEFAULT_DATA_SENDING_PERIOD
-     *                    "batteryLowThr": {float} - Battery low alert threshold
-     *                                          Default: DEFAULT_BATTERY_LOW
-     *                   "shockThreshold": {float} - Shock acceleration threshold, in g.
-     *                                      Default: DEFAULT_SHOCK_THRESHOLD
-     */
-    function _checkDataProcSettings(dataProcSettings) {
-        foreach (key, value in dataProcSettings) {
-            if (typeof key == "string") {
-                switch(key) {
-                    case "temperatureHighAlertThr":
-                        _temperatureHighAlertThr = _checkVal(key, value, DEFAULT_TEMPERATURE_HIGH);
-                        break;
-                    case "temperatureLowAlertThr":
-                        _temperatureLowAlertThr = _checkVal(key, value, DEFAULT_TEMPERATURE_LOW);
-                        break;
-                    case "dataReadingPeriod":
-                        _dataReadingPeriod = _checkVal(key, value, DEFAULT_DATA_READING_PERIOD);
-                        break;
-                    case "dataSendingPeriod":
-                        _dataSendingPeriod = _checkVal(key, value, DEFAULT_DATA_SENDING_PERIOD);
-                        break;
-                    case "batteryLowThr":
-                        _batteryLowThr = _checkVal(key, value, DEFAULT_BATTERY_LOW);
-                        break;
-                    case "shockThreshold":
-                        _shockThreshold = _checkVal(key, value, DEFAULT_SHOCK_THRESHOLD, true);
-                        break;
-                    default:
-                        ::error("Incorrect key name", "DataProcessor");
-                        break;
-                }
-            } else {
-                ::error("Incorrect key type", "DataProcessor");
-            }
+    // TODO: Comment
+    function _updCfgAlerts(cfg) {
+        local alertsCfg = getValFromTable(cfg, "alerts");
+        local shockDetectedCfg   = getValFromTable(alertsCfg, "shockDetected");
+        local temperatureHighCfg = getValFromTable(alertsCfg, "temperatureHigh");
+        local temperatureLowCfg  = getValFromTable(alertsCfg, "temperatureLow");
+        local batteryLowCfg      = getValFromTable(alertsCfg, "batteryLow");
+
+        if (shockDetectedCfg) {
+            _allAlerts.shockDetected = false;
+            mixTables(shockDetectedCfg, _alertsSettings.shockDetected);
+            _configureShockDetection();
+        }
+        if (temperatureHighCfg || temperatureLowCfg) {
+            _temperatureState = DP_TEMPERATURE_LEVEL.NORMAL;
+            _allAlerts.temperatureHigh = false;
+            _allAlerts.temperatureLow = false;
+            mixTables(temperatureHighCfg, _alertsSettings.temperatureHigh);
+            mixTables(temperatureLowCfg, _alertsSettings.temperatureLow);
+        }
+        if (batteryLowCfg) {
+            _batteryState = DP_BATTERY_LEVEL.NORMAL;
+            _allAlerts.batteryLow = false;
+            mixTables(batteryLowCfg, _alertsSettings.batteryLow);
+        }
+    }
+
+    // TODO: Comment
+    function _configureShockDetection() {
+        if (_alertsSettings.shockDetected.enabled) {
+            ::debug("Activating shock detection..", "DataProcessor");
+            local settings = { "shockThreshold" : _alertsSettings.shockDetected.threshold };
+            _ad.enableShockDetection(_onShockDetectedEvent.bindenv(this), settings);
+        } else {
+            _ad.enableShockDetection(null);
         }
     }
 
@@ -4735,42 +5146,46 @@ class DataProcessor {
      *  Data and alerts reading and processing.
      */
     function _dataProc() {
-
-        _dataReadingTimer && imp.cancelwakeup(_dataReadingTimer);
-
         // read temperature, check alert conditions
         _checkTemperature();
 
         // read battery level, check alert conditions
-        _checkBatteryVoltLevel();
+        _checkBatteryLevel();
 
         // check if alerts have been triggered
         local alerts = [];
         foreach (key, val in _allAlerts) {
             if (val) {
-                alerts.append(key.tostring());
+                alerts.append(key);
+                _allAlerts[key] = false;
             }
-            _allAlerts[key] = false;
         }
         local alertsCount = alerts.len();
 
-        _dataMesg = {"trackerId":hardware.getdeviceid(),
-                      "timestamp": time(),
-                      "status":{"inMotion":_inMotion},
-                                "location":{"timestamp": _currentLocation.timestamp,
-                                    "type": _currentLocation.type,
-                                    "accuracy": _currentLocation.accuracy,
-                                    "lng": _currentLocation.longitude,
-                                    "lat": _currentLocation.latitude},
-                       "sensors":{"temperature": _curTemper == DP_INIT_TEMPER_VALUE ? 0 : _curTemper}, // send 0 degrees of Celsius if termosensor error
-                       "alerts":alerts};
+        local lmStatus = _lm.getStatus();
+        local flags = mixTables(_mm.getStatus().flags, lmStatus.flags);
+        local location = lmStatus.location;
 
-        ::debug("Message: trackerId: " + _dataMesg.trackerId + ", timestamp: " + _dataMesg.timestamp +
-               ", inMotion: " + _inMotion +
-               ", location timestamp: " + _currentLocation.timestamp + ", type: " +
-               _currentLocation.type + ", accuracy: " + _currentLocation.accuracy +
-               ", lng: " + _currentLocation.longitude + ", lat: " + _currentLocation.latitude +
-               ", temperature: " + _curTemper, "DataProcessor");
+        local dataMsg = {
+            "trackerId": hardware.getdeviceid(),
+            "timestamp": time(),
+            "status": flags,
+            "location": {
+                "timestamp": location.timestamp,
+                "type": location.type,
+                "accuracy": location.accuracy,
+                "lng": location.longitude,
+                "lat": location.latitude
+            },
+            "sensors": {},
+            "alerts": alerts
+        };
+
+        (_temperature  != null) && (dataMsg.sensors.temperature  <- _temperature);
+        (_batteryLevel != null) && (dataMsg.sensors.batteryLevel <- _batteryLevel);
+
+        ::debug("Message: " + JSONEncoder.encode(dataMsg), "DataProcessor");
+
         if (alertsCount > 0) {
             ::info("Alerts:", "DataProcessor");
             foreach (item in alerts) {
@@ -4779,7 +5194,7 @@ class DataProcessor {
         }
 
         // ReplayMessenger saves the message till imp-device is connected
-        rm.send(APP_RM_MSG_NAME.DATA, clone _dataMesg, RM_IMPORTANCE_HIGH);
+        rm.send(APP_RM_MSG_NAME.DATA, dataMsg, RM_IMPORTANCE_HIGH);
         ledIndication && ledIndication.indicate(LI_EVENT_TYPE.NEW_MSG);
 
         // If at least one alert, try to send data immediately
@@ -4787,6 +5202,7 @@ class DataProcessor {
             _dataSend();
         }
 
+        _dataReadingTimer && imp.cancelwakeup(_dataReadingTimer);
         _dataReadingTimer = imp.wakeup(_dataReadingPeriod,
                                        _dataProcTimerCb.bindenv(this));
     }
@@ -4798,89 +5214,70 @@ class DataProcessor {
         local res = _ts.read();
         if ("error" in res) {
             ::error("Failed to read temperature: " + res.error, "DataProcessor");
-            _curTemper = DP_INIT_TEMPER_VALUE;
-        } else {
-            _curTemper = res.temperature;
-            ::debug("Temperature: " + _curTemper);
+            // Don't generate alerts and don't send temperature to the cloud
+            _temperature = null;
+            return;
         }
 
-        if (_curTemper > _temperatureHighAlertThr) {
-            if (_temperatureState != DP_TEMPERATURE_LEVEL.T_HIGHER_RANGE) {
+        _temperature = res.temperature;
+        ::debug("Temperature: " + _temperature, "DataProcessor");
+
+        local tempHigh = _alertsSettings.temperatureHigh;
+        local tempLow = _alertsSettings.temperatureLow;
+
+        if (tempHigh.enabled) {
+            if (_temperature > tempHigh.threshold && _temperatureState != DP_TEMPERATURE_LEVEL.HIGH) {
                 _allAlerts.temperatureHigh = true;
-                _temperatureState = DP_TEMPERATURE_LEVEL.T_HIGHER_RANGE;
+                _temperatureState = DP_TEMPERATURE_LEVEL.HIGH;
 
                 ledIndication && ledIndication.indicate(LI_EVENT_TYPE.ALERT_TEMP_HIGH);
+            } else if (_temperatureState == DP_TEMPERATURE_LEVEL.HIGH &&
+                       _temperature < (tempHigh.threshold - tempHigh.hysteresis)) {
+                _temperatureState = DP_TEMPERATURE_LEVEL.NORMAL;
             }
         }
 
-        if ((_temperatureState == DP_TEMPERATURE_LEVEL.T_HIGHER_RANGE) &&
-            (_curTemper < (_temperatureHighAlertThr - DP_TEMPER_HYST)) &&
-            (_curTemper > _temperatureLowAlertThr)) {
-            _temperatureState = DP_TEMPERATURE_LEVEL.T_IN_RANGE;
-        }
-
-        if (_curTemper < _temperatureLowAlertThr &&
-            _curTemper != DP_INIT_TEMPER_VALUE) {
-            if (_temperatureState != DP_TEMPERATURE_LEVEL.T_BELOW_RANGE) {
+        if (tempLow.enabled) {
+            if (_temperature < tempLow.threshold && _temperatureState != DP_TEMPERATURE_LEVEL.LOW) {
                 _allAlerts.temperatureLow = true;
-                _temperatureState = DP_TEMPERATURE_LEVEL.T_BELOW_RANGE;
+                _temperatureState = DP_TEMPERATURE_LEVEL.LOW;
 
                 ledIndication && ledIndication.indicate(LI_EVENT_TYPE.ALERT_TEMP_LOW);
+            } else if (_temperatureState == DP_TEMPERATURE_LEVEL.LOW &&
+                       _temperature > (tempLow.threshold + tempLow.hysteresis)) {
+                _temperatureState = DP_TEMPERATURE_LEVEL.NORMAL;
             }
-        }
-
-        if ((_temperatureState == DP_TEMPERATURE_LEVEL.T_BELOW_RANGE) &&
-            (_curTemper > (_temperatureLowAlertThr + DP_TEMPER_HYST)) &&
-            (_curTemper < _temperatureHighAlertThr)) {
-            _temperatureState = DP_TEMPERATURE_LEVEL.T_IN_RANGE;
         }
     }
 
     /**
      *  Read battery level, check alert conditions
      */
-    function _checkBatteryVoltLevel() {
-        // get the current battery level, check alert conditions - TODO
-        if (_curBatteryLev < _batteryLowThr &&
-            _curBatteryLev != DP_INIT_BATTERY_LEVEL) {
-                if (_batteryState == DP_BATTERY_VOLT_LEVEL.V_IN_RANGE) {
-                    _allAlerts.batteryLow = true;
-                    _batteryState = DP_BATTERY_VOLT_LEVEL.V_NOT_IN_RANGE;
-                }
+    function _checkBatteryLevel() {
+        try {
+            _batteryLevel = _bd.measureBattery();
+        } catch (err) {
+            ::error("Failed to get battery level: " + err, "DataProcessor");
+            // Don't generate alerts and don't send battery level to the cloud
+            _batteryLevel = null;
+            return;
         }
 
-        if (_curBatteryLev > (_batteryLowThr + DP_BATTERY_LEV_HYST)) {
-            _batteryState = DP_BATTERY_VOLT_LEVEL.V_IN_RANGE;
-        }
-    }
+        ::debug("Battery level: " + _batteryLevel, "DataProcessor");
 
-    /**
-     *  The handler is called when a new location is received.
-     *  @param {table} loc - Location information.
-     *      The fields:
-     *          "timestamp": {integer}  - Time value
-     *               "type": {string}   - gnss or cell e.g.
-     *           "accuracy": {integer}  - Accuracy in meters
-     *          "longitude": {float}    - Longitude in degrees
-     *           "latitude": {float}    - Latitude in degrees
-     */
-    function _onNewLocation(loc) {
-        if (loc && typeof loc == "table") {
-            _currentLocation = loc;
-        } else {
-            ::error("Error type of location value", "DataProcessor");
+        if (!_alertsSettings.batteryLow.enabled) {
+            return;
         }
-    }
 
-    /**
-     *  The handler is called when a new battery level is received.
-     *  @param {float} lev - Сharge level in percent.
-     */
-    function _onNewBatteryLevel(lev) {
-        if (lev && typeof lev == "float") {
-            _curBatteryLev = lev;
-        } else {
-            ::error("Error type of battery level", "DataProcessor");
+        local batteryLowThr = _alertsSettings.batteryLow.threshold;
+
+        if (_batteryLevel < batteryLowThr && _batteryState == DP_BATTERY_LEVEL.NORMAL) {
+            _allAlerts.batteryLow = true;
+            _batteryState = DP_BATTERY_LEVEL.LOW;
+        }
+
+        if (_batteryLevel > batteryLowThr + DP_BATTERY_LEVEL_HYST) {
+            _batteryState = DP_BATTERY_LEVEL.NORMAL;
         }
     }
 
@@ -4901,15 +5298,12 @@ class DataProcessor {
     function _onMotionEvent(eventType) {
         if (eventType) {
             _allAlerts.motionStarted = true;
-            _inMotion = true;
-
             ledIndication && ledIndication.indicate(LI_EVENT_TYPE.ALERT_MOTION_STARTED);
         } else {
             _allAlerts.motionStopped = true;
-            _inMotion = false;
-
             ledIndication && ledIndication.indicate(LI_EVENT_TYPE.ALERT_MOTION_STOPPED);
         }
+
         _dataProc();
     }
 
@@ -4923,13 +5317,21 @@ class DataProcessor {
         } else {
             _allAlerts.geofenceExited = true;
         }
+
+        _dataProc();
+    }
+
+    /**
+     *  The handler is called when repossession mode is activated
+     */
+    function _onRepossessionEvent() {
+        _allAlerts.repossessionActivated = true;
+
         _dataProc();
     }
 }
 
-//line 40 "/home/we/Develop/Squirrel/prog-x/src/device/Main.device.nut"
-
-//line 2 "LocationDriver.device.nut"
+//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/LocationDriver.device.nut"
 
 // GNSS options:
 // Accuracy threshold of positioning, in meters
@@ -4948,6 +5350,11 @@ const LD_UBLOX_LOC_CHECK_PERIOD = 1;
 // The minimum period of updating the offline assist data of u-blox, in seconds
 const LD_ASSIST_DATA_UPDATE_MIN_PERIOD = 43200;
 
+// File names used by LocationDriver
+enum LD_FILE_NAMES {
+    LAST_KNOWN_LOCATION = "lastKnownLocation"
+}
+
 // U-blox fix types enumeration
 enum LD_UBLOX_FIX_TYPE {
     NO_FIX,
@@ -4965,8 +5372,8 @@ class LocationDriver {
     _ubxDriver = null;
     // UBloxAssistNow instance
     _ubxAssist = null;
-    // SPIFlashFileSystem instance. Used to store u-blox assist data
-    _assistDataStorage = null;
+    // SPIFlashFileSystem instance. Used to store u-blox assist data and other data
+    _storage = null;
     // Timestamp of the latest assist data check (download)
     _assistDataUpdateTs = 0;
     // Promise that resolves or rejects when the location has been obtained.
@@ -4979,6 +5386,8 @@ class LocationDriver {
     _gnssFailsCounter = 0;
     // ESP32 object
     _esp = null;
+    // True if location using BLE devices is enabled, false otherwise
+    _bleDevicesEnabled = false;
     // Known BLE devices
     _knownBLEDevices = null;
 
@@ -4986,8 +5395,7 @@ class LocationDriver {
      * Constructor for Location Driver
      */
     constructor() {
-        _knownBLEDevices = DEFAULT_BLE_DEVICES;
-
+        // TODO: Disable UART when it's not in use to save power
         _ubxDriver = UBloxM8N(HW_UBLOX_UART);
         local ubxSettings = {
             "baudRate"     : LD_UBLOX_UART_BAUDRATE,
@@ -5000,12 +5408,32 @@ class LocationDriver {
         _ubxDriver.configure(ubxSettings);
         _ubxAssist = UBloxAssistNow(_ubxDriver);
 
-        _assistDataStorage = SPIFlashFileSystem(HW_LD_SFFS_START_ADDR, HW_LD_SFFS_END_ADDR);
-        _assistDataStorage.init();
+        _storage = SPIFlashFileSystem(HW_LD_SFFS_START_ADDR, HW_LD_SFFS_END_ADDR);
+        _storage.init();
 
         cm.onConnect(_onConnected.bindenv(this), "LocationDriver");
         _esp = ESP32Driver(HW_ESP_POWER_EN_PIN, HW_ESP_UART);
         _updateAssistData();
+    }
+
+    // TODO: Comment
+    function lastKnownLocation() {
+        local decoder = @(data) JSONParser.parse(data.tostring());
+        return _load(LD_FILE_NAMES.LAST_KNOWN_LOCATION, Serializer.deserialize.bindenv(Serializer));
+    }
+
+    // TODO: Comment
+    // NOTE: This class only stores a reference to the object with BLE devices.
+    // If this object is changed outside this class, this class will have the updated version of the object
+    function configureBLEDevices(enabled = null, knownBLEDevices = null) {
+        // TODO: Convert all letters to small
+        knownBLEDevices && (_knownBLEDevices = knownBLEDevices);
+
+        if (enabled && !_knownBLEDevices) {
+            throw "Known BLE devices must be specified to enable location using BLE devices";
+        }
+
+        (enabled != null) && (_bleDevicesEnabled = enabled);
     }
 
     /**
@@ -5025,7 +5453,12 @@ class LocationDriver {
 
         return _gettingLocation = _getLocationBLEDevices()
         .fail(function(err) {
-            ::info("Couldn't get location using BLE devices: " + err, "LocationDriver");
+            if (err == null) {
+                ::debug("Location using BLE devices is disabled", "LocationDriver");
+            } else {
+                ::info("Couldn't get location using BLE devices: " + err, "LocationDriver");
+            }
+
             return _getLocationGNSS();
         }.bindenv(this))
         .fail(function(err) {
@@ -5034,6 +5467,8 @@ class LocationDriver {
         }.bindenv(this))
         .then(function(location) {
             _gettingLocation = null;
+            // Save this location as the last known one
+            _save(location, LD_FILE_NAMES.LAST_KNOWN_LOCATION, Serializer.serialize.bindenv(Serializer));
             return location;
         }.bindenv(this), function(err) {
             ::info("Couldn't get location using WiFi networks and cell towers: " + err, "LocationDriver");
@@ -5197,14 +5632,21 @@ class LocationDriver {
      * - rejects with an error if the operation failed
      */
     function _getLocationBLEDevices() {
-        ::debug("Getting location using BLE devices..", "LocationDriver");
         // Default accuracy
         const LD_BLE_BEACON_DEFAULT_ACCURACY = 10;
 
+        if (!_bleDevicesEnabled) {
+            // Reject with null to indicate that the feature is disabled
+            return Promise.reject(null);
+        }
+
+        ::debug("Getting location using BLE devices..", "LocationDriver");
+
+        local knownGeneric = _knownBLEDevices.generic;
+        local knownIBeacons = _knownBLEDevices.iBeacon;
+
         return _esp.scanBLEAdverts()
         .then(function(adverts) {
-            local knownGeneric = _knownBLEDevices.generic;
-            local knownIBeacons = _knownBLEDevices.iBeacon;
             // Table of "recognized" advertisements (for which the location is known) and their locations
             local recognized = {};
 
@@ -5221,7 +5663,7 @@ class LocationDriver {
                 if (parsed && parsed.uuid  in knownIBeacons
                            && parsed.major in knownIBeacons[parsed.uuid]
                            && parsed.minor in knownIBeacons[parsed.uuid][parsed.major]) {
-                    local iBeaconInfo = format("UUID %s, Major %d, Minor %d", _formatUUID(parsed.uuid), parsed.major, parsed.minor);
+                    local iBeaconInfo = format("UUID %s, Major %s, Minor %s", _formatUUID(parsed.uuid), parsed.major, parsed.minor);
                     ::debug(format("An iBeacon device with known location found: %s, %s", advert.address, iBeaconInfo), "LocationDriver");
 
                     recognized[advert] <- knownIBeacons[parsed.uuid][parsed.major][parsed.minor];
@@ -5241,6 +5683,7 @@ class LocationDriver {
 
             ::info("Got location using BLE devices", "LocationDriver");
             ::debug("The closest BLE device with known location: " + closestDevice.address, "LocationDriver");
+            ::debug(recognized[closestDevice], "LocationDriver");
 
             return {
                 "timestamp": time(),
@@ -5343,8 +5786,8 @@ class LocationDriver {
      * @return {table | null} Parsed iBeacon packet or null if no iBeacon packet found
      *  The keys and values of the table:
      *     "uuid"  : {string}  - UUID (16 bytes).
-     *     "major" : {integer} - Major (from 0 to 65535).
-     *     "minor" : {integer} - Minor (from 0 to 65535).
+     *     "major" : {string} - Major (from 0 to 65535).
+     *     "minor" : {string} - Minor (from 0 to 65535).
      */
     function _parseIBeaconPacket(data) {
         // Packet length: 0x1A = 26 bytes
@@ -5381,9 +5824,11 @@ class LocationDriver {
         data.seek(packetStartIdx + LD_IBEACON_PREFIX.len());
 
         return {
-            "uuid": data.readblob(16).tostring(),
-            "major": (data.readn('b') << 8) | data.readn('b'),
-            "minor": (data.readn('b') << 8) | data.readn('b'),
+            // Get a string like "74d2515660e6444ca177a96e67ecfc5f" without "0x" prefix
+            "uuid": utilities.blobToHexString(data.readblob(16)).slice(2),
+            // We convert them to strings here just for convenience - these values are strings in the table (JSON) of known BLE devices
+            "major": ((data.readn('b') << 8) | data.readn('b')).tostring(),
+            "minor": ((data.readn('b') << 8) | data.readn('b')).tostring(),
         }
     }
 
@@ -5502,11 +5947,11 @@ class LocationDriver {
             local tomorrowFileName = UBloxAssistNow.getDateString(date(time() + LD_DAY_SEC));
             local yesterdayFileName = UBloxAssistNow.getDateString(date(time() - LD_DAY_SEC));
 
-            if (_assistDataStorage.fileExists(todayFileName)) {
+            if (_storage.fileExists(todayFileName)) {
                 chosenFile = todayFileName;
-            } else if (_assistDataStorage.fileExists(tomorrowFileName)) {
+            } else if (_storage.fileExists(tomorrowFileName)) {
                 chosenFile = tomorrowFileName;
-            } else if (_assistDataStorage.fileExists(yesterdayFileName)) {
+            } else if (_storage.fileExists(yesterdayFileName)) {
                 chosenFile = yesterdayFileName;
             }
 
@@ -5517,9 +5962,7 @@ class LocationDriver {
 
             ::debug("Found applicable u-blox assist data with the following date: " + chosenFile, "LocationDriver");
 
-            local file = _assistDataStorage.open(chosenFile, "r");
-            local data = file.read();
-            file.close();
+            local data = _load(chosenFile);
             data.seek(0, 'b');
 
             return data;
@@ -5538,19 +5981,8 @@ class LocationDriver {
     function _saveUBloxAssistData(data) {
         ::debug("Saving u-blox assist data..", "LocationDriver");
 
-        try {
-            foreach (date, assistMsgs in data) {
-                // Erase the existing file if any
-                if (_assistDataStorage.fileExists(date)) {
-                    _assistDataStorage.eraseFile(date);
-                }
-
-                local file = _assistDataStorage.open(date, "w");
-                file.write(assistMsgs);
-                file.close();
-            }
-        } catch (err) {
-            ::error("Couldn't save u-blox assist data: " + err, "LocationDriver");
+        foreach (date, assistMsgs in data) {
+            _save(assistMsgs, date);
         }
     }
 
@@ -5558,30 +5990,38 @@ class LocationDriver {
      * Erase stale u-blox assist data from the storage
      */
     function _eraseStaleUBloxAssistData() {
+        const LD_UBLOX_AD_INTEGER_DATE_MIN = 20220101;
+        const LD_UBLOX_AD_INTEGER_DATE_MAX = 20990101;
+
         ::debug("Erasing stale u-blox assist data..", "LocationDriver");
 
         try {
-            local files = _assistDataStorage.getFileList();
+            local files = _storage.getFileList();
             // Since the date has the following format YYYYMMDD, we can compare dates as integer numbers
             local yesterday = UBloxAssistNow.getDateString(date(time() - LD_DAY_SEC)).tointeger();
 
+            ::debug("There are " + files.len() + " file(s) in the storage", "LocationDriver");
+
             foreach (file in files) {
                 local name = file.fname;
-                local erase = true;
+                local erase = false;
 
                 try {
-                    // We need to find assist files for dates before yesterday
+                    // Any assist data file has a name that can be converted to an integer
                     local fileDate = name.tointeger();
 
-                    erase = fileDate < yesterday;
-                } catch (err) {
-                    ::error("Couldn't check the date of a u-blox assist data file: " + err, "LocationDriver");
+                    // We need to find assist files for dates before yesterday
+                    if (fileDate > LD_UBLOX_AD_INTEGER_DATE_MIN && fileDate < LD_UBLOX_AD_INTEGER_DATE_MAX) {
+                        erase = fileDate < yesterday;
+                    }
+                } catch (_) {
+                    // If the file's name can't be converted to an integer, this is not an assist data file and we must not erase it
                 }
 
                 if (erase) {
                     ::debug("Erasing u-blox assist data file: " + name, "LocationDriver");
                     // Erase stale assist message
-                    _assistDataStorage.eraseFile(name);
+                    _storage.eraseFile(name);
                 }
             }
         } catch (err) {
@@ -5609,6 +6049,47 @@ class LocationDriver {
         return (gpsAccuracy < 0) ? LD_EARTH_RAD : gpsAccuracy / 1000.0;
     }
 
+
+    // -------------------- STORAGE METHODS -------------------- //
+
+    // TODO: Comment
+    function _save(data, fileName, encoder = null) {
+        _erase(fileName);
+
+        try {
+            local file = _storage.open(fileName, "w");
+            file.write(encoder ? encoder(data) : data);
+            file.close();
+        } catch (err) {
+            ::error(format("Couldn't save data (file name = %s): %s", fileName, err), "LocationDriver");
+        }
+    }
+
+    // TODO: Comment
+    function _load(fileName, decoder = null) {
+        try {
+            if (_storage.fileExists(fileName)) {
+                local file = _storage.open(fileName, "r");
+                local data = file.read();
+                file.close();
+                return decoder ? decoder(data) : data;
+            }
+        } catch (err) {
+            ::error(format("Couldn't load data (file name = %s): %s", fileName, err), "LocationDriver");
+        }
+
+        return null;
+    }
+
+    // TODO: Comment
+    function _erase(fileName) {
+        try {
+            // Erase the existing file if any
+            _storage.fileExists(fileName) && _storage.eraseFile(fileName);
+        } catch (err) {
+            ::error(format("Couldn't erase data (file name = %s): %s", fileName, err), "LocationDriver");
+        }
+    }
 
     // -------------------- HELPER METHODS -------------------- //
 
@@ -5679,7 +6160,7 @@ class LocationDriver {
     }
 }
 
-//line 46 "/home/we/Develop/Squirrel/prog-x/src/device/Main.device.nut"
+//line 48 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
 
 // Main application on Imp-Device: does the main logic of the application
 
@@ -5705,6 +6186,9 @@ const APP_SEND_BUFFER_SIZE = 10240;
 class Application {
     _locationDriver = null;
     _accelDriver = null;
+    _cfgManager = null;
+    _batteryMon = null;
+    _locationMon = null;
     _motionMon = null;
     _dataProc = null;
     _thermoSensDriver = null;
@@ -5713,6 +6197,7 @@ class Application {
      * Application Constructor
      */
     constructor() {
+
         // Create and intialize Connection Manager
         // NOTE: This needs to be called as early in the code as possible
         // in order to run the application without a connection to the Internet
@@ -5730,29 +6215,35 @@ class Application {
         // Create and intialize Replay Messenger
         _initReplayMessenger()
         .then(function(_) {
+            HW_SHARED_I2C.configure(CLOCK_SPEED_400_KHZ);
+
+            _batteryMon = BatteryMonitor(HW_SHARED_I2C);
+            return _batteryMon.init();
+        }.bindenv(this))
+        .then(function(_) {
             // Create and initialize Location Driver
             _locationDriver = LocationDriver();
 
             // Create and initialize Accelerometer Driver
-            _accelDriver = AccelerometerDriver(HW_ACCEL_I2C, HW_ACCEL_INT_PIN);
+            _accelDriver = AccelerometerDriver(HW_SHARED_I2C, HW_ACCEL_INT_PIN);
 
             // Create and initialize Thermosensor Driver
-            _thermoSensDriver = HTS221(HW_TEMPHUM_SENSOR_I2C);
+            _thermoSensDriver = HTS221(HW_SHARED_I2C);
             _thermoSensDriver.setMode(HTS221_MODE.ONE_SHOT);
 
+            // Create and initialize Location Monitor
+            _locationMon = LocationMonitor(_locationDriver);
             // Create and initialize Motion Monitor
-            _motionMon = MotionMonitor(_accelDriver, _locationDriver);
+            _motionMon = MotionMonitor(_accelDriver, _locationMon);
             // Create and initialize Data Processor
-            _dataProc = DataProcessor(_motionMon, _accelDriver, _thermoSensDriver, null);
-            // Start Data processor
-            _dataProc.start();
-            // Start Motion monitor
-            _motionMon.start();
-        }.bindenv(this), function(err) {
-            ::error("Replay Messenger initialization error: " + err);
+            _dataProc = DataProcessor(_locationMon, _motionMon, _accelDriver, _thermoSensDriver, _batteryMon);
+            // Create and initialize Cfg Manager
+            _cfgManager = CfgManager([_locationMon, _motionMon, _dataProc]);
+            // Start Cfg Manager
+            _cfgManager.start();
         }.bindenv(this))
         .fail(function(err) {
-            ::error("Error during initialization of business logic modules: " + err);
+            ::error("Error during initialization: " + err);
 
             // TODO: Reboot after a delay? Or enter the emergency mode?
         }.bindenv(this));
@@ -5816,6 +6307,21 @@ class Application {
         local name = message.payload.name;
         return name == APP_RM_MSG_NAME.DATA;
     }
+
+    // TODO: Comment
+    function _eraseFlash() {
+        ::info(format("Erasing SPI flash from 0x%x to 0x%x...", HW_ERASE_FLASH_START_ADDR, HW_ERASE_FLASH_END_ADDR));
+
+        local spiflash = hardware.spiflash;
+        spiflash.enable();
+
+        for (local addr = HW_ERASE_FLASH_START_ADDR; addr < HW_ERASE_FLASH_END_ADDR; addr += 0x1000) {
+            spiflash.erasesector(addr);
+        }
+
+        spiflash.disable();
+        ::info("Erasing finished!");
+    }
 }
 
 // ---------------------------- THE MAIN CODE ---------------------------- //
@@ -5837,3 +6343,5 @@ function startApp() {
 
 pm <- ProductionManager(startApp);
 pm.start();
+//line 7 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/not_for_uploading/my_main.device.nut"
+

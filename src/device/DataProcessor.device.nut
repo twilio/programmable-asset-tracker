@@ -2,28 +2,19 @@
 
 // Temperature state enum
 enum DP_TEMPERATURE_LEVEL {
-    T_BELOW_RANGE,
-    T_IN_RANGE,
-    T_HIGHER_RANGE
+    LOW,
+    NORMAL,
+    HIGH
 };
 
 // Battery voltage state enum
-enum DP_BATTERY_VOLT_LEVEL {
-    V_IN_RANGE,
-    V_NOT_IN_RANGE
+enum DP_BATTERY_LEVEL {
+    NORMAL,
+    LOW
 };
 
-// Temperature hysteresis
-const DP_TEMPER_HYST = 1.0;
-
-// Init impossible temperature value
-const DP_INIT_TEMPER_VALUE = -300.0;
-
-// Init battery level
-const DP_INIT_BATTERY_LEVEL = 0;
-
 // Battery level hysteresis
-const DP_BATTERY_LEV_HYST = 2.0;
+const DP_BATTERY_LEVEL_HYST = 4.0;
 
 // Data Processor class.
 // Processes data, saves and sends messages
@@ -41,58 +32,65 @@ class DataProcessor {
     // Data sending timer handler
     _dataSendingTimer = null;
 
-    // Result message
-    _dataMesg = null;
-
     // Thermosensor driver object
     _ts = null;
 
+    // Battery driver object
+    _bd = null;
+
     // Accelerometer driver object
     _ad = null;
+
+    // Location Monitor object
+    _lm = null;
 
     // Motion Monitor driver object
     _mm = null;
 
     // Last temperature value
-    _curTemper = DP_INIT_TEMPER_VALUE;
+    _temperature = null;
 
     // Last battery level
-    _curBatteryLev = DP_INIT_BATTERY_LEVEL;
+    _batteryLevel = null;
 
     // Array of alerts
     _allAlerts = null;
 
     // state battery (voltage in permissible range or not)
-    _batteryState = DP_BATTERY_VOLT_LEVEL.V_IN_RANGE;
+    _batteryState = DP_BATTERY_LEVEL.NORMAL;
 
     // temperature state (temperature in permissible range or not)
-    _temperatureState = DP_TEMPERATURE_LEVEL.T_IN_RANGE;
+    _temperatureState = DP_TEMPERATURE_LEVEL.NORMAL;
 
     // Settings of shock, temperature and battery alerts
     _alertsSettings = null;
 
     /**
      *  Constructor for Data Processor class.
+     *  @param {object} locationMon - Location monitor object.
      *  @param {object} motionMon - Motion monitor object.
      *  @param {object} accelDriver - Accelerometer driver object.
      *  @param {object} temperDriver - Temperature sensor driver object.
      *  @param {object} batDriver - Battery driver object.
      */
-    constructor(motionMon, accelDriver, temperDriver, batDriver) {
+    constructor(locationMon, motionMon, accelDriver, temperDriver, batDriver) {
         _ad = accelDriver;
+        _lm = locationMon;
         _mm = motionMon;
         _ts = temperDriver;
+        _bd = batDriver;
 
         _allAlerts = {
             // TODO: Do we need alerts like trackerReset, trackerReconfigured?
-            "shockDetected"   : false,
-            "motionStarted"   : false,
-            "motionStopped"   : false,
-            "geofenceEntered" : false,
-            "geofenceExited"  : false,
-            "temperatureHigh" : false,
-            "temperatureLow"  : false,
-            "batteryLow"      : false
+            "shockDetected"         : false,
+            "motionStarted"         : false,
+            "motionStopped"         : false,
+            "geofenceEntered"       : false,
+            "geofenceExited"        : false,
+            "repossessionActivated" : false,
+            "temperatureHigh"       : false,
+            "temperatureLow"        : false,
+            "batteryLow"            : false
         };
 
         _alertsSettings = {
@@ -107,12 +105,17 @@ class DataProcessor {
      *  Start data processing.
      *  @param {table} cfg - Table with the full configuration.
      *                       For details, please, see the documentation
+     *
+     * @return {Promise} that:
+     * - resolves if the operation succeeded
+     * - rejects if the operation failed
      */
     function start(cfg) {
         updateCfg(cfg);
 
+        _lm.setGeofencingEventCb(_onGeofencingEvent.bindenv(this));
+        _lm.setRepossessionEventCb(_onRepossessionEvent.bindenv(this));
         _mm.setMotionEventCb(_onMotionEvent.bindenv(this));
-        _mm.setGeofencingEventCb(_onGeofencingEvent.bindenv(this));
 
         return Promise.resolve(null);
     }
@@ -154,14 +157,14 @@ class DataProcessor {
             _configureShockDetection();
         }
         if (temperatureHighCfg || temperatureLowCfg) {
-            _temperatureState = DP_TEMPERATURE_LEVEL.T_IN_RANGE;
+            _temperatureState = DP_TEMPERATURE_LEVEL.NORMAL;
             _allAlerts.temperatureHigh = false;
             _allAlerts.temperatureLow = false;
             mixTables(temperatureHighCfg, _alertsSettings.temperatureHigh);
             mixTables(temperatureLowCfg, _alertsSettings.temperatureLow);
         }
         if (batteryLowCfg) {
-            _batteryState = DP_BATTERY_VOLT_LEVEL.V_IN_RANGE;
+            _batteryState = DP_BATTERY_LEVEL.NORMAL;
             _allAlerts.batteryLow = false;
             mixTables(batteryLowCfg, _alertsSettings.batteryLow);
         }
@@ -213,7 +216,7 @@ class DataProcessor {
         _checkTemperature();
 
         // read battery level, check alert conditions
-        _checkBatteryVoltLevel();
+        _checkBatteryLevel();
 
         // check if alerts have been triggered
         local alerts = [];
@@ -225,26 +228,29 @@ class DataProcessor {
         }
         local alertsCount = alerts.len();
 
-        local status = _mm.getStatus();
+        local lmStatus = _lm.getStatus();
+        local flags = mixTables(_mm.getStatus().flags, lmStatus.flags);
+        local location = lmStatus.location;
 
-        _dataMesg = {
+        local dataMsg = {
             "trackerId": hardware.getdeviceid(),
             "timestamp": time(),
-            "status": status.flags,
+            "status": flags,
             "location": {
-                "timestamp": status.location.timestamp,
-                "type": status.location.type,
-                "accuracy": status.location.accuracy,
-                "lng": status.location.longitude,
-                "lat": status.location.latitude
+                "timestamp": location.timestamp,
+                "type": location.type,
+                "accuracy": location.accuracy,
+                "lng": location.longitude,
+                "lat": location.latitude
             },
             "sensors": {},
             "alerts": alerts
         };
-        if (_curTemper != DP_INIT_TEMPER_VALUE) {
-            _dataMesg.sensors.temperature <- _curTemper;
-        }
-        ::debug("Message: " + JSONEncoder.encode(_dataMesg), "@{CLASS_NAME}");
+
+        (_temperature  != null) && (dataMsg.sensors.temperature  <- _temperature);
+        (_batteryLevel != null) && (dataMsg.sensors.batteryLevel <- _batteryLevel);
+
+        ::debug("Message: " + JSONEncoder.encode(dataMsg), "@{CLASS_NAME}");
 
         if (alertsCount > 0) {
             ::info("Alerts:", "@{CLASS_NAME}");
@@ -254,7 +260,7 @@ class DataProcessor {
         }
 
         // ReplayMessenger saves the message till imp-device is connected
-        rm.send(APP_RM_MSG_NAME.DATA, clone _dataMesg, RM_IMPORTANCE_HIGH);
+        rm.send(APP_RM_MSG_NAME.DATA, dataMsg, RM_IMPORTANCE_HIGH);
         ledIndication && ledIndication.indicate(LI_EVENT_TYPE.NEW_MSG);
 
         // If at least one alert, try to send data immediately
@@ -274,49 +280,38 @@ class DataProcessor {
         local res = _ts.read();
         if ("error" in res) {
             ::error("Failed to read temperature: " + res.error, "@{CLASS_NAME}");
-            // Don't generate a temperatureLow alert and don't send temperature to the cloud
-            _curTemper = DP_INIT_TEMPER_VALUE;
+            // Don't generate alerts and don't send temperature to the cloud
+            _temperature = null;
             return;
-        } else {
-            _curTemper = res.temperature;
-            ::debug("Temperature: " + _curTemper, "@{CLASS_NAME}");
         }
+
+        _temperature = res.temperature;
+        ::debug("Temperature: " + _temperature, "@{CLASS_NAME}");
 
         local tempHigh = _alertsSettings.temperatureHigh;
         local tempLow = _alertsSettings.temperatureLow;
 
         if (tempHigh.enabled) {
-            if (_curTemper > tempHigh.threshold) {
-                if (_temperatureState != DP_TEMPERATURE_LEVEL.T_HIGHER_RANGE) {
-                    _allAlerts.temperatureHigh = true;
-                    _temperatureState = DP_TEMPERATURE_LEVEL.T_HIGHER_RANGE;
+            if (_temperature > tempHigh.threshold && _temperatureState != DP_TEMPERATURE_LEVEL.HIGH) {
+                _allAlerts.temperatureHigh = true;
+                _temperatureState = DP_TEMPERATURE_LEVEL.HIGH;
 
-                    ledIndication && ledIndication.indicate(LI_EVENT_TYPE.ALERT_TEMP_HIGH);
-                }
-            }
-
-            if ((_temperatureState == DP_TEMPERATURE_LEVEL.T_HIGHER_RANGE) &&
-                (_curTemper < (tempHigh.threshold - tempHigh.hysteresis)) &&
-                (!tempLow.enabled || _curTemper > tempLow.threshold)) {
-                _temperatureState = DP_TEMPERATURE_LEVEL.T_IN_RANGE;
+                ledIndication && ledIndication.indicate(LI_EVENT_TYPE.ALERT_TEMP_HIGH);
+            } else if (_temperatureState == DP_TEMPERATURE_LEVEL.HIGH &&
+                       _temperature < (tempHigh.threshold - tempHigh.hysteresis)) {
+                _temperatureState = DP_TEMPERATURE_LEVEL.NORMAL;
             }
         }
 
         if (tempLow.enabled) {
-            if (_curTemper < tempLow.threshold &&
-                _curTemper != DP_INIT_TEMPER_VALUE) {
-                if (_temperatureState != DP_TEMPERATURE_LEVEL.T_BELOW_RANGE) {
-                    _allAlerts.temperatureLow = true;
-                    _temperatureState = DP_TEMPERATURE_LEVEL.T_BELOW_RANGE;
+            if (_temperature < tempLow.threshold && _temperatureState != DP_TEMPERATURE_LEVEL.LOW) {
+                _allAlerts.temperatureLow = true;
+                _temperatureState = DP_TEMPERATURE_LEVEL.LOW;
 
-                    ledIndication && ledIndication.indicate(LI_EVENT_TYPE.ALERT_TEMP_LOW);
-                }
-            }
-
-            if ((_temperatureState == DP_TEMPERATURE_LEVEL.T_BELOW_RANGE) &&
-                (_curTemper > (tempLow.threshold + tempLow.hysteresis)) &&
-                (!tempHigh.enabled || _curTemper < tempHigh.threshold)) {
-                _temperatureState = DP_TEMPERATURE_LEVEL.T_IN_RANGE;
+                ledIndication && ledIndication.indicate(LI_EVENT_TYPE.ALERT_TEMP_LOW);
+            } else if (_temperatureState == DP_TEMPERATURE_LEVEL.LOW &&
+                       _temperature > (tempLow.threshold + tempLow.hysteresis)) {
+                _temperatureState = DP_TEMPERATURE_LEVEL.NORMAL;
             }
         }
     }
@@ -324,36 +319,31 @@ class DataProcessor {
     /**
      *  Read battery level, check alert conditions
      */
-    function _checkBatteryVoltLevel() {
+    function _checkBatteryLevel() {
+        try {
+            _batteryLevel = _bd.measureBattery();
+        } catch (err) {
+            ::error("Failed to get battery level: " + err, "@{CLASS_NAME}");
+            // Don't generate alerts and don't send battery level to the cloud
+            _batteryLevel = null;
+            return;
+        }
+
+        ::debug("Battery level: " + _batteryLevel, "@{CLASS_NAME}");
+
         if (!_alertsSettings.batteryLow.enabled) {
             return;
         }
 
         local batteryLowThr = _alertsSettings.batteryLow.threshold;
 
-        // get the current battery level, check alert conditions - TODO
-        if (_curBatteryLev < batteryLowThr &&
-            _curBatteryLev != DP_INIT_BATTERY_LEVEL) {
-                if (_batteryState == DP_BATTERY_VOLT_LEVEL.V_IN_RANGE) {
-                    _allAlerts.batteryLow = true;
-                    _batteryState = DP_BATTERY_VOLT_LEVEL.V_NOT_IN_RANGE;
-                }
+        if (_batteryLevel < batteryLowThr && _batteryState == DP_BATTERY_LEVEL.NORMAL) {
+            _allAlerts.batteryLow = true;
+            _batteryState = DP_BATTERY_LEVEL.LOW;
         }
 
-        if (_curBatteryLev > (batteryLowThr + DP_BATTERY_LEV_HYST)) {
-            _batteryState = DP_BATTERY_VOLT_LEVEL.V_IN_RANGE;
-        }
-    }
-
-    /**
-     *  The handler is called when a new battery level is received.
-     *  @param {float} lev - Сharge level in percent.
-     */
-    function _onNewBatteryLevel(lev) {
-        if (lev && typeof lev == "float") {
-            _curBatteryLev = lev;
-        } else {
-            ::error("Error type of battery level", "@{CLASS_NAME}");
+        if (_batteryLevel > batteryLowThr + DP_BATTERY_LEVEL_HYST) {
+            _batteryState = DP_BATTERY_LEVEL.NORMAL;
         }
     }
 
@@ -393,6 +383,15 @@ class DataProcessor {
         } else {
             _allAlerts.geofenceExited = true;
         }
+
+        _dataProc();
+    }
+
+    /**
+     *  The handler is called when repossession mode is activated
+     */
+    function _onRepossessionEvent() {
+        _allAlerts.repossessionActivated = true;
 
         _dataProc();
     }

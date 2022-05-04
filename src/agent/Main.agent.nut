@@ -34,39 +34,15 @@ class Application {
      */
     constructor() {
         ::info("Application Version: " + APP_VERSION);
-        // Initialize logger settings
-        _initLoggerSettings();
         // Initialize library for communication with Imp-Device
         _initMsngr();
         // Initialize configuration service
         _initCfgService();
+
+        // TODO: Make a build-flag to allow erasing the agent's memory?
     }
 
     // -------------------- PRIVATE METHODS -------------------- //
-
-    /**
-     * Initialize Logger by settings from Imp-agent persistent memory
-     */
-    function _initLoggerSettings() {
-        local storedAgentData = server.load();
-        if (!("deploymentId" in storedAgentData)) {
-            ::debug("No saved deployment ID found");
-        } else if (storedAgentData["deploymentId"] == __EI.DEPLOYMENT_ID) {
-            local logLevel = "agentLogLevel" in storedAgentData ? 
-                             storedAgentData["agentLogLevel"] : 
-                             null;
-            if (logLevel) {
-                ::info("Imp-agent log level is set to \"" + logLevel + "\"");
-                Logger.setLogLevelStr(logLevel);
-            } else {
-                ::debug("No saved imp-agent log level found");
-            }
-        } else {
-            ::debug("Current Deployment Id: " + 
-                    __EI.DEPLOYMENT_ID + 
-                    " - is not equal to the stored one");
-        }
-    }
 
     /**
      * Create and initialize Messenger instance
