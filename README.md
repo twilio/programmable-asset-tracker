@@ -1,31 +1,32 @@
 # Prog-X Asset Tracker #
 
-**Version of the Application: 1.3.0 (POC)**
+**Version of the Application: 2.0.0 (Field Trial on imp006 Breakout Board)**
 
 An application in Squirrel language for [Electric Imp platform](https://www.electricimp.com/platform) that implements asset tracking functionality.
 
 The requirements: [./docs/Requirements - Prog-X Asset Tracker - external-GPx.pdf](./docs/Requirements%20-%20Prog-X%20Asset%20Tracker%20-%20external-GPx.pdf)
 
-This version (Proof-Of-Concept) supports:
+This version supports:
 - Target hardware:
   - [imp006 Breakout Board](https://developer.electricimp.com/hardware/resources/reference-designs/imp006breakout)
   - [u-blox NEO-M8N GNSS module](https://www.u-blox.com/en/product/neo-m8-series). Tested with [Readytosky Ublox NEO M8N Kit](http://www.readytosky.com/)
   - [Espressif ESP32 Series WiFi and Bluetooth chipset](https://www.espressif.com/en/products/socs/esp32) with [ESP-AT](https://docs.espressif.com/projects/esp-at/en/latest/esp32/) version [v2.2.0.0_esp32](https://github.com/espressif/esp-at/releases/tag/v2.2.0.0_esp32). Tested with [Mikroe WiFi BLE Click board](https://www.mikroe.com/wifi-ble-click) (ESP32-WROOM-32 module). See [esp32_readme](./esp32/esp32_readme.md)
 - Communication with the Internet (between Imp-Device and Imp-Agent) via cellular network.
-- Application configuration is hardcoded in the source file.
+- Default configuration of the asset tracker application is hardcoded in the source file.
+- The configuration can be updated in runtime using the [Southbound REST API](./docs/southbound-api.md)
 - Motion start detection using Accelerometer.
-- Periodic Location tracking when the asset is in motion.
 - Motion stop detection using Location tracking (+ Accelerometer for confirmation).
-- Default configuration settings intended for manual testing of motion ("walking pattern").
-- Location tracking by:
+- Periodic Location tracking by:
   - Nearby BLE devices (+ BLE devices location specified in the configuration). BLE devices with [iBeacon Technology](https://developer.apple.com/ibeacon/) are supported.
   - GNSS fix (u-blox NEO-M8N GNSS) (+ U-blox AssistNow data)
   - Nearby WiFi networks information (+ Google Maps Geolocation API)
   - Nearby cellular towers information (+ Google Maps Geolocation API)
+- Repossession (theft) mode (location reporting after a configured date)
 - Geofencing:
   - One circle geofence zone configured by the center location and the radius
 - Periodic reading and reporting of:
   - Temperature
+  - Battery status
 - Alerts determination and immediate reporting for:
   - Temperature High
   - Temperature Low
@@ -34,16 +35,19 @@ This version (Proof-Of-Concept) supports:
   - Motion Stopped
   - Geofence Entered
   - Geofence Exited
+  - Battery Low
+  - Repossession Mode Activated
 - Staying offline most of time. Connect to the Internet (from Imp-device to Imp-Agent) when required only. Internet connection is used for:
   - Data/alerts sending
   - GNSS Assist data obtaining
   - Location obtaining by cellular towers and WiFi networks information
+  - Reporting the actual device configuration
 - If no/bad cellular network, saving messages in the flash and re-sending them later.
-- Sending data/alerts from Imp-Agent to a cloud with the predefined REST API.
+- Sending data/alerts from Imp-Agent to a cloud with the predefined [Northbound REST API](./docs/northbound-api.md)
 - Emergency (recovery) mode.
 - UART logging.
 - LED indication of the application behavior.
-- The cloud REST API simple emulation on another Imp.
+- The cloud [Northbound REST API](./docs/northbound-api.md) simple emulation on another Imp.
 
 ## Source Code ##
 
@@ -57,9 +61,13 @@ Preprocessed files: [./build](./build)
 
 ## Setup ##
 
-### Hardcoded Configuration ###
+### Default Configuration ###
 
-Configuration constants: [./src/device/Configuration.device.nut](./src/device/Configuration.device.nut)
+Default Configuration:
+- for Imp-Device part - [./src/device/DefaultConfiguration.device.nut](./src/device/DefaultConfiguration.device.nut)
+- for Imp-Agent part - [./src/agent/DefaultConfiguration.agent.nut](./src/agent/DefaultConfiguration.agent.nut)
+
+For the configuration description see the [Southbound REST API](./docs/southbound-api.md)
 
 ### Builder Variables ###
 
@@ -68,10 +76,10 @@ Should be passed to [Builder](https://github.com/electricimp/Builder/):
 - or using `--use-directives <path_to_json_file>` option, where the json file contains the variables with the values.
 
 Variables:
-- `LOGGER_LEVEL` - Set logging level ("ERROR", "INFO", "DEBUG") on Imp-Agent/Device after the Imp firmware is deployed. Optional. Default: **"INFO"**
+- `ERASE_MEMORY` - Enable (`1`) / disable (`0`) erasing persistent memory used by the application, once after the new application build is deployed. Optional. Default: **disabled**. It can be used, for example, to delete the application configuration previously saved in the flash. **Note:** Currently, only SPI flash of the Imp-Device is erased by this feature.
+- `LOGGER_LEVEL` - Set logging level ("ERROR", "INFO", "DEBUG") on Imp-Agent/Device which works after the application restart till the application configuration is applied. Optional. Default: **"INFO"**. Note, when the application configuration is applied, the logging level is set according to the configuration. The logging level can be changed in runtime by updating the configuration.
 - `UART_LOGGING` - Enable (`1`) / disable (`0`) [UART logging](#uart-logging) on Imp-Device. Optional. Default: **enabled**
 - `LED_INDICATION` - Enable (`1`) / disable (`0`) [LED indication](#led-indication) of events. Optional. Default: **enabled**
-- `BG96_GNSS` - Enable (`1`) / disable (`0`) usage of BG96 GNSS rather than U-blox GNSS. Optional. Default: **disabled**
 
 ### User-Defined Environment Variables ###
 
@@ -80,9 +88,11 @@ Are used for sensitive settings, eg. credentials.
 Should be passed to [impcentral Device Group Environment Variables](https://developer.electricimp.com/tools/impcentral/environmentvariables#user-defined-environment-variables) in JSON format
 
 Variables:
-- `CLOUD_REST_API_URL` - Cloud REST API URL. Mandatory. Has no default.
-- `CLOUD_REST_API_USERNAME` - Username to access the cloud REST API. Mandatory. Has no default.
-- `CLOUD_REST_API_PASSWORD` - Password to access the cloud REST API. Mandatory. Has no default.
+- `CLOUD_REST_API_URL` - Cloud (Northbound) REST API URL. Mandatory. Has no default.
+- `CLOUD_REST_API_USERNAME` - Username to access the cloud (Northbound) REST API. Mandatory. Has no default.
+- `CLOUD_REST_API_PASSWORD` - Password to access the cloud (Northbound) REST API. Mandatory. Has no default.
+- `CFG_REST_API_USERNAME` - Username to access the tracker (Southbound) REST API. Mandatory. Has no default.
+- `CFG_REST_API_PASSWORD` - Password to access the tracker (Southbound) REST API. Mandatory. Has no default.
 - `GOOGLE_MAPS_API_KEY` - API Key for Google Maps Platform. Required by [Google Maps Geolocation API](https://developers.google.com/maps/documentation/geolocation/overview) to determine the location by cell towers info or by WiFi networks. See [here](https://developers.google.com/maps/documentation/geolocation/get-api-key) how to obtain the Key.
 - `UBLOX_ASSIST_NOW_TOKEN` - [U-blox AssistNow token](https://www.u-blox.com/en/product/assistnow). Required for downloading of assist data for u-blox GNSS receiver. See [here](https://www.u-blox.com/en/assistnow-service-evaluation-token-request-form) how to obtain the Token.
 
@@ -92,6 +102,8 @@ Example of JSON with environment variables (when Cloud REST API is [emulated on 
   "CLOUD_REST_API_URL": "https://agent.electricimp.com/7jiDVu1t_w-1", // not a real url
   "CLOUD_REST_API_USERNAME": "test",
   "CLOUD_REST_API_PASSWORD": "test",
+  "CFG_REST_API_USERNAME": "test",
+  "CFG_REST_API_PASSWORD": "test",
   "GOOGLE_MAPS_API_KEY": "AIzaSyDJQV2m_qNMjdw5snP6qPjdtoMRau-ger8", // not a real key
   "UBLOX_ASSIST_NOW_TOKEN": "CW2lcwNtSE2pHmXYP_LbKP" // not a real token
 }
@@ -99,9 +111,9 @@ Example of JSON with environment variables (when Cloud REST API is [emulated on 
 
 ## Build And Run ##
 
-- If no need to change the default values of [Configuration Constants](#hardcoded-configuration) and [Builder Variables](#builder-variables), take already preprocessed files from the [./build](./build) folder.
+- If no need to change [Default Configuration](#default-configuration) and [Builder Variables](#builder-variables), take already preprocessed files from the [./build](./build) folder.
 - Otherwise:
-  - Change [Configuration Constants](#hardcoded-configuration), if needed.
+  - Change [Default Configuration](#default-configuration), if needed.
   - Specify [Builder Variables](#builder-variables), if needed.
   - Run [Builder](https://github.com/electricimp/Builder/) for [./src/agent/Main.agent.nut](./src/agent/Main.agent.nut) file to get Imp-Agent preprocessed file.
   - Run [Builder](https://github.com/electricimp/Builder/) for [./src/device/Main.device.nut](./src/device/Main.device.nut) file to get Imp-Device preprocessed file.
@@ -109,82 +121,13 @@ Example of JSON with environment variables (when Cloud REST API is [emulated on 
 - Create and build a new deployment in the Device Group and restart Imp.
 - Control the application behavior using logs in the impcentral and/or via [UART logging](#uart-logging) (if enabled), and using [LED indication](#led-indication) (if enabled).
 
-## Simple Cloud Integration ##
+## Configuration And Behavior ##
 
-To get data messages from the Asset Tracker application running on Imp, a cloud should implement the following REST API:
-- Accept `POST https://<cloud_api_url>/data` requests. Where:
-  - `<cloud_api_url>` will be set as `CLOUD_REST_API_URL` [Environment Variable](#user-defined-environment-variables) in the Imp application,
-  - `/data` - is an endpoint.
-- Support the basic authentication - `<username>/<password>`. Where:
-  - `<username>/<password>` will be set as `CLOUD_REST_API_USERNAME`/`CLOUD_REST_API_PASSWORD` [Environment Variables](#user-defined-environment-variables) in the Imp application.
-- Accept message body in [JSON format](#data-message-json).
-- Return HTTP response code `200` when a message is accepted/received. The Imp application interpreters any other codes as error.
+[Default Configuration](#default-configuration) of the Asset Tracker application can be updated in runtime. For all details, as well as the application behavior description, see the [Southbound REST API](./docs/southbound-api.md).
 
-### Data Message JSON ###
+## Cloud Integration ##
 
-All fields are mandatory, if not specified otherwise.
-
-```
-{
-   "trackerId": <string>,    // Unique Id of the tracker (Imp deviceId)
-   "timestamp": <number>,    // Timestamp when the data was read (Unix time - secs since the Epoch)
-   "status": {
-     "inMotion": <boolean>   // true - the asset is in motion now; false - the asset is not in motion
-   },
-   "location": {             // Last known location
-     "timestamp": <number>,  // Timestamp when this location was determined (Unix time - secs since the Epoch)
-     "type": <string>,       // Type of location determination: "ble", "gnss", "wifi+cell", "wifi", "cell"
-     "accuracy": 3,          // Location accuracy, in meters
-     "lng": <number>,        // Longitude
-     "lat": <number>         // Latitude
-   },
-   "sensors": {
-     "temperature": <number> // Current temperature, in Celsius
-   },
-   "alerts": [ <array_of_strings> ]    // Alerts. Optional. Can be missed or empty if no alerts.
-   // Possible values:
-   //    "temperatureHigh", "temperatureLow", "shockDetected",
-   //    "motionStarted", "motionStopped", "geofenceEntered", "geofenceExited"
-}
-```
-
-Example:
-```
-{
-   "trackerId": "c0010c2a69f088a4",
-   "timestamp": 1617900077,
-   "status": {
-     "inMotion": true
-   },
-   "location": {
-     "timestamp": 1617900070,
-     "type": "gnss",
-     "accuracy": 3,
-     "lng": 30.571465,
-     "lat": 59.749069
-   },
-   "sensors": {
-     "temperature": 42.191177
-   },
-   "alerts": [
-     "temperatureHigh",
-     "shockDetected"
-   ]
-}
-```
-
-### Simple Cloud Emulation ###
-
-Cloud REST API is emulated by an application in Squirrel language which can be run on another Imp device.
-
-How to run the emulator:
-- Use any Imp model. Only Imp-Agent is utilized.
-- Determine its URL. It comprises the base URL `agent.electricimp.com` plus the [agent’s ID](https://developer.electricimp.com/faqs/terminology#agent). Example: `https://agent.electricimp.com/7jiDVu1t_w--`
-- Take the emulator file: [./tests/CloudRestApiEmulator.agent.nut](./tests/CloudRestApiEmulator.agent.nut)
-- Set `CLOUD_REST_API_USERNAME` and `CLOUD_REST_API_PASSWORD` constants inside this file. For example to "test"/"test".
-- Upload, build and run this file on the Imp which is used for emulation. No [Builder](https://github.com/electricimp/Builder/) is required. Imp-Device code can be empty.
-- [Setup](#setup) the asset tracker application according to the emulator REST API URL/username/password and [run](#build-and-run) the application.
-- Check the emulator and the application logs.
+The Asset Tracker application sends data to a cloud. For all details see the [Northbound REST API](./docs/northbound-api.md).
 
 ## Debug Features ##
 
@@ -218,3 +161,14 @@ There are two LEDs:
     - Temperature is low alert: **blue**
     - Temperature is high alert: **yellow**
   - When the indication is disabled, the User LED is not in use.
+
+### Emergency Mode ###
+
+If an unhandled error has occurred, the tracker application:
+- saves the error,
+- stops all activities,
+- goes to the "sleep" mode,
+- periodically wakes up:
+  - connects to the imp-central server,
+  - logs the saved error,
+  - waits for an application update.
