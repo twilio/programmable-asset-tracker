@@ -17,6 +17,11 @@ const LD_UBLOX_LOC_CHECK_PERIOD = 1;
 // The minimum period of updating the offline assist data of u-blox, in seconds
 const LD_ASSIST_DATA_UPDATE_MIN_PERIOD = 43200;
 
+// File names used by LocationDriver
+enum LD_FILE_NAMES {
+    LAST_KNOWN_LOCATION = "lastKnownLocation"
+}
+
 // U-blox fix types enumeration
 enum LD_UBLOX_FIX_TYPE {
     NO_FIX,
@@ -34,8 +39,8 @@ class LocationDriver {
     _ubxDriver = null;
     // UBloxAssistNow instance
     _ubxAssist = null;
-    // SPIFlashFileSystem instance. Used to store u-blox assist data
-    _assistDataStorage = null;
+    // SPIFlashFileSystem instance. Used to store u-blox assist data and other data
+    _storage = null;
     // Timestamp of the latest assist data check (download)
     _assistDataUpdateTs = 0;
     // Promise that resolves or rejects when the location has been obtained.
@@ -48,6 +53,8 @@ class LocationDriver {
     _gnssFailsCounter = 0;
     // ESP32 object
     _esp = null;
+    // True if location using BLE devices is enabled, false otherwise
+    _bleDevicesEnabled = false;
     // Known BLE devices
     _knownBLEDevices = null;
 
@@ -55,8 +62,7 @@ class LocationDriver {
      * Constructor for Location Driver
      */
     constructor() {
-        _knownBLEDevices = DEFAULT_BLE_DEVICES;
-
+        // TODO: Disable UART when it's not in use to save power
         _ubxDriver = UBloxM8N(HW_UBLOX_UART);
         local ubxSettings = {
             "baudRate"     : LD_UBLOX_UART_BAUDRATE,
@@ -77,12 +83,32 @@ class LocationDriver {
         _ubxDriver.configure(ubxSettings);
         _ubxAssist = UBloxAssistNow(_ubxDriver);
 
-        _assistDataStorage = SPIFlashFileSystem(HW_LD_SFFS_START_ADDR, HW_LD_SFFS_END_ADDR);
-        _assistDataStorage.init();
+        _storage = SPIFlashFileSystem(HW_LD_SFFS_START_ADDR, HW_LD_SFFS_END_ADDR);
+        _storage.init();
 
         cm.onConnect(_onConnected.bindenv(this), "@{CLASS_NAME}");
         _esp = ESP32Driver(HW_ESP_POWER_EN_PIN, HW_ESP_UART);
         _updateAssistData();
+    }
+
+    // TODO: Comment
+    function lastKnownLocation() {
+        local decoder = @(data) JSONParser.parse(data.tostring());
+        return _load(LD_FILE_NAMES.LAST_KNOWN_LOCATION, Serializer.deserialize.bindenv(Serializer));
+    }
+
+    // TODO: Comment
+    // NOTE: This class only stores a reference to the object with BLE devices.
+    // If this object is changed outside this class, this class will have the updated version of the object
+    function configureBLEDevices(enabled = null, knownBLEDevices = null) {
+        // TODO: Convert all letters to small
+        knownBLEDevices && (_knownBLEDevices = knownBLEDevices);
+
+        if (enabled && !_knownBLEDevices) {
+            throw "Known BLE devices must be specified to enable location using BLE devices";
+        }
+
+        (enabled != null) && (_bleDevicesEnabled = enabled);
     }
 
     /**
@@ -102,7 +128,12 @@ class LocationDriver {
 
         return _gettingLocation = _getLocationBLEDevices()
         .fail(function(err) {
-            ::info("Couldn't get location using BLE devices: " + err, "@{CLASS_NAME}");
+            if (err == null) {
+                ::debug("Location using BLE devices is disabled", "@{CLASS_NAME}");
+            } else {
+                ::info("Couldn't get location using BLE devices: " + err, "@{CLASS_NAME}");
+            }
+
             return _getLocationGNSS();
         }.bindenv(this))
         .fail(function(err) {
@@ -111,6 +142,8 @@ class LocationDriver {
         }.bindenv(this))
         .then(function(location) {
             _gettingLocation = null;
+            // Save this location as the last known one
+            _save(location, LD_FILE_NAMES.LAST_KNOWN_LOCATION, Serializer.serialize.bindenv(Serializer));
             return location;
         }.bindenv(this), function(err) {
             ::info("Couldn't get location using WiFi networks and cell towers: " + err, "@{CLASS_NAME}");
@@ -274,14 +307,21 @@ class LocationDriver {
      * - rejects with an error if the operation failed
      */
     function _getLocationBLEDevices() {
-        ::debug("Getting location using BLE devices..", "@{CLASS_NAME}");
         // Default accuracy
         const LD_BLE_BEACON_DEFAULT_ACCURACY = 10;
 
+        if (!_bleDevicesEnabled) {
+            // Reject with null to indicate that the feature is disabled
+            return Promise.reject(null);
+        }
+
+        ::debug("Getting location using BLE devices..", "@{CLASS_NAME}");
+
+        local knownGeneric = _knownBLEDevices.generic;
+        local knownIBeacons = _knownBLEDevices.iBeacon;
+
         return _esp.scanBLEAdverts()
         .then(function(adverts) {
-            local knownGeneric = _knownBLEDevices.generic;
-            local knownIBeacons = _knownBLEDevices.iBeacon;
             // Table of "recognized" advertisements (for which the location is known) and their locations
             local recognized = {};
 
@@ -298,7 +338,7 @@ class LocationDriver {
                 if (parsed && parsed.uuid  in knownIBeacons
                            && parsed.major in knownIBeacons[parsed.uuid]
                            && parsed.minor in knownIBeacons[parsed.uuid][parsed.major]) {
-                    local iBeaconInfo = format("UUID %s, Major %d, Minor %d", _formatUUID(parsed.uuid), parsed.major, parsed.minor);
+                    local iBeaconInfo = format("UUID %s, Major %s, Minor %s", _formatUUID(parsed.uuid), parsed.major, parsed.minor);
                     ::debug(format("An iBeacon device with known location found: %s, %s", advert.address, iBeaconInfo), "@{CLASS_NAME}");
 
                     recognized[advert] <- knownIBeacons[parsed.uuid][parsed.major][parsed.minor];
@@ -318,6 +358,7 @@ class LocationDriver {
 
             ::info("Got location using BLE devices", "@{CLASS_NAME}");
             ::debug("The closest BLE device with known location: " + closestDevice.address, "@{CLASS_NAME}");
+            ::debug(recognized[closestDevice], "@{CLASS_NAME}");
 
             return {
                 "timestamp": time(),
@@ -420,8 +461,8 @@ class LocationDriver {
      * @return {table | null} Parsed iBeacon packet or null if no iBeacon packet found
      *  The keys and values of the table:
      *     "uuid"  : {string}  - UUID (16 bytes).
-     *     "major" : {integer} - Major (from 0 to 65535).
-     *     "minor" : {integer} - Minor (from 0 to 65535).
+     *     "major" : {string} - Major (from 0 to 65535).
+     *     "minor" : {string} - Minor (from 0 to 65535).
      */
     function _parseIBeaconPacket(data) {
         // Packet length: 0x1A = 26 bytes
@@ -458,9 +499,11 @@ class LocationDriver {
         data.seek(packetStartIdx + LD_IBEACON_PREFIX.len());
 
         return {
-            "uuid": data.readblob(16).tostring(),
-            "major": (data.readn('b') << 8) | data.readn('b'),
-            "minor": (data.readn('b') << 8) | data.readn('b'),
+            // Get a string like "74d2515660e6444ca177a96e67ecfc5f" without "0x" prefix
+            "uuid": utilities.blobToHexString(data.readblob(16)).slice(2),
+            // We convert them to strings here just for convenience - these values are strings in the table (JSON) of known BLE devices
+            "major": ((data.readn('b') << 8) | data.readn('b')).tostring(),
+            "minor": ((data.readn('b') << 8) | data.readn('b')).tostring(),
         }
     }
 
@@ -587,11 +630,11 @@ class LocationDriver {
             local tomorrowFileName = UBloxAssistNow.getDateString(date(time() + LD_DAY_SEC));
             local yesterdayFileName = UBloxAssistNow.getDateString(date(time() - LD_DAY_SEC));
 
-            if (_assistDataStorage.fileExists(todayFileName)) {
+            if (_storage.fileExists(todayFileName)) {
                 chosenFile = todayFileName;
-            } else if (_assistDataStorage.fileExists(tomorrowFileName)) {
+            } else if (_storage.fileExists(tomorrowFileName)) {
                 chosenFile = tomorrowFileName;
-            } else if (_assistDataStorage.fileExists(yesterdayFileName)) {
+            } else if (_storage.fileExists(yesterdayFileName)) {
                 chosenFile = yesterdayFileName;
             }
 
@@ -602,9 +645,7 @@ class LocationDriver {
 
             ::debug("Found applicable u-blox assist data with the following date: " + chosenFile, "@{CLASS_NAME}");
 
-            local file = _assistDataStorage.open(chosenFile, "r");
-            local data = file.read();
-            file.close();
+            local data = _load(chosenFile);
             data.seek(0, 'b');
 
             return data;
@@ -623,19 +664,8 @@ class LocationDriver {
     function _saveUBloxAssistData(data) {
         ::debug("Saving u-blox assist data..", "@{CLASS_NAME}");
 
-        try {
-            foreach (date, assistMsgs in data) {
-                // Erase the existing file if any
-                if (_assistDataStorage.fileExists(date)) {
-                    _assistDataStorage.eraseFile(date);
-                }
-
-                local file = _assistDataStorage.open(date, "w");
-                file.write(assistMsgs);
-                file.close();
-            }
-        } catch (err) {
-            ::error("Couldn't save u-blox assist data: " + err, "@{CLASS_NAME}");
+        foreach (date, assistMsgs in data) {
+            _save(assistMsgs, date);
         }
     }
 
@@ -643,30 +673,38 @@ class LocationDriver {
      * Erase stale u-blox assist data from the storage
      */
     function _eraseStaleUBloxAssistData() {
+        const LD_UBLOX_AD_INTEGER_DATE_MIN = 20220101;
+        const LD_UBLOX_AD_INTEGER_DATE_MAX = 20990101;
+
         ::debug("Erasing stale u-blox assist data..", "@{CLASS_NAME}");
 
         try {
-            local files = _assistDataStorage.getFileList();
+            local files = _storage.getFileList();
             // Since the date has the following format YYYYMMDD, we can compare dates as integer numbers
             local yesterday = UBloxAssistNow.getDateString(date(time() - LD_DAY_SEC)).tointeger();
 
+            ::debug("There are " + files.len() + " file(s) in the storage", "@{CLASS_NAME}");
+
             foreach (file in files) {
                 local name = file.fname;
-                local erase = true;
+                local erase = false;
 
                 try {
-                    // We need to find assist files for dates before yesterday
+                    // Any assist data file has a name that can be converted to an integer
                     local fileDate = name.tointeger();
 
-                    erase = fileDate < yesterday;
-                } catch (err) {
-                    ::error("Couldn't check the date of a u-blox assist data file: " + err, "@{CLASS_NAME}");
+                    // We need to find assist files for dates before yesterday
+                    if (fileDate > LD_UBLOX_AD_INTEGER_DATE_MIN && fileDate < LD_UBLOX_AD_INTEGER_DATE_MAX) {
+                        erase = fileDate < yesterday;
+                    }
+                } catch (_) {
+                    // If the file's name can't be converted to an integer, this is not an assist data file and we must not erase it
                 }
 
                 if (erase) {
                     ::debug("Erasing u-blox assist data file: " + name, "@{CLASS_NAME}");
                     // Erase stale assist message
-                    _assistDataStorage.eraseFile(name);
+                    _storage.eraseFile(name);
                 }
             }
         } catch (err) {
@@ -742,6 +780,47 @@ class LocationDriver {
         }
     }
 @endif
+
+    // -------------------- STORAGE METHODS -------------------- //
+
+    // TODO: Comment
+    function _save(data, fileName, encoder = null) {
+        _erase(fileName);
+
+        try {
+            local file = _storage.open(fileName, "w");
+            file.write(encoder ? encoder(data) : data);
+            file.close();
+        } catch (err) {
+            ::error(format("Couldn't save data (file name = %s): %s", fileName, err), "@{CLASS_NAME}");
+        }
+    }
+
+    // TODO: Comment
+    function _load(fileName, decoder = null) {
+        try {
+            if (_storage.fileExists(fileName)) {
+                local file = _storage.open(fileName, "r");
+                local data = file.read();
+                file.close();
+                return decoder ? decoder(data) : data;
+            }
+        } catch (err) {
+            ::error(format("Couldn't load data (file name = %s): %s", fileName, err), "@{CLASS_NAME}");
+        }
+
+        return null;
+    }
+
+    // TODO: Comment
+    function _erase(fileName) {
+        try {
+            // Erase the existing file if any
+            _storage.fileExists(fileName) && _storage.eraseFile(fileName);
+        } catch (err) {
+            ::error(format("Couldn't erase data (file name = %s): %s", fileName, err), "@{CLASS_NAME}");
+        }
+    }
 
     // -------------------- HELPER METHODS -------------------- //
 

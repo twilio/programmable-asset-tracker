@@ -3,202 +3,127 @@
 // Mean earth radius in meters (https://en.wikipedia.org/wiki/Great-circle_distance)
 const MM_EARTH_RAD = 6371009;
 
-// min longitude
-const MM_MIN_LNG = -180.0;
-// max latitude
-const MM_MAX_LNG = 180.0;
-// min latitude
-const MM_MIN_LAT = -90.0;
-// max latitude
-const MM_MAX_LAT = 90.0;
-
 // Motion Monitor class.
 // Starts and stops motion monitoring.
 class MotionMonitor {
-
     // Accelerometer driver object
     _ad = null;
 
-    // Location driver object
-    _ld = null;
-
-    // New location callback function
-    _newLocCb = null;
+    // Location Monitor object
+    _lm = null;
 
     // Motion event callback function
     _motionEventCb = null;
 
-    // Geofencing event callback function
-    _geofencingEventCb = null;
-
-    // Location reading timer period
-    _locReadingPeriod = null;
-
-    // Location reading timer
-    _locReadingTimer = null;
-
-    // Promise of the location reading process or null
-    _locReadingPromise = null;
-
     // Motion stop assumption
-    _motionStopAssumption = null;
+    _motionStopAssumption = false;
 
-    // Moton state
+    // Motion state: true (in motion) / false (not in motion) / null (feature disabled)
     _inMotion = null;
 
     // Current location
     _curLoc = null;
 
     // Sign of the current location relevance
+    // True (relevant) / false (not relevant) / null (haven't yet got a location or a failure)
     _curLocFresh = null;
 
     // Previous location
     _prevLoc = null;
 
     // Sign of the previous location relevance
+    // True (relevant) / false (not relevant) / null (haven't yet got a location or a failure)
     _prevLocFresh = null;
 
-    // Movement acceleration threshold range: maximum level
-    _movementMax = null;
+    // TODO: Comment
+    _motionStopTimeout = null;
 
-    // Movement acceleration threshold range: minimum (starting) level
-    _movementMin = null;
+    // TODO: Comment
+    _confirmMotionStopTimer = null;
 
-    // Duration of exceeding movement acceleration threshold
-    _movementDur = null;
+    // TODO: Comment
+    _motionMonitoringEnabled = false;
 
-    // Maximum time to determine motion detection after the initial movement
-    _motionTimeout = null;
-
-    // Minimal instantaneous velocity to determine motion detection condition
-    _motionVelocity = null;
-
-    // Minimal movement distance to determine motion detection condition
-    _motionDistance = null;
-
-    // geofence zone center location
-    _geofenceCenter = null;
-
-    // geofence zone radius
-    _geofenceRadius = null;
-
-    // enable/disable flag
-    _geofenceIsEnable = null;
-
-    // in zone or not
-    _inGeofenceZone = null;
+    // TODO: Comment
+    _accelDetectMotionParams = null;
 
     /**
      *  Constructor for Motion Monitor class.
      *  @param {object} accelDriver - Accelerometer driver object.
-     *  @param {object} locDriver - Location driver object.
+     *  @param {object} locMonitor - Location Monitor object.
      */
-    constructor(accelDriver, locDriver) {
+    constructor(accelDriver, locMonitor) {
         _ad = accelDriver;
-        _ld = locDriver;
-
-        _geofenceIsEnable = false;
-        _geofenceRadius = DEFAULT_GEOFENCE_RADIUS;
-        _motionStopAssumption = false;
-        _inMotion = false;
-        _curLocFresh = false;
-        _prevLocFresh = false;
-        _curLoc = {"timestamp": 0,
-                   "type": "gnss",
-                   "accuracy": MM_EARTH_RAD,
-                   "longitude": INIT_LONGITUDE,
-                   "latitude": INIT_LATITUDE};
-        _prevLoc = {"timestamp": 0,
-                    "type": "gnss",
-                    "accuracy": MM_EARTH_RAD,
-                    "longitude": INIT_LONGITUDE,
-                    "latitude": INIT_LATITUDE};
-        _geofenceCenter = {"longitude": DEFAULT_GEOFENCE_CENTER_LNG,
-                            "latitude": DEFAULT_GEOFENCE_CENTER_LAT};
-        _locReadingPeriod = DEFAULT_LOCATION_READING_PERIOD;
-        _movementMax = DEFAULT_MOVEMENT_ACCELERATION_MAX;
-        _movementMin = DEFAULT_MOVEMENT_ACCELERATION_MIN;
-        _movementDur = DEFAULT_MOVEMENT_ACCELERATION_DURATION;
-        _motionTimeout = DEFAULT_MOTION_TIME;
-        _motionVelocity = DEFAULT_MOTION_VELOCITY;
-        _motionDistance = DEFAULT_MOTION_DISTANCE;
+        _lm = locMonitor;
     }
 
     /**
-     *   Start motion monitoring.
-     *   @param {table} motionMonSettings - Table with the settings.
-     *        Optional, all settings have defaults.
-     *        If a setting is missed, it is reset to default.
-     *        The settings:
-     *          "locReadingPeriod": {float} - Location reading period, in seconds.
-     *                                          Default: DEFAULT_LOCATION_READING_PERIOD
-     *          "movementMax": {float}    - Movement acceleration maximum threshold, in g.
-     *                                        Default: DEFAULT_MOVEMENT_ACCELERATION_MAX
-     *          "movementMin": {float}    - Movement acceleration minimum threshold, in g.
-     *                                        Default: DEFAULT_MOVEMENT_ACCELERATION_MIN
-     *          "movementDur": {float}    - Duration of exceeding movement acceleration threshold, in seconds.
-     *                                        Default: DEFAULT_MOVEMENT_ACCELERATION_DURATION
-     *          "motionTimeout": {float}  - Maximum time to determine motion detection after the initial movement, in seconds.
-     *                                        Default: DEFAULT_MOTION_TIME
-     *          "motionVelocity": {float} - Minimum instantaneous velocity  to determine motion detection condition, in meters per second.
-     *                                        Default: DEFAULT_MOTION_VELOCITY
-     *          "motionDistance": {float} - Minimal movement distance to determine motion detection condition, in meters.
-     *                                      If 0, distance is not calculated (not used for motion detection).
-     *                                        Default: DEFAULT_MOTION_DISTANCE
+     *  Start motion monitoring.
+     *  @param {table} cfg - Table with the full configuration.
+     *                       For details, please, see the documentation
+     *
+     * @return {Promise} that:
+     * - resolves if the operation succeeded
+     * - rejects if the operation failed
      */
-    function start(motionMonSettings = {}) {
-        _locReadingPeriod = DEFAULT_LOCATION_READING_PERIOD;
-        _movementMax = DEFAULT_MOVEMENT_ACCELERATION_MAX;
-        _movementMin = DEFAULT_MOVEMENT_ACCELERATION_MIN;
-        _movementDur = DEFAULT_MOVEMENT_ACCELERATION_DURATION;
-        _motionTimeout = DEFAULT_MOTION_TIME;
-        _motionVelocity = DEFAULT_MOTION_VELOCITY;
-        _motionDistance = DEFAULT_MOTION_DISTANCE;
+    function start(cfg) {
+        _curLoc = _lm.getStatus().location;
+        _prevLoc = clone _curLoc;
 
-        // check and set the settings
-        _checkMotionMonSettings(motionMonSettings);
-
-        // get current location
-        _locReading();
-
-        // initial state after start: not in motion
-        _motionStopAssumption = false;
-        _inMotion = false;
-
-        // detect motion start
-        _ad.detectMotion(_onAccelMotionDetected.bindenv(this), {"movementMax"      : _movementMax,
-                                                                "movementMin"      : _movementMin,
-                                                                "movementDur"      : _movementDur,
-                                                                "motionTimeout"    : _motionTimeout,
-                                                                "motionVelocity"   : _motionVelocity,
-                                                                "motionDistance"   : _motionDistance});
+        return updateCfg(cfg);
     }
 
-    /**
-     *   Stop motion monitoring.
-     */
-    function stop() {
-        _locReadingTimer && imp.cancelwakeup(_locReadingTimer);
-    }
+    // TODO: Comment
+    function updateCfg(cfg) {
+        local detectMotionParamNames = ["movementAccMin", "movementAccMax", "movementAccDur",
+                                        "motionTime", "motionVelocity", "motionDistance"];
 
-    /**
-     *  Set new location callback function.
-     *  @param {function | null} locCb - The callback will be called every time the new location is received (null - disables the callback)
-     *                 locCb(loc), where
-     *                 @param {table} loc - Location information
-     *                      The fields:
-     *                          "timestamp": {integer}  - The number of seconds that have elapsed since midnight on 1 January 1970.
-     *                               "type": {string}   - "gnss", "cell", "wifi", "ble"
-     *                           "accuracy": {integer}  - Accuracy in meters
-     *                          "longitude": {float}    - Longitude in degrees
-     *                           "latitude": {float}    - Latitude in degrees
-     */
-    function setNewLocationCb(locCb) {
-        if (typeof locCb == "function" || locCb == null) {
-            _newLocCb = locCb;
-        } else {
-            ::error("Argument not a function or null", "@{CLASS_NAME}");
+        local motionMonitoringCfg = getValFromTable(cfg, "locationTracking/motionMonitoring");
+        local newDetectMotionParams = nullEmpty(getValsFromTable(motionMonitoringCfg, detectMotionParamNames));
+        // Can be: true/false/null
+        local enabledParam = getValFromTable(motionMonitoringCfg, "enabled");
+
+        _accelDetectMotionParams = mixTables(newDetectMotionParams, _accelDetectMotionParams || {});
+        _motionStopTimeout = getValFromTable(motionMonitoringCfg, "motionStopTimeout", _motionStopTimeout);
+
+        local enable   = !_motionMonitoringEnabled && enabledParam == true;
+        local reEnable =  _motionMonitoringEnabled && enabledParam != false && newDetectMotionParams;
+        local disable  =  _motionMonitoringEnabled && enabledParam == false;
+
+        if (reEnable || enable) {
+            ::debug("(Re)enabling motion monitoring..", "@{CLASS_NAME}");
+
+            _inMotion = false;
+            _motionStopAssumption = false;
+            _motionMonitoringEnabled = true;
+
+            // Enable (or re-enable) motion detection
+            _ad.detectMotion(_onAccelMotionDetected.bindenv(this), _accelDetectMotionParams);
+        } else if (disable) {
+            ::debug("Disabling motion monitoring..", "@{CLASS_NAME}");
+
+            _inMotion = null;
+            _motionStopAssumption = false;
+            _motionMonitoringEnabled = false;
+
+            // Disable motion detection
+            _ad.detectMotion(null);
+            // Cancel the timer as we don't check for motion anymore
+            _confirmMotionStopTimer && imp.cancelwakeup(_confirmMotionStopTimer);
         }
+
+        return Promise.resolve(null);
+    }
+
+    // TODO: Comment
+    function getStatus() {
+        local res = {
+            "flags": {}
+        };
+
+        (_inMotion != null) && (res.flags.inMotion <- _inMotion);
+
+        return res;
     }
 
     /**
@@ -208,227 +133,45 @@ class MotionMonitor {
      *                 @param {bool} ev - true: motion started, false: motion stopped
      */
     function setMotionEventCb(motionEventCb) {
-        if (typeof motionEventCb == "function" || motionEventCb == null) {
-            _motionEventCb = motionEventCb;
-        } else {
-            ::error("Argument not a function or null", "@{CLASS_NAME}");
-        }
-    }
-
-    /**
-     *  Set geofencing event callback function.
-     *  @param {function | null} geofencingEventCb - The callback will be called every time the new geofencing event is detected (null - disables the callback)
-     *                 geofencingEventCb(ev), where
-     *                 @param {bool} ev - true: geofence entered, false: geofence exited
-     */
-    function setGeofencingEventCb(geofencingEventCb) {
-        if (typeof geofencingEventCb == "function" || geofencingEventCb == null) {
-            _geofencingEventCb = geofencingEventCb;
-        } else {
-            ::error("Argument not a function or null", "@{CLASS_NAME}");
-        }
-    }
-
-    /**
-     *  Enable/disable and set settings for geofencing.
-     *  @param {table} settings - Table with the center coordinates of geofence zone, radius.
-     *      The settings include:
-     *          "enabled"   : {bool}  - Enable/disable, true - geofence is enabled.
-     *          "lng"       : {float} - Center longitude, in degrees.
-     *          "lat"       : {float} - Center latitude, in degrees.
-     *          "radius"    : {float} - Radius, in meters. (value must exceed the accuracy of the coordinate)
-     */
-    function configureGeofence(settings) {
-        // reset in zone flag
-        _inGeofenceZone = null;
-        if (settings != null && typeof settings == "table") {
-            _geofenceIsEnable = false;
-            if ("enabled" in settings) {
-                if (typeof settings.enabled == "bool") {
-                    ::info("Geofence is " + (settings.enabled ? "enabled" : "disabled"), "@{CLASS_NAME}");
-                    _geofenceIsEnable = settings.enabled;
-                }
-            }
-            _geofenceRadius = DEFAULT_GEOFENCE_RADIUS;
-            if ("radius" in settings) {
-                if (typeof settings.radius == "float" && 
-                    settings.radius >= 0) {
-                    ::info("Geofence radius: " + settings.radius, "@{CLASS_NAME}");
-                    _geofenceRadius = settings.radius > MM_EARTH_RAD ? MM_EARTH_RAD : settings.radius;
-                }
-            }
-            _geofenceCenter = {"longitude": DEFAULT_GEOFENCE_CENTER_LNG,
-                               "latitude" : DEFAULT_GEOFENCE_CENTER_LAT};
-            if ("lng" in settings && "lat" in settings) {
-                if (typeof settings.lat == "float") {
-                    ::info("Geofence latitude: " + settings.lat, "@{CLASS_NAME}");
-                    _geofenceCenter.latitude = settings.lat;
-                    if (_geofenceCenter.latitude < MM_MIN_LAT) {
-                        ::error("Geofence latitude not in range [-90;90]: " + settings.lat, "@{CLASS_NAME}");
-                        _geofenceCenter.latitude = MM_MIN_LAT;
-                    }
-                    if (_geofenceCenter.latitude > MM_MAX_LAT) {
-                        ::error("Geofence latitude not in range [-90;90]: " + settings.lat, "@{CLASS_NAME}");
-                        _geofenceCenter.latitude = MM_MAX_LAT;
-                    }
-                    ::info("Geofence longitude: " + settings.lng, "@{CLASS_NAME}");
-                    _geofenceCenter.longitude = settings.lng;
-                    if (_geofenceCenter.longitude < MM_MIN_LNG) {
-                        ::error("Geofence longitude not in range [-180;180]: " + settings.lng, "@{CLASS_NAME}");
-                        _geofenceCenter.longitude = MM_MIN_LAT;
-                    }
-                    if (_geofenceCenter.longitude > MM_MAX_LAT) {
-                        ::error("Geofence longitude not in range [-180;180]: " + settings.lng, "@{CLASS_NAME}");
-                        _geofenceCenter.longitude = MM_MAX_LAT;
-                    }
-                }
-            }
-        }
+        _motionEventCb = motionEventCb;
     }
 
     // -------------------- PRIVATE METHODS -------------------- //
 
     /**
-     * Check settings element.
-     * Returns the specified value if the check fails.
-     *
-     * @param {float} val - Value of settings element.
-     * @param {float} defVal - Default value of settings element.
-     * @param {bool} flCheckSignEq - Flag for sign check.
-     *
-     * @return {float} If success - value, else - default value.
+     *  Motion stop confirmation timer callback function
      */
-    function _checkVal(val, defVal, flCheckSignEq = true) {
-        if (typeof val == "float") {
-            if (flCheckSignEq) {
-                if (val >= 0.0) {
-                    return val;
-                }
-            } else {
-                if (val > 0.0) {
-                    return val;
-                }
-            }
-        } else {
-            ::error("Incorrect type of settings parameter", "@{CLASS_NAME}");
-        }
-
-        return defVal;
-    }
-
-    /**
-     *  Check and set settings.
-     *  Sets default values for incorrect settings.
-     *
-     *   @param {table} motionMonSettings - Table with the settings.
-     *        Optional, all settings have defaults.
-     *        The settings:
-     *          "locReadingPeriod": {float} - Location reading period, in seconds.
-     *                                          Default: DEFAULT_LOCATION_READING_PERIOD
-     *          "movementMax": {float}    - Movement acceleration maximum threshold, in g.
-     *                                        Default: DEFAULT_MOVEMENT_ACCELERATION_MAX
-     *          "movementMin": {float}    - Movement acceleration minimum threshold, in g.
-     *                                        Default: DEFAULT_MOVEMENT_ACCELERATION_MIN
-     *          "movementDur": {float}    - Duration of exceeding movement acceleration threshold, in seconds.
-     *                                        Default: DEFAULT_MOVEMENT_ACCELERATION_DURATION
-     *          "motionTimeout": {float}  - Maximum time to determine motion detection after the initial movement, in seconds.
-     *                                        Default: DEFAULT_MOTION_TIME
-     *          "motionVelocity": {float} - Minimum instantaneous velocity  to determine motion detection condition, in meters per second.
-     *                                        Default: DEFAULT_MOTION_VELOCITY
-     *          "motionDistance": {float} - Minimal movement distance to determine motion detection condition, in meters.
-     *                                      If 0, distance is not calculated (not used for motion detection).
-     *                                        Default: DEFAULT_MOTION_DISTANCE
-     */
-    function _checkMotionMonSettings(motionMonSettings) {
-        foreach (key, value in motionMonSettings) {
-            if (typeof key == "string") {
-                switch(key){
-                    case "locReadingPeriod":
-                        _locReadingPeriod = _checkVal(value, DEFAULT_LOCATION_READING_PERIOD);
-                        break;
-                    case "movementMax":
-                        _movementMax = _checkVal(value, DEFAULT_MOVEMENT_ACCELERATION_MAX, false);
-                        break;
-                    case "movementMin":
-                        _movementMin = _checkVal(value, DEFAULT_MOVEMENT_ACCELERATION_MIN, false);
-                        break;
-                    case "movementDur":
-                        _movementDur = _checkVal(value, DEFAULT_MOVEMENT_ACCELERATION_DURATION, false);
-                        break;
-                    case "motionTimeout":
-                        _motionTimeout = _checkVal(value, DEFAULT_MOTION_TIME, false);
-                        break;
-                    case "motionVelocity":
-                        _motionVelocity = _checkVal(value, DEFAULT_MOTION_VELOCITY);
-                        break;
-                    case "motionDistance":
-                        _motionDistance = _checkVal(value, DEFAULT_MOTION_DISTANCE);
-                        break;
-                    default:
-                        ::error("Incorrect key name", "@{CLASS_NAME}");
-                        break;
-                }
-            } else {
-                ::error("Incorrect motion condition settings", "@{CLASS_NAME}");
-            }
-        }
-    }
-
-    /**
-     *  Location reading timer callback function.
-     */
-    function _locReadingTimerCb() {
-        local start = hardware.millis();
-
+    function _confirmMotionStop() {
         if (_motionStopAssumption) {
-            // no movement during location reading period =>
-            // motion stop is confirmed
+            // No movement during motion stop confirmation period => motion stop is confirmed
             _inMotion = false;
             _motionStopAssumption = false;
-            if (_motionEventCb) {
-                _motionEventCb(_inMotion);
-            }
-        } else {
-            // read location and, after that, check if it is the same as the previous one
-            _locReading()
-            .finally(function(_) {
-                _checkMotionStop();
+            _motionEventCb && _motionEventCb(false);
 
-                // Calculate the delay for the timer according to the time spent on location reading and etc.
-                local delay = _locReadingPeriod - (hardware.millis() - start) / 1000.0;
-                _locReadingTimer && imp.cancelwakeup(_locReadingTimer);
-                _locReadingTimer = imp.wakeup(delay, _locReadingTimerCb.bindenv(this));
-            }.bindenv(this));
+            // Clear these variables so that next time we need to get the location, at least,
+            // two times before checking if the motion is stopped
+            _curLocFresh = _prevLocFresh = null;
+        } else {
+            // Since we are still in motion, we need to get new locations
+            _lm.setLocationCb(_onLocation.bindenv(this));
         }
     }
 
-    /**
-     *  Try to determine the current location
-     */
-    function _locReading() {
-        if (_locReadingPromise) {
-            return _locReadingPromise;
-        }
-
+    // TODO: Comment
+    function _onLocation(location) {
         _prevLoc = _curLoc;
         _prevLocFresh = _curLocFresh;
 
-        ::debug("Getting location..", "@{CLASS_NAME}");
-
-        return _locReadingPromise = _ld.getLocation()
-        .then(function(loc) {
-            _locReadingPromise = null;
-            _curLoc = loc;
+        if (location) {
+            _curLoc = location;
             _curLocFresh = true;
-            _newLocCb && _newLocCb(_curLoc);
-            _procGeofence(loc);
-        }.bindenv(this), function(_) {
-            _locReadingPromise = null;
-
+        } else {
             // the current location becomes non-fresh
-            _curLoc = _prevLoc;
             _curLocFresh = false;
-        }.bindenv(this));
+        }
+
+        // Once we have got two locations or failures, let's check if the motion stopped
+        (_prevLocFresh != null) && _checkMotionStop();
     }
 
     /**
@@ -436,43 +179,27 @@ class MotionMonitor {
      */
     function _checkMotionStop() {
         if (_curLocFresh) {
+            // Calculate distance between two locations
+            local dist = _lm.greatCircleDistance(_curLoc, _prevLoc);
 
-            local dist = 0;
-            if (_curLoc && _prevLoc) {
-                // calculate distance between two locations
-                dist = _greatCircleDistance(_curLoc, _prevLoc);
-            } else {
-                ::error("Location is null", "@{CLASS_NAME}");
-            }
             ::debug("Distance: " + dist, "@{CLASS_NAME}");
 
-            // check if the distance is less than 2 radius of accuracy
-            if (dist < 2*_curLoc.accuracy) {
-                // maybe motion is stopped, need to double check
-                _motionStopAssumption = true;
-            } else {
-                // still in motion
-                if (!_inMotion) {
-                    _inMotion = true;
-                    _motionEventCb && _motionEventCb(_inMotion);
-                }
-            }
-        }
-
-        if (!_curLocFresh && !_prevLocFresh) {
-            // the location has not been determined two times in a raw,
+            // Check if the distance is less than 2 radius of accuracy.
+            // Maybe motion is stopped but need to double check
+            _motionStopAssumption = dist < 2*_curLoc.accuracy;
+        } else if (!_prevLocFresh) {
+            // The location has not been determined two times in a row,
             // need to double check the motion
             _motionStopAssumption = true;
         }
 
-        if(_motionStopAssumption) {
-            // enable motion detection by accelerometer to double check the motion
-            _ad.detectMotion(_onAccelMotionDetected.bindenv(this), {"movementMax"      : _movementMax,
-                                                                    "movementMin"      : _movementMin,
-                                                                    "movementDur"      : _movementDur,
-                                                                    "motionTimeout"    : _motionTimeout,
-                                                                    "motionVelocity"   : _motionVelocity,
-                                                                    "motionDistance"   : _motionDistance});
+        if (_motionStopAssumption) {
+            // We don't need new locations anymore
+            _lm.setLocationCb(null);
+            // Enable motion detection by accelerometer to double check the motion
+            _ad.detectMotion(_onAccelMotionDetected.bindenv(this), _accelDetectMotionParams);
+            // Set a timer for motion stop confirmation timeout
+            _confirmMotionStopTimer = imp.wakeup(_motionStopTimeout, _confirmMotionStop.bindenv(this));
         }
     }
 
@@ -484,106 +211,10 @@ class MotionMonitor {
         if (!_inMotion) {
             _inMotion = true;
 
-            // start reading location
-            _locReading();
-            _motionEventCb && _motionEventCb(_inMotion);
-
-            _locReadingTimer && imp.cancelwakeup(_locReadingTimer);
-            _locReadingTimer = imp.wakeup(_locReadingPeriod, _locReadingTimerCb.bindenv(this));
+            // Start getting new locations to check if we are actually moving
+            _lm.setLocationCb(_onLocation.bindenv(this));
+            _motionEventCb && _motionEventCb(true);
         }
-    }
-
-    /**
-     *  Zone border crossing check.
-     *  
-     *   @param {table} curLocation - Table with the current location.
-     *        The table must include parts:
-     *          "accuracy" : {integer}  - Accuracy, in meters.
-     *          "longitude": {float}    - Longitude, in degrees.
-     *          "latitude" : {float}    - Latitude, in degrees.  
-     */
-    function _procGeofence(curLocation) {
-        //              _____GeofenceZone
-        //             /      \
-        //            /__     R\    dist           __Location
-        //           |/\ \  .---|-----------------/- \
-        //           |\__/      |                 \_\/accuracy (radius)
-        //            \ Location/
-        //             \______ /
-        //            in zone                     not in zone
-        // (location with accuracy radius      (location with accuracy radius
-        //  entirely in geofence zone)          entirely not in geofence zone)
-        // TODO: location after reboot/reconfigure - not in geofence zone
-        if (_geofenceIsEnable) {
-            local dist = _greatCircleDistance(_geofenceCenter, curLocation);
-            ::debug("Geofence distance: " + dist, "@{CLASS_NAME}");
-            if (dist > _geofenceRadius) {
-                local distWithoutAccurace = dist - curLocation.accuracy;
-                if (distWithoutAccurace > 0 && distWithoutAccurace > _geofenceRadius) {
-                    if (_inGeofenceZone == null || _inGeofenceZone == true) {
-                        _geofencingEventCb && _geofencingEventCb(false);
-                        _inGeofenceZone = false;
-                    }
-                }
-            } else {
-                local distWithAccurace = dist + curLocation.accuracy;
-                if (distWithAccurace <= _geofenceRadius) {
-                    if (_inGeofenceZone == null || _inGeofenceZone == false) {
-                        _geofencingEventCb && _geofencingEventCb(true);
-                        _inGeofenceZone = true;
-                    }
-                }
-            }
-        }
-    }
-
-    /**
-     *  Calculate distance between two locations.
-     *
-     *   @param {table} locationFirstPoint - Table with the first location value.
-     *        The table must include parts:
-     *          "longitude": {float} - Longitude, in degrees.
-     *          "latitude":  {float} - Latitude, in degrees.
-     *   @param {table} locationSecondPoint - Table with the second location value.
-     *        The location must include parts:
-     *          "longitude": {float} - Longitude, in degrees.
-     *          "latitude":  {float} - Latitude, in degrees.
-     *  
-     *   @return {float} If success - value, else - default value (0).
-     */
-    function _greatCircleDistance(locationFirstPoint, locationSecondPoint) {
-        local dist = 0;
-
-        if (locationFirstPoint != null || locationSecondPoint != null) {
-            if ("longitude" in locationFirstPoint &&
-                "longitude" in locationSecondPoint &&
-                "latitude" in locationFirstPoint &&
-                "latitude" in locationSecondPoint) {
-                // https://en.wikipedia.org/wiki/Great-circle_distance
-                local deltaLat = math.fabs(locationFirstPoint.latitude - 
-                                           locationSecondPoint.latitude)*PI/180.0;
-                local deltaLong = math.fabs(locationFirstPoint.longitude - 
-                                            locationSecondPoint.longitude)*PI/180.0;
-                //  -180___180 
-                //     / | \
-                //west|  |  |east   selection of the shortest arc
-                //     \_|_/ 
-                // Earth 0 longitude
-                if (deltaLong > PI) {
-                    deltaLong = 2*PI - deltaLong;
-                }
-                local deltaSigma = math.pow(math.sin(0.5*deltaLat), 2);
-                deltaSigma += math.cos(locationFirstPoint.latitude*PI/180.0)*
-                              math.cos(locationSecondPoint.latitude*PI/180.0)*
-                              math.pow(math.sin(0.5*deltaLong), 2);
-                deltaSigma = 2*math.asin(math.sqrt(deltaSigma));
-
-                // actual arc length on a sphere of radius r (mean Earth radius)
-                dist = MM_EARTH_RAD*deltaSigma;
-            }
-        }
-
-        return dist
     }
 }
 

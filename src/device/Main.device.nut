@@ -14,6 +14,10 @@
 #require "UbxMsgParser.lib.nut:2.0.1"
 #require "UBloxAssistNow.device.lib.nut:0.1.0"
 
+@if MAX17055 || !defined(MAX17055)
+#require "MAX17055.device.lib.nut:1.0.2"
+@endif
+
 @include once "../shared/Version.shared.nut"
 @include once "../shared/Constants.shared.nut"
 @include once "../shared/Logger/Logger.shared.nut"
@@ -27,22 +31,20 @@
 @endif
 
 @include once "Hardware.device.nut"
+@include once "Helpers.device.nut"
 @include once "ProductionManager.device.nut"
-@include once "Configuration.device.nut"
+@include once "CfgManager.device.nut"
 @include once "CustomConnectionManager.device.nut"
 @include once "CustomReplayMessenger.device.nut"
 @include once "bg96_gps.device.lib.nut"
 @include once "BG96CellInfo.device.nut"
 @include once "ESP32Driver.device.nut"
 @include once "AccelerometerDriver.device.nut"
+@include once "BatteryMonitor.device.nut"
+@include once "LocationMonitor.device.nut"
 @include once "MotionMonitor.device.nut"
 @include once "DataProcessor.device.nut"
-
-@if BG96_GNSS
-@include once "LocationDriverBG96.device.nut"
-@else
 @include once "LocationDriver.device.nut"
-@endif
 
 // Main application on Imp-Device: does the main logic of the application
 
@@ -68,6 +70,9 @@ const APP_SEND_BUFFER_SIZE = 10240;
 class Application {
     _locationDriver = null;
     _accelDriver = null;
+    _cfgManager = null;
+    _batteryMon = null;
+    _locationMon = null;
     _motionMon = null;
     _dataProc = null;
     _thermoSensDriver = null;
@@ -76,6 +81,10 @@ class Application {
      * Application Constructor
      */
     constructor() {
+@if ERASE_MEMORY
+        pm.isNewDeployment() && _eraseFlash();
+@endif
+
         // Create and intialize Connection Manager
         // NOTE: This needs to be called as early in the code as possible
         // in order to run the application without a connection to the Internet
@@ -97,29 +106,35 @@ class Application {
         // Create and intialize Replay Messenger
         _initReplayMessenger()
         .then(function(_) {
+            HW_SHARED_I2C.configure(CLOCK_SPEED_400_KHZ);
+
+            _batteryMon = BatteryMonitor(HW_SHARED_I2C);
+            return _batteryMon.init();
+        }.bindenv(this))
+        .then(function(_) {
             // Create and initialize Location Driver
             _locationDriver = LocationDriver();
 
             // Create and initialize Accelerometer Driver
-            _accelDriver = AccelerometerDriver(HW_ACCEL_I2C, HW_ACCEL_INT_PIN);
+            _accelDriver = AccelerometerDriver(HW_SHARED_I2C, HW_ACCEL_INT_PIN);
 
             // Create and initialize Thermosensor Driver
-            _thermoSensDriver = HTS221(HW_TEMPHUM_SENSOR_I2C);
+            _thermoSensDriver = HTS221(HW_SHARED_I2C);
             _thermoSensDriver.setMode(HTS221_MODE.ONE_SHOT);
 
+            // Create and initialize Location Monitor
+            _locationMon = LocationMonitor(_locationDriver);
             // Create and initialize Motion Monitor
-            _motionMon = MotionMonitor(_accelDriver, _locationDriver);
+            _motionMon = MotionMonitor(_accelDriver, _locationMon);
             // Create and initialize Data Processor
-            _dataProc = DataProcessor(_motionMon, _accelDriver, _thermoSensDriver, null);
-            // Start Data processor
-            _dataProc.start();
-            // Start Motion monitor
-            _motionMon.start();
-        }.bindenv(this), function(err) {
-            ::error("Replay Messenger initialization error: " + err);
+            _dataProc = DataProcessor(_locationMon, _motionMon, _accelDriver, _thermoSensDriver, _batteryMon);
+            // Create and initialize Cfg Manager
+            _cfgManager = CfgManager([_locationMon, _motionMon, _dataProc]);
+            // Start Cfg Manager
+            _cfgManager.start();
         }.bindenv(this))
         .fail(function(err) {
-            ::error("Error during initialization of business logic modules: " + err);
+            ::error("Error during initialization: " + err);
 
             // TODO: Reboot after a delay? Or enter the emergency mode?
         }.bindenv(this));
@@ -186,6 +201,21 @@ class Application {
         // Resend all messages with the specified names
         local name = message.payload.name;
         return name == APP_RM_MSG_NAME.DATA;
+    }
+
+    // TODO: Comment
+    function _eraseFlash() {
+        ::info(format("Erasing SPI flash from 0x%x to 0x%x...", HW_ERASE_FLASH_START_ADDR, HW_ERASE_FLASH_END_ADDR));
+
+        local spiflash = hardware.spiflash;
+        spiflash.enable();
+
+        for (local addr = HW_ERASE_FLASH_START_ADDR; addr < HW_ERASE_FLASH_END_ADDR; addr += 0x1000) {
+            spiflash.erasesector(addr);
+        }
+
+        spiflash.disable();
+        ::info("Erasing finished!");
     }
 }
 
