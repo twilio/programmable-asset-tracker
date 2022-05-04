@@ -210,7 +210,7 @@ The "configuration" block of the configuration reported by the tracker to a clou
         "threshold": <number>     // Battery low alert threshold, in %
       },
 
-      "tamperingDetected": {    // TBD
+      "tamperingDetected": {    // Not supported
         "enabled": true/false     // true - alert is enabled
       }
     },
@@ -235,7 +235,95 @@ The "configuration" block of the configuration reported by the tracker to a clou
 
 Examples of the "configuration" and "agentConfiguration" blocks can be found in [Default Configuration](../README.md#default-configuration).
 
-Example of a full reported configuration can be found here - ???
+Example of a full reported configuration:
+```
+{
+    "description": {
+        "trackerId": "600a0002d7026715",
+        "cfgTimestamp": 1651659656,
+        "cfgSchemeVersion": "1.0"
+    },
+    "configuration": {
+        "updateId": "61",
+        "locationTracking": {
+            "locReadingPeriod": 30,
+            "alwaysOn": true,
+            "motionMonitoring": {
+                "enabled": true,
+                "movementAccMin": 0.15000001,
+                "movementAccMax": 0.30000001,
+                "movementAccDur": 0.25,
+                "motionTime": 5,
+                "motionDistance": 1,
+                "motionVelocity": 0.25,
+                "motionStopTimeout": 10
+            },
+            "repossessionMode": {
+                "enabled": false,
+                "after": 1651655116
+            },
+            "bleDevices": {
+                "enabled": true,
+                "generic": {},
+                "iBeacon": {
+                    "0112233445566778899aabbccddeeff0": {
+                        "1800": {
+                            "1286": {
+                                "lng": 16.32,
+                                "lat": 64.255997
+                            }
+                        }
+                    }
+                }
+            },
+            "geofence": {
+                "enabled": true,
+                "lat": 0,
+                "lng": 0,
+                "radius": 0
+            }
+        },
+        "connectingPeriod": 60,
+        "readingPeriod": 20
+        "alerts": {
+            "batteryLow": {
+                "enabled": true,
+                "threshold": 16
+            },
+            "shockDetected": {
+                "enabled": true,
+                "threshold": 3
+            },
+            "tamperingDetected": {
+                "enabled": false
+            },
+            "temperatureHigh": {
+                "enabled": true,
+                "hysteresis": 1,
+                "threshold": 25
+            },
+            "temperatureLow": {
+                "enabled": true,
+                "hysteresis": 1,
+                "threshold": 20
+            }
+        },
+        "debug": {
+            "logLevel": "DEBUG"
+        }
+    },
+    "agentConfiguration": {
+        "debug": {
+            "logLevel": "DEBUG"
+        }
+    }
+}
+```
+
+Example of a curl command (it updates the log level on Imp-Agent):
+```
+curl -u test:test -k --data '{"agentConfiguration":{"debug":{"logLevel":"DEBUG"}}}' -H "content-type: application/json" -X PATCH https://agent.electricimp.com/LPoC4xOL8ESr_/cfg
+```
 
 ## Behavior Description ##
 

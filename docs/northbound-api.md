@@ -20,11 +20,14 @@ All fields are mandatory, if not specified otherwise.
    "trackerId": <string>,    // Unique Id of the tracker (Imp deviceId)
    "timestamp": <number>,    // Timestamp when the data was read (Unix time - secs since the Epoch)
    "status": {
-     "inMotion": <boolean>,  // true - the asset is in motion now; false - the asset is not in motion.
-                             // Optional. Absent if motion tracking is not enabled in configuration.
-     "inGeofence": <boolean> // true - the asset is inside geofence zone now; false - the asset is outside geofence zone.
-                             // Optional. Absent if geofencing is not enabled in configuration.
-     ???
+     "inMotion": true/false,    // true - the asset is in motion now; false - the asset is not in motion.
+                                // Optional. Absent if motion tracking is not enabled in configuration.
+     "inGeofence": true/false,  // true - the asset is inside geofence zone now; false - the asset is outside geofence zone.
+                                // Optional. Absent if geofencing is not enabled in configuration
+                                // or it is not yet determined if the tracker is inside or outside geofence zone.
+     "repossession": true/false // true - the asset is in repossession mode now;
+                                // false - the asset is not in repossession mode.
+                                // Optional. Absent if repossession mode is not enabled in configuration.
    },
    "location": {             // Last known location
      "timestamp": <number>,  // Timestamp when this location was determined (Unix time - secs since the Epoch)
@@ -34,12 +37,13 @@ All fields are mandatory, if not specified otherwise.
      "lat": <number>         // Latitude
    },
    "sensors": {
-     "temperature": <number> // Current temperature, in Celsius
+     "temperature": <number>,  // Current temperature, in Celsius
+     "batteryLevel": <number>  // Current battery level, in %
    },
    "alerts": [ <array_of_strings> ]    // Alerts. Optional. Can be missed or empty if no alerts.
    // Possible values:
    //    "temperatureHigh", "temperatureLow", "shockDetected", "batteryLow",
-   //    "motionStarted", "motionStopped", "geofenceEntered", "geofenceExited", "repossessionModeActivated" ???
+   //    "motionStarted", "motionStopped", "geofenceEntered", "geofenceExited", "repossessionActivated"
 }
 ```
 
@@ -49,7 +53,8 @@ Example:
    "trackerId": "c0010c2a69f088a4",
    "timestamp": 1617900077,
    "status": {
-     "inMotion": true
+     "inMotion": true,
+     "repossession": false
    },
    "location": {
      "timestamp": 1617900070,
@@ -59,6 +64,7 @@ Example:
      "lat": 59.749069
    },
    "sensors": {
+     "batteryLevel": 100,
      "temperature": 42.191177
    },
    "alerts": [

@@ -76,8 +76,7 @@ Should be passed to [Builder](https://github.com/electricimp/Builder/):
 - or using `--use-directives <path_to_json_file>` option, where the json file contains the variables with the values.
 
 Variables:
-- `ERASE_MEMORY` - Enable (`1`) / disable (`0`) erasing persistent memory used by the application, once after the new application build is deployed. Optional. Default: **disabled**. Note, it can be used, for example, to delete the application configuration previously saved in the flash.<br>
-**Note:** Currrently, only SPI flash of the Imp-device is erased by this feature.
+- `ERASE_MEMORY` - Enable (`1`) / disable (`0`) erasing persistent memory used by the application, once after the new application build is deployed. Optional. Default: **disabled**. It can be used, for example, to delete the application configuration previously saved in the flash. **Note:** Currently, only SPI flash of the Imp-Device is erased by this feature.
 - `LOGGER_LEVEL` - Set logging level ("ERROR", "INFO", "DEBUG") on Imp-Agent/Device which works after the application restart till the application configuration is applied. Optional. Default: **"INFO"**. Note, when the application configuration is applied, the logging level is set according to the configuration. The logging level can be changed in runtime by updating the configuration.
 - `UART_LOGGING` - Enable (`1`) / disable (`0`) [UART logging](#uart-logging) on Imp-Device. Optional. Default: **enabled**
 - `LED_INDICATION` - Enable (`1`) / disable (`0`) [LED indication](#led-indication) of events. Optional. Default: **enabled**
@@ -162,3 +161,14 @@ There are two LEDs:
     - Temperature is low alert: **blue**
     - Temperature is high alert: **yellow**
   - When the indication is disabled, the User LED is not in use.
+
+### Emergency Mode ###
+
+If an unhandled error has occurred, the tracker application:
+- saves the error,
+- stops all activities,
+- goes to the "sleep" mode,
+- periodically wakes up:
+  - connects to the imp-central server,
+  - logs the saved error,
+  - waits for an application update.
