@@ -133,7 +133,7 @@ The "configuration" block of the configuration reported by the tracker to a clou
 
       "repossessionMode": {   // Location obtaining activation after the specified date
         "enabled": true/false,  // true - repossession mode is enabled
-        "after": <string>       // Timestamp (Unix time - secs since the Epoch) after which location obtaining is activated
+        "after": <number>       // Timestamp (Unix time - secs since the Epoch) after which location obtaining is activated
       },
 
       "bleDevices": {         // Bluetooth Low Energy (BLE) devices for location obtaining.
@@ -161,7 +161,7 @@ The "configuration" block of the configuration reported by the tracker to a clou
               },
               ... // more iBeacon devices with the same sub-group identifier can be specified
             },
-            ... // more iBeacon sub-groups can be specified
+            ... // more iBeacon sub-groups with the same group UUID can be specified
           },
           ... // more iBeacon groups can be specified
         }
@@ -187,6 +187,10 @@ The "configuration" block of the configuration reported by the tracker to a clou
       "shockDetected" : {       // One-time shock acceleration
         "enabled": true/false,    // true - alert is enabled
         "threshold": <number>     // Shock acceleration alert threshold, in g
+        // IMPORTANT: This value affects the measurement range and accuracy of the accelerometer:
+        // the larger the range - the lower the accuracy.
+        // This can affect the effectiveness of "movementAccMin".
+        // For example: if "threshold" > 4.0 g, then "movementAccMin" should be > 0.1 g
       },
 
       "temperatureLow": {       // Temperature crosses the lower limit (becomes below the threshold)
@@ -229,24 +233,135 @@ The "configuration" block of the configuration reported by the tracker to a clou
 
 ## Configuration Examples ##
 
-Examples of "configuration" and "agentConfiguration" blocks can be found in [Default Configuration](../README.md#default-configuration).
+Examples of the "configuration" and "agentConfiguration" blocks can be found in [Default Configuration](../README.md#default-configuration).
 
-Example of a full reported configuration can found here - ???
+Example of a full reported configuration can be found here - ???
 
 ## Behavior Description ##
 
-### Location obtaining ###
+### Location Tracking ###
 
-#### BLE ####
+Location is determined:
+- once after every restart of the tracker application,
+- periodically, if any of the following conditions has occurred:
+  - "alwaysOn" is true,
+  - "motionMonitoring" is enabled and the tracker is in motion,
+  - "repossessionMode" is enabled and the current timestamp is greater than the specified timestamp ("after").
 
-#### geofencing ####
+Period of location determination is specified by "locReadingPeriod".
 
-### Motion monitoring ###
+The latest determined location is saved in non-volatile memory and is restored after every restart of the tracker application.
 
-#### Motion start ####
+The application tries to determine a location using different ways in the following order:
+1. By nearby BLE devices, if "bleDevices" is enabled and a list of BLE devices with their coordinates is specified. Currently, two types of BLE devices are supported: generic devices specified by MAC address and iBeacon devices.
+1. By GNSS fix (u-blox NEO-M8N GNSS). U-blox AssistNow data, if available, is used to speed up GNSS fix.
+1. By nearby WiFi networks information. Google Maps Geolocation API is used.
+1. By nearby cellular towers information. Google Maps Geolocation API is used.
 
-#### Motion stop ####
+### Motion Monitoring ###
 
-### data and alerts ###
+When "motionMonitoring" is enabled, the tracker application uses data from accelerometer and location tracking to determine if the tracker is in motion or not.
 
-### Configuration selection on the tracker ###
+#### Motion Start ####
+
+Motion start detection consists of the two steps:
+1. initial movement detection,
+1. motion start confirmation.
+
+Accelerometer is switched on and is used during the both steps. Location tracking is not used for motion start detection.
+
+##### Initial Movement Detection #####
+
+Accelerometer is configured to detect a movement.
+
+"movementAccMin" and "movementAccMax" specify the range for movement acceleration threshold:
+- Initially, the acceleration threshold is set to "movementAccMin".
+- If the movement is detected but after that the motion start is not confirmed, then the acceleration threshold is increased by 0.1 g.
+- This may happen several times, but the maximum value set for the acceleration threshold is "movementAccMax".
+- Every time when the motion start is confirmed, the acceleration threshold is reset back to "movementAccMin".
+
+"movementAccDur" specifies the duration of exceeding the movement acceleration threshold.
+
+If accelerometer detects a movement, the algorithm goes to the second step - motion start confirmation.
+
+##### Motion Start Confirmation #####
+
+Accelerometer is configured to provide data for velocity and distance calculations.
+
+"motionTime" specifies the maximum time to confirm the motion start after the initial movement is detected.
+
+There are two independent conditions to confirm the motion start:
+- Instantaneous velocity reaches/exceeds "motionVelocity" at least once during "motionTime" and is not zero at the end of "motionTime". In this case the motion start is confirmed right after "motionTime".
+- Optional (is disabled if "motionDistance" is set to 0). Total motion distance after the initial movement reaches "motionDistance" before "motionTime". In this case the motion start is confirmed immediately, without waiting for "motionTime".
+
+Example:
+```
+"motionTime": 15.0,
+"motionVelocity": 0.5,
+"motionDistance": 5.0
+Motion start will be confirmed if:
+- Either instantaneous velocity 0.5 m/sec (or more) is detected at least once and it is still not zero after 15 secs.
+- Or total motion distance reaches 5 meters anytime before 15 secs. 
+```
+
+If the motion start is not confirmed by any of the conditions after "motionTime", then the algorithm returns to the first step - initial movement detection.
+
+If the motion start is confirmed by any of the conditions:
+- "motionStarted" alert is generated,
+- accelerometer is switched off,
+- periodic location tracking is activated (if it is not already active by other configuration settings),
+- the algorithm starts detection the motion stop.
+
+#### Motion Stop ####
+
+Motion stop detection consists of the two steps:
+1. motion stop assumption checking,
+1. motion stop confirmation.
+
+##### Motion Stop Assumption Checking #####
+
+Location is determined periodically, with "locReadingPeriod".
+
+When a new location is determined it is compared with the previous one. If the both locations are identical (taking into account location accuracy), then the motion stop assumption occurs. Note, the motion stop assumption occurs also when a location can not be determined during two "locReadingPeriod" in a raw.
+
+If the motion stop assumption occurs:
+- periodic location tracking is deactivated (it can still continue to be active by other configuration settings),
+- accelerometer is switched on and configured like for motion start detection, it is going to be used to check if the motion is really stopped or not,
+- the algorithm goes to the second step - motion stop confirmation.
+
+##### Motion Stop Confirmation #####
+
+"motionStopTimeout" - timeout after the motion stop assumption to confirm the motion stop.
+
+If during "motionStopTimeout" a motion start is detected (ie. the tracker is still in motion):
+- periodic location tracking is reactivated (if it is not already active by other configuration settings),
+- the algorithm returns to the first step - motion stop assumption checking.
+
+If during "motionStopTimeout" a motion start is not detected (ie. the motion stop is confirmed):
+- "motionStopped" alert is generated,
+- the algorithm continues with the motion start detection.
+
+### Data And Alerts ###
+
+Some data is obtained "by event" and corresponding alerts are checked/generated immediately.
+
+Other data is obtained "by polling" - periodically, with "readingPeriod". And corresponding alerts are checked/generated with the same period.
+
+If no alerts occur, the data is saved in SPI flash and sent to a cloud periodically, with "connectingPeriod".
+
+If an alert occurs, the new and previously unsent data are sent immediately.
+
+### Configuration Deployment Algorithm ###
+
+After every restart of the tracker application (Imp-Device part):
+- If it is a new build of the application and "ERASE_MEMORY" builder-variable is enabled, then the saved configuration (if any) is deleted from SPI flash.
+- If a configuration exists in SPI flash, then it is being deployed:
+  - If the configuration deployment is successful, then it is reported as the actual configuration and the tracking starts working.
+  - If the configuration deployment is not successful, then the saved configuration is deleted from SPI flash and the tracker is restarted.
+- If there is no configuration saved in SPI flash, then the default configuration (should exist with every build of the application) is being deployed:
+  - If the configuration deployment is successful, then it is reported as the actual configuration and the tracking starts working.
+  - If the configuration deployment is not successful, then the application goes to Emergency Mode.
+
+After a configuration update, which can come in runtime from a cloud, is successfully applied, the full new configuration is saved in SPI flash and is reported as the actual configuration.
+
+The tracking is not stopped during the configuration update is being applied. Only components which are affected by the update may be temporary stopped / restarted.
