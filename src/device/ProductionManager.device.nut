@@ -3,6 +3,7 @@
 // ProductionManager's user config field
 const PMGR_USER_CONFIG_FIELD = "ProductionManager";
 // Period (sec) of checking for new deployments
+// TODO: Make a global const? Or use a builer-variable? Think of many other variables
 const PMGR_CHECK_UPDATES_PERIOD = 10;
 // Maximum length of stats arrays
 const PMGR_STATS_MAX_LEN = 10;
@@ -76,6 +77,7 @@ class ProductionManager {
     function enterEmergencyMode(error = null) {
         _setErrorFlag(error);
         server.flush(PMGR_FLUSH_TIMEOUT);
+        // TODO: Sleep immediately?
         server.restart();
     }
 

@@ -1,4 +1,4 @@
-#require "rocky.class.nut:2.0.2"
+#require "rocky.agent.lib.nut:3.0.1"
 #require "Promise.lib.nut:4.0.0"
 #require "Messenger.lib.nut:0.2.0"
 #require "UBloxAssistNow.agent.lib.nut:1.0.0"
@@ -11,10 +11,11 @@
 @include once "LocationAssistant.agent.nut"
 @include once "CfgValidation.agent.nut"
 @include once "CfgService.agent.nut"
+@include once "WebUI.agent.nut"
 
 // Main application on Imp-Agent:
 // - Forwards Data messages from Imp-Device to Cloud REST API
-// - Obtains GNSS Assist data for BG96 from server and returns it to Imp-Device
+// - Obtains GNSS Assist data for u-blox from server and returns it to Imp-Device
 // - Obtains the location by cell towers and wifi networks info using Google Maps Geolocation API
 //   and returns it to Imp-Device
 // - Implements REST API for the tracker configuration
@@ -24,10 +25,14 @@
 class Application {
     // Messenger instance
     _msngr = null;
-    // Rocky instance
-    _rocky = null;
     // Configuration service instance
-    _cfgService =null;
+    _cfgService = null;
+    // Location Assistant instance
+    _locAssistant = null;
+    // Cloud Client instance
+    _cloudClient = null;
+    // Web UI instance. If disabled, null
+    _webUI = null;
 
     /**
      * Application Constructor
@@ -38,6 +43,22 @@ class Application {
         _initMsngr();
         // Initialize configuration service
         _initCfgService();
+        // Initialize Location Assistant
+        _initLocAssistant();
+
+@if WEB_UI || !defined(WEB_UI)
+        // Initialize configuration service with no authentication
+        _initCfgService();
+        // Initialize Web UI
+        _initWebUI();
+@else
+        // Initialize configuration service using env vars as a username and password for authentication
+        _initCfgService(__VARS.CFG_REST_API_USERNAME, __VARS.CFG_REST_API_PASSWORD);
+        // Initialize Cloud Client instance
+        _initCloudClient(__VARS.CLOUD_REST_API_URL, __VARS.CLOUD_REST_API_USERNAME, __VARS.CLOUD_REST_API_PASSWORD);
+        // Since Web UI is disabled, let's take tokens from env vars
+        _locAssistant.setTokens(__VARS.UBLOX_ASSIST_NOW_TOKEN, __VARS.GOOGLE_MAPS_API_KEY);
+@endif
 
         // TODO: Make a build-flag to allow erasing the agent's memory?
     }
@@ -56,10 +77,35 @@ class Application {
 
     /**
      * Create and initialize configuration service instance
+     * TODO: Update
      */
-    function _initCfgService() {
-        _rocky = Rocky();
-        _cfgService = CfgService(_msngr, _rocky);
+    function _initCfgService(user = null, pass = null) {
+        Rocky.init();
+        _cfgService = CfgService(_msngr, user, pass);
+    }
+
+    /**
+     * Create and initialize Location Assistant instance
+     */
+    function _initLocAssistant() {
+        _locAssistant = LocationAssistant();
+    }
+
+    /**
+     * Create and initialize Cloud Client instance
+     * TODO: Update
+     */
+    function _initCloudClient(url, user, pass) {
+        _cloudClient = CloudClient(url, user, pass);
+    }
+
+    /**
+     * Create and initialize Web UI
+     */
+    function _initWebUI() {
+        local tokensSetter = _locAssistant.setTokens.bindenv(_locAssistant);
+        local cloudConfigurator = _initCloudClient.bindenv(this);
+        _webUI = WebUI(tokensSetter, cloudConfigurator);
     }
 
     /**
@@ -72,13 +118,20 @@ class Application {
         ::debug("Data received from imp-device, msgId = " + msg.id);
         local data = http.jsonencode(msg.data);
 
-        CloudClient.send(data)
-        .then(function(_) {
-            ::info("Data has been successfully sent to the cloud: " + data);
-        }.bindenv(this), function(err) {
-            ::error("Cloud reported an error while receiving data: " + err);
-            ::error("The data caused this error: " + data);
-        }.bindenv(this));
+        // If Web UI is enabled, pass there the latest data
+        _webUI && _webUI.newData(msg.data);
+
+        if (_cloudClient) {
+            _cloudClient.send(data)
+            .then(function(_) {
+                ::info("Data has been successfully sent to the cloud: " + data);
+            }.bindenv(this), function(err) {
+                ::error("Cloud reported an error while receiving data: " + err);
+                ::error("The data caused this error: " + data);
+            }.bindenv(this));
+        } else {
+            ::info("No cloud configured. Data received but not sent further: " + data);
+        }
     }
 
     /**
@@ -90,7 +143,7 @@ class Application {
     function _onGnssAssist(msg, customAck) {
         local ack = customAck();
 
-        LocationAssistant.getGnssAssistData()
+        _locAssistant.getGnssAssistData()
         .then(function(data) {
             ::info("Assist data downloaded");
             ack(data);
@@ -110,7 +163,7 @@ class Application {
     function _onLocationCellAndWiFi(msg, customAck) {
         local ack = customAck();
 
-        LocationAssistant.getLocationByCellInfoAndWiFi(msg.data)
+        _locAssistant.getLocationByCellInfoAndWiFi(msg.data)
         .then(function(location) {
             ::info("Location obtained using Google Geolocation API");
             ack(location);
@@ -119,7 +172,6 @@ class Application {
             ack(null);
         }.bindenv(this));
     }
-
 }
 
 // ---------------------------- THE MAIN CODE ---------------------------- //

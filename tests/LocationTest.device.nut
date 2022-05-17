@@ -15,17 +15,10 @@
 @include once "../src/device/Hardware.device.nut"
 @include once "../src/device/CustomConnectionManager.device.nut"
 @include once "../src/device/CustomReplayMessenger.device.nut"
-@include once "../src/device/bg96_gps.device.lib.nut"
 @include once "../src/device/BG96CellInfo.device.nut"
 @include once "../src/device/ESP32Driver.device.nut"
 @include once "../src/device/Configuration.device.nut"
-
-
-@if BG96_GNSS
-@include once "../src/device/LocationDriverBG96.device.nut"
-@else
 @include once "../src/device/LocationDriver.device.nut"
-@endif
 
 
 // Test for Location determination.

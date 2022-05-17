@@ -85,7 +85,7 @@ class CustomConnectionManager extends ConnectionManager {
      * Keep/don't keep the connection (if established) while a consumer is using it.
      * If there is at least one consumer using the connection, automatic disconnection is deactivated.
      * Once there are no consumers, automatic disconnection is activated.
-     * May be called when connectected and when disconnected as well
+     * May be called when connected and when disconnected as well
      *
      * @param {string} consumerId - Consumer's identificator.
      * @param {boolean} keep - Flag indicating if the connection should be kept for this consumer.

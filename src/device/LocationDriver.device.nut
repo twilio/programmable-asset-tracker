@@ -552,8 +552,8 @@ class LocationDriver {
                         "timestamp": time() > LD_VALID_TS ? time() : _dateToTimestamp(parsed),
                         "type": "gnss",
                         "accuracy": accuracy,
-                        "longitude": parsed.lon,
-                        "latitude": parsed.lat
+                        "longitude": UbxMsgParser.toDecimalDegreeString(parsed.lon).tofloat(),
+                        "latitude": UbxMsgParser.toDecimalDegreeString(parsed.lat).tofloat()
                     });
                 }
             }

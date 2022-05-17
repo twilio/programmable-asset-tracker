@@ -17,8 +17,6 @@ enum CFG_REST_API_HTTP_CODES {
 class CfgService {
     // Messenger instance
     _msngr = null;
-    // Rocky instance
-    _rocky = null;
     // HTTP Authorization
     _authHeader = null;
     // Cfg update ("configuration") which waits for successful delivering to the imp-device
@@ -37,31 +35,24 @@ class CfgService {
      * Constructor for Configuration Service Class
      *
      * @param {object} msngr - Messenger instance
-     * @param {object} rocky - Rocky instance
+     * TODO: Update
      */
-    constructor(msngr, rocky) {
+    constructor(msngr, user = null, pass = null) {
         _msngr = msngr;
-        _rocky = rocky;
-
-        _authHeader = "Basic " +
-                      http.base64encode(__VARS.CFG_REST_API_USERNAME +
-                      ":" +
-                      __VARS.CFG_REST_API_PASSWORD);
-
         _msngr.on(APP_RM_MSG_NAME.CFG, _cfgCb.bindenv(this));
         _msngr.onAck(_ackCb.bindenv(this));
         _msngr.onFail(_failCb.bindenv(this));
 
-        _rocky.authorize(_authCb.bindenv(this));
-        _rocky.onUnauthorized(_unauthCb.bindenv(this));
-        _rocky.on("GET",
-                  CFG_REST_API_DATA_ENDPOINT,
-                  _getCfgRockyHandler.bindenv(this),
-                  null);
-        _rocky.on("PATCH",
-                  CFG_REST_API_DATA_ENDPOINT,
-                  _patchCfgRockyHandler.bindenv(this),
-                  null);
+        local getRoute = Rocky.on("GET", CFG_REST_API_DATA_ENDPOINT, _getCfgRockyHandler.bindenv(this));
+        local patchRoute = Rocky.on("PATCH", CFG_REST_API_DATA_ENDPOINT, _patchCfgRockyHandler.bindenv(this));
+
+        if (user && pass) {
+            _authHeader = "Basic " + http.base64encode(user + ":" + pass);
+
+            foreach (route in [getRoute, patchRoute]) {
+                route.authorize(_authCb.bindenv(this)).onUnauthorized(_unauthCb.bindenv(this));
+            }
+        }
 
         _loadCfgs();
         _applyAgentCfg(_agentCfg);
@@ -105,7 +96,7 @@ class CfgService {
         _saveCfgs();
     }
 
-   /**
+    /**
      * HTTP GET request callback function.
      *
      * @param context - Rocky.Context object.
