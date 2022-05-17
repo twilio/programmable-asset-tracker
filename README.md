@@ -181,14 +181,16 @@ The Web UI does not require any user credentials to access.
 Note, it is recommended to open the UI from a PC/laptop. The UI may not be optimized for smartphone screens.
 
 The UI includes the following capabilities:
-- Displaying the latest data reported by the Asset Tracker application. Note, in parallel with displaying in this UI the data messages still can be forwarded to a cloud, if the cloud URL and credentials are specified (see below).
-- Displaying a history of alerts reported by the Asset Tracker application (several latest alerts).
+- Displaying the latest data reported by the Asset Tracker application (the latest data message received from Imp-Device, this is not neccessary a message with the latest timestamp). Note, in parallel with displaying in this UI the data messages still can be forwarded to a cloud, if the cloud URL and credentials are specified (see below).
+- Displaying a history of alerts reported by the Asset Tracker application (several latest alerts received from Imp-Device, they are not neccessary sorted by alert timestamps).
 - Requesting, displaying, updating and applying the Asset Tracker application configuration. For the configuration description see the [Southbound REST API](./docs/southbound-api.md).
 - Specifying the Asset Tracker application settings - the same which are specified by the [Environment Variables](#user-defined-environment-variables) for production deployments:
   - Tokens / Access keys. Note, there are no defaults for these tokens, for the full functionality of the Asset Tracker application the tokens should be manually specified.
   - URL and credentials of a cloud that implements the [Northbound REST API](./docs/northbound-api.md). Optional. If specified, then the data messages are forwarded to the cloud, in parallel with the Web UI.
   - Note, credentials to access the [Southbound REST API](./docs/southbound-api.md) are not needed. It is still possible to access this API from a cloud, in parallel with working via the Web UI. No authentication is needed in this case.
   - Note, all specified settings are lost after the application redeployment or Imp-Agent restart.
+
+The blocks with the latest data and alerts are auto-refreshed every 30 seconds.
 
 ### Emergency Mode ###
 
