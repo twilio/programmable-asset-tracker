@@ -1,5 +1,9 @@
 //line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/agent/Main.agent.nut"
+<<<<<<< HEAD
 #require "rocky.agent.lib.nut:3.0.1"
+=======
+#require "rocky.class.nut:2.0.2"
+>>>>>>> main
 #require "Promise.lib.nut:4.0.0"
 #require "Messenger.lib.nut:0.2.0"
 #require "UBloxAssistNow.agent.lib.nut:1.0.0"
@@ -234,7 +238,11 @@ class GoogleMaps {
 }
 //line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/shared/Version.shared.nut"
 // Application Version
+<<<<<<< HEAD
 const APP_VERSION = "2.1.0";
+=======
+const APP_VERSION = "2.0.0";
+>>>>>>> main
 //line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/shared/Constants.shared.nut"
 // Constants common for the imp-agent and the imp-device
 
@@ -675,6 +683,12 @@ class CloudClient {
 }
 
 //line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/agent/LocationAssistant.agent.nut"
+<<<<<<< HEAD
+=======
+
+// URL to request BG96 Assist data
+const LA_BG96_ASSIST_DATA_URL = "http://xtrapath4.izatcloud.net/xtra3grc.bin";
+>>>>>>> main
 
 // Google Maps Geolocation API URL
 const LA_GOOGLE_MAPS_LOCATION_URL = "https://www.googleapis.com/geolocation/v1/geolocate?key=";
@@ -892,13 +906,21 @@ const CFG_STRING_LENGTH_MAX = 50;
 // validation rules for coordinates
 coordValidationRules <- [{"name":"lng",
                           "required":false,
+<<<<<<< HEAD
                           "validationType":"integer|float",
+=======
+                          "validationType":"float",
+>>>>>>> main
                           "lowLim":CFG_LONGITUDE_SAFEGUARD_MIN,
                           "highLim":CFG_LONGITUDE_SAFEGUARD_MAX,
                           "dependencies":["lat"]},
                          {"name":"lat",
                           "required":false,
+<<<<<<< HEAD
                           "validationType":"integer|float",
+=======
+                          "validationType":"float",
+>>>>>>> main
                           "lowLim":CFG_LATITUDE_SAFEGUARD_MIN,
                           "highLim":CFG_LATITUDE_SAFEGUARD_MAX,
                           "dependencies":["lng"]}];
@@ -911,8 +933,11 @@ coordValidationRules <- [{"name":"lng",
  * @return {null | string} null - validation success, otherwise error string.
  */
 function validateCfg(msg) {
+<<<<<<< HEAD
     // TODO: Check if there are extra fields in the cfg
 
+=======
+>>>>>>> main
     // validate agent configuration
     if ("agentConfiguration" in msg) {
         local agentCfg = msg.agentConfiguration;
@@ -958,8 +983,12 @@ function validateCfg(msg) {
  *        The table fields:
  *          "name": {string} - Parameter name.
  *          "required": {bool} - Availability in the configuration parameters.
+<<<<<<< HEAD
  *          "validationType": {string} - Allowed parameter type(s) ("float", "string", "integer").
                                          Several types can be specified using "|" as a separator.
+=======
+ *          "validationType": {string} - Parameter type ("float", "string", "integer").
+>>>>>>> main
  *          "lowLim": {float, integer} - Parameter minimum value (for float and integer).
  *          "highLim": {float, integer} - Parameter maximum value (for float and integer).
  *          "minLen": {integer} - Minimal length of the string parameter.
@@ -978,8 +1007,12 @@ function _rulesCheck(rules, cfgGroup) {
         foreach (fieldName, field in cfgGroup) {
             if (rule.name == fieldName) {
                 fieldNotExist = false;
+<<<<<<< HEAD
                 local allowedTypes = split(rule.validationType, "|");
                 if (allowedTypes.find(typeof(field)) == null) {
+=======
+                if (typeof(field) != rule.validationType) {
+>>>>>>> main
                     return ("Field: "  + fieldName + " - type mismatch");
                 }
                 if ("lowLim" in rule && "highLim" in rule) {
@@ -1033,7 +1066,11 @@ function _rulesCheck(rules, cfgGroup) {
             }
         }
         if (rule.required && fieldNotExist) {
+<<<<<<< HEAD
             return ("Field: "  + rule.name + " - not exist");
+=======
+            return ("Field: "  + fieldName + " - not exist");
+>>>>>>> main
         }
     }
 
@@ -1075,14 +1112,25 @@ function _validateLogLevel(logLevels) {
  */
 function _validateIndividualField(conf) {
     local validationRules = [];
+<<<<<<< HEAD
     validationRules.append({"name":"connectingPeriod",
                             "required":false,
                             "validationType":"integer|float",
+=======
+    // TODO: Integer values must be allowed
+    validationRules.append({"name":"connectingPeriod",
+                            "required":false,
+                            "validationType":"float",
+>>>>>>> main
                             "lowLim":CFG_CONNECTING_SAFEGUARD_MIN,
                             "highLim":CFG_CONNECTING_SAFEGUARD_MAX});
     validationRules.append({"name":"readingPeriod",
                             "required":false,
+<<<<<<< HEAD
                             "validationType":"integer|float",
+=======
+                            "validationType":"float",
+>>>>>>> main
                             "lowLim":CFG_READING_SAFEGUARD_MIN,
                             "highLim":CFG_READING_SAFEGUARD_MAX});
     validationRules.append({"name":"updateId",
@@ -1115,7 +1163,11 @@ function _validateAlerts(alerts) {
                 // charge level [0;100] %
                 validationRules.append({"name":"threshold",
                                         "required":false,
+<<<<<<< HEAD
                                         "validationType":"integer|float",
+=======
+                                        "validationType":"float",
+>>>>>>> main
                                         "lowLim":CFG_CHARGE_LEVEL_THR_SAFEGUARD_MIN,
                                         "highLim":CFG_CHARGE_LEVEL_THR_SAFEGUARD_MAX});
                 break;
@@ -1124,12 +1176,20 @@ function _validateAlerts(alerts) {
                 // industrial temperature range
                 validationRules.append({"name":"threshold",
                                         "required":false,
+<<<<<<< HEAD
                                         "validationType":"integer|float",
+=======
+                                        "validationType":"float",
+>>>>>>> main
                                         "lowLim":CFG_TEMPERATURE_THR_SAFEGUARD_MIN,
                                         "highLim":CFG_TEMPERATURE_THR_SAFEGUARD_MAX});
                 validationRules.append({"name":"hysteresis",
                                         "required":false,
+<<<<<<< HEAD
                                         "validationType":"integer|float",
+=======
+                                        "validationType":"float",
+>>>>>>> main
                                         "lowLim":CFG_TEMPERATURE_HYST_SAFEGUARD_MIN,
                                         "highLim":CFG_TEMPERATURE_HYST_SAFEGUARD_MAX});
                 break;
@@ -1137,7 +1197,11 @@ function _validateAlerts(alerts) {
                 // LIS2DH12 maximum shock threshold - 16 g
                 validationRules.append({"name":"threshold",
                                         "required":false,
+<<<<<<< HEAD
                                         "validationType":"integer|float",
+=======
+                                        "validationType":"float",
+>>>>>>> main
                                         "lowLim":CFG_SHOCK_ACC_SAFEGUARD_MIN,
                                         "highLim":CFG_SHOCK_ACC_SAFEGUARD_MAX});
                 break;
@@ -1177,7 +1241,11 @@ function _validateLocTracking(locTracking) {
         local validationRules = [];
         validationRules.append({"name":"locReadingPeriod",
                                 "required":false,
+<<<<<<< HEAD
                                 "validationType":"integer|float",
+=======
+                                "validationType":"float",
+>>>>>>> main
                                 "lowLim":CFG_LOC_READING_SAFEGUARD_MIN,
                                 "highLim":CFG_LOC_READING_SAFEGUARD_MAX});
         rulesCheckRes = _rulesCheck(validationRules, locTracking);
@@ -1200,41 +1268,69 @@ function _validateLocTracking(locTracking) {
         if (checkEnableRes != null) return checkEnableRes;
         validationRules.append({"name":"movementAccMin",
                                 "required":false,
+<<<<<<< HEAD
                                 "validationType":"integer|float",
+=======
+                                "validationType":"float",
+>>>>>>> main
                                 "lowLim":CFG_MOVEMENT_ACC_SAFEGUARD_MIN,
                                 "highLim":CFG_MOVEMENT_ACC_SAFEGUARD_MAX,
                                 "dependencies":["movementAccMax"]});
         validationRules.append({"name":"movementAccMax",
                                 "required":false,
+<<<<<<< HEAD
                                 "validationType":"integer|float",
+=======
+                                "validationType":"float",
+>>>>>>> main
                                 "lowLim":CFG_MOVEMENT_ACC_SAFEGUARD_MIN,
                                 "highLim":CFG_MOVEMENT_ACC_SAFEGUARD_MAX,
                                 "dependencies":["movementAccMin"]});
         // min 1/ODR (current 100 Hz), max INT1_DURATION - 127/ODR
         validationRules.append({"name":"movementAccDur",
                                 "required":false,
+<<<<<<< HEAD
                                 "validationType":"integer|float",
+=======
+                                "validationType":"float",
+>>>>>>> main
                                 "lowLim":CFG_MOVEMENT_ACC_DURATION_SAFEGUARD_MIN,
                                 "highLim":CFG_MOVEMENT_ACC_DURATION_SAFEGUARD_MAX});
         validationRules.append({"name":"motionTime",
                                 "required":false,
+<<<<<<< HEAD
                                 "validationType":"integer|float",
+=======
+                                "validationType":"float",
+>>>>>>> main
                                 "lowLim":CFG_MOTION_TIME_SAFEGUARD_MIN,
                                 "highLim":CFG_MOTION_TIME_SAFEGUARD_MAX});
         validationRules.append({"name":"motionVelocity",
                                 "required":false,
+<<<<<<< HEAD
                                 "validationType":"integer|float",
+=======
+                                "validationType":"float",
+>>>>>>> main
                                 "lowLim":CFG_MOTION_VEL_SAFEGUARD_MIN,
                                 "highLim":CFG_MOTION_VEL_SAFEGUARD_MAX});
         validationRules.append({"name":"motionDistance",
                                 "required":false,
+<<<<<<< HEAD
                                 "validationType":"integer|float",
+=======
+                                "validationType":"float",
+>>>>>>> main
                                 "fixedValues":[CFG_MOTION_DIST_FIXED_VAL],
                                 "lowLim":CFG_MOTION_DIST_SAFEGUARD_MIN,
                                 "highLim":CFG_MOTION_DIST_SAFEGUARD_MAX});
         validationRules.append({"name":"motionStopTimeout",
                                 "required":false,
+<<<<<<< HEAD
                                 "validationType":"integer|float",
+=======
+                                "validationType":"float",
+>>>>>>> main
                                 "lowLim":CFG_MOTION_STOP_SAFEGUARD_MIN,
                                 "highLim":CFG_MOTION_STOP_SAFEGUARD_MAX});
         rulesCheckRes = _rulesCheck(validationRules, motionMon);
@@ -1258,19 +1354,31 @@ function _validateLocTracking(locTracking) {
         if (checkEnableRes != null) return checkEnableRes;
         validationRules.append({"name":"lng",
                                 "required":false,
+<<<<<<< HEAD
                                 "validationType":"integer|float",
+=======
+                                "validationType":"float",
+>>>>>>> main
                                 "lowLim":CFG_LONGITUDE_SAFEGUARD_MIN,
                                 "highLim":CFG_LONGITUDE_SAFEGUARD_MAX,
                                 "dependencies":["lat", "radius"]});
         validationRules.append({"name":"lat",
                                 "required":false,
+<<<<<<< HEAD
                                 "validationType":"integer|float",
+=======
+                                "validationType":"float",
+>>>>>>> main
                                 "lowLim":CFG_LATITUDE_SAFEGUARD_MIN,
                                 "highLim":CFG_LATITUDE_SAFEGUARD_MAX,
                                 "dependencies":["lng", "radius"]});
         validationRules.append({"name":"radius",
                                 "required":false,
+<<<<<<< HEAD
                                 "validationType":"integer|float",
+=======
+                                "validationType":"float",
+>>>>>>> main
                                 "lowLim":CFG_GEOFENCE_RADIUS_SAFEGUARD_MIN,
                                 "highLim":CFG_GEOFENCE_RADIUS_SAFEGUARD_MAX,
                                 "dependencies":["lng","lat"]});
@@ -1409,6 +1517,11 @@ enum CFG_REST_API_HTTP_CODES {
 class CfgService {
     // Messenger instance
     _msngr = null;
+<<<<<<< HEAD
+=======
+    // Rocky instance
+    _rocky = null;
+>>>>>>> main
     // HTTP Authorization
     _authHeader = null;
     // Cfg update ("configuration") which waits for successful delivering to the imp-device
@@ -1427,14 +1540,29 @@ class CfgService {
      * Constructor for Configuration Service Class
      *
      * @param {object} msngr - Messenger instance
+<<<<<<< HEAD
      * TODO: Update
      */
     constructor(msngr, user = null, pass = null) {
         _msngr = msngr;
+=======
+     * @param {object} rocky - Rocky instance
+     */
+    constructor(msngr, rocky) {
+        _msngr = msngr;
+        _rocky = rocky;
+
+        _authHeader = "Basic " +
+                      http.base64encode(__VARS.CFG_REST_API_USERNAME +
+                      ":" +
+                      __VARS.CFG_REST_API_PASSWORD);
+
+>>>>>>> main
         _msngr.on(APP_RM_MSG_NAME.CFG, _cfgCb.bindenv(this));
         _msngr.onAck(_ackCb.bindenv(this));
         _msngr.onFail(_failCb.bindenv(this));
 
+<<<<<<< HEAD
         local getRoute = Rocky.on("GET", CFG_REST_API_DATA_ENDPOINT, _getCfgRockyHandler.bindenv(this));
         local patchRoute = Rocky.on("PATCH", CFG_REST_API_DATA_ENDPOINT, _patchCfgRockyHandler.bindenv(this));
 
@@ -1445,6 +1573,18 @@ class CfgService {
                 route.authorize(_authCb.bindenv(this)).onUnauthorized(_unauthCb.bindenv(this));
             }
         }
+=======
+        _rocky.authorize(_authCb.bindenv(this));
+        _rocky.onUnauthorized(_unauthCb.bindenv(this));
+        _rocky.on("GET",
+                  CFG_REST_API_DATA_ENDPOINT,
+                  _getCfgRockyHandler.bindenv(this),
+                  null);
+        _rocky.on("PATCH",
+                  CFG_REST_API_DATA_ENDPOINT,
+                  _patchCfgRockyHandler.bindenv(this),
+                  null);
+>>>>>>> main
 
         _loadCfgs();
         _applyAgentCfg(_agentCfg);
@@ -1488,7 +1628,11 @@ class CfgService {
         _saveCfgs();
     }
 
+<<<<<<< HEAD
     /**
+=======
+   /**
+>>>>>>> main
      * HTTP GET request callback function.
      *
      * @param context - Rocky.Context object.
@@ -1632,7 +1776,11 @@ class CfgService {
     "logLevel": "DEBUG"       // logging level on Imp-Agent ("ERROR", "INFO", "DEBUG")
   }
 }
+<<<<<<< HEAD
 //line 238 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/agent/CfgService.agent.nut"
+=======
+//line 247 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/agent/CfgService.agent.nut"
+>>>>>>> main
         return cfg;
     }
 
@@ -1698,6 +1846,7 @@ class CfgService {
     }
 }
 
+<<<<<<< HEAD
 //line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/agent/WebUI.agent.nut"
 
 // Configuration API endpoint
@@ -1812,6 +1961,13 @@ class WebUI {
 // Main application on Imp-Agent:
 // - Forwards Data messages from Imp-Device to Cloud REST API
 // - Obtains GNSS Assist data for u-blox from server and returns it to Imp-Device
+=======
+//line 14 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/agent/Main.agent.nut"
+
+// Main application on Imp-Agent:
+// - Forwards Data messages from Imp-Device to Cloud REST API
+// - Obtains GNSS Assist data for BG96 from server and returns it to Imp-Device
+>>>>>>> main
 // - Obtains the location by cell towers and wifi networks info using Google Maps Geolocation API
 //   and returns it to Imp-Device
 // - Implements REST API for the tracker configuration
@@ -1821,6 +1977,7 @@ class WebUI {
 class Application {
     // Messenger instance
     _msngr = null;
+<<<<<<< HEAD
     // Configuration service instance
     _cfgService = null;
     // Location Assistant instance
@@ -1829,6 +1986,12 @@ class Application {
     _cloudClient = null;
     // Web UI instance. If disabled, null
     _webUI = null;
+=======
+    // Rocky instance
+    _rocky = null;
+    // Configuration service instance
+    _cfgService =null;
+>>>>>>> main
 
     /**
      * Application Constructor
@@ -1839,6 +2002,7 @@ class Application {
         _initMsngr();
         // Initialize configuration service
         _initCfgService();
+<<<<<<< HEAD
         // Initialize Location Assistant
         _initLocAssistant();
 
@@ -1846,6 +2010,8 @@ class Application {
         _initCfgService();
         // Initialize Web UI
         _initWebUI();
+=======
+>>>>>>> main
 
         // TODO: Make a build-flag to allow erasing the agent's memory?
     }
@@ -1864,6 +2030,7 @@ class Application {
 
     /**
      * Create and initialize configuration service instance
+<<<<<<< HEAD
      * TODO: Update
      */
     function _initCfgService(user = null, pass = null) {
@@ -1893,6 +2060,12 @@ class Application {
         local tokensSetter = _locAssistant.setTokens.bindenv(_locAssistant);
         local cloudConfigurator = _initCloudClient.bindenv(this);
         _webUI = WebUI(tokensSetter, cloudConfigurator);
+=======
+     */
+    function _initCfgService() {
+        _rocky = Rocky();
+        _cfgService = CfgService(_msngr, _rocky);
+>>>>>>> main
     }
 
     /**
@@ -1959,6 +2132,7 @@ class Application {
             ack(null);
         }.bindenv(this));
     }
+
 }
 
 // ---------------------------- THE MAIN CODE ---------------------------- //

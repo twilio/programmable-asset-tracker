@@ -19,11 +19,17 @@
 
 #require "MAX17055.device.lib.nut:1.0.2"
 
+<<<<<<< HEAD
 // TODO: Aggregate all constants that should be customized in production in one place?
 
 //line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/shared/Version.shared.nut"
 // Application Version
 const APP_VERSION = "2.1.0";
+=======
+//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/shared/Version.shared.nut"
+// Application Version
+const APP_VERSION = "2.0.0";
+>>>>>>> main
 //line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/shared/Constants.shared.nut"
 // Constants common for the imp-agent and the imp-device
 
@@ -400,7 +406,11 @@ Logger <- {
 
 Logger.setLogLevelStr("INFO");
 
+<<<<<<< HEAD
 //line 26 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
+=======
+//line 24 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
+>>>>>>> main
 
 //line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/shared/Logger/stream/Logger.IOutputStream.shared.nut"
 /**
@@ -447,7 +457,11 @@ class UartOutputStream extends Logger.IOutputStream {
         return server.log(data);
     }
 }
+<<<<<<< HEAD
 //line 30 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
+=======
+//line 28 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
+>>>>>>> main
 
 //line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/LedIndication.device.nut"
 
@@ -529,7 +543,11 @@ class LedIndication {
     }
 }
 
+<<<<<<< HEAD
 //line 34 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
+=======
+//line 32 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
+>>>>>>> main
 
 //line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Hardware.device.nut"
 // TODO: Comment
@@ -766,7 +784,10 @@ class ProductionManager {
     function enterEmergencyMode(error = null) {
         _setErrorFlag(error);
         server.flush(PMGR_FLUSH_TIMEOUT);
+<<<<<<< HEAD
         // TODO: Sleep immediately?
+=======
+>>>>>>> main
         server.restart();
     }
 
@@ -1169,6 +1190,8 @@ class CfgManager {
 
         foreach (k in keysToRemove) {
             delete cfgUpdate[k];
+<<<<<<< HEAD
+=======
         }
     }
 
@@ -1187,10 +1210,32 @@ class CfgManager {
             } else {
                 actualCfg[k] <- v;
             }
+>>>>>>> main
         }
     }
 
     // TODO: Comment
+<<<<<<< HEAD
+    function _applyDiff(diff, actualCfg, path = "") {
+        foreach (k, v in diff) {
+            // The full path which includes the key currently considered
+            local fullPath = path + "/" + k;
+            // Check if this path should be fully replaced in the actual cfg
+            local fullyReplace = !(k in actualCfg) || CFGM_DIFF_SPECIAL_PATHS.find("^" + fullPath + "$") != null;
+
+            // We assume that configuration can only contain nested tables, not arrays
+            if (type(v) == "table" && !fullyReplace) {
+                // Make a diff from a nested table
+                _applyDiff(v, actualCfg[k], fullPath);
+            } else {
+                actualCfg[k] <- v;
+            }
+        }
+    }
+
+    // TODO: Comment
+=======
+>>>>>>> main
     function _defaultCfg() {
         local cfg =
 //line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/DefaultConfiguration.device.nut"
@@ -1251,6 +1296,7 @@ class CfgManager {
       // the larger the range - the lower the accuracy.
       // This can affect the effectiveness of "movementAccMin".
       // For example: if "threshold" > 4.0 g, then "movementAccMin" should be > 0.1 g
+<<<<<<< HEAD
     },
 
     "temperatureLow": {         // temperature crosses the lower limit (becomes below the threshold)
@@ -1270,6 +1316,27 @@ class CfgManager {
       "threshold": 12.0         // battery low alert threshold, in %
     },
 
+=======
+    },
+
+    "temperatureLow": {         // temperature crosses the lower limit (becomes below the threshold)
+      "enabled": true,          // true - alert is enabled
+      "threshold": 10.0,        // temperature low alert threshold, in Celsius
+      "hysteresis": 1.0         // "hysteresis" to avoid alerts "bounce", in Celsius
+    },
+
+    "temperatureHigh": {        // temperature crosses the upper limit (becomes above the threshold)
+      "enabled": true,          // true - alert is enabled
+      "threshold": 25.0,        // temperature high alert threshold, in Celsius
+      "hysteresis": 1.0         // "hysteresis" to avoid alerts "bounce", in Celsius
+    },
+
+    "batteryLow": {             // battery level crosses the lower limit (becomes below the threshold)
+      "enabled": false,         // true - alert is enabled
+      "threshold": 12.0         // battery low alert threshold, in %
+    },
+
+>>>>>>> main
     "tamperingDetected": {      // Not supported!
       "enabled": false          // true - alert is enabled
     }
@@ -1948,6 +2015,610 @@ class CustomReplayMessenger extends ReplayMessenger {
     }
 }
 
+<<<<<<< HEAD
+//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/BG96CellInfo.device.nut"
+=======
+//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/bg96_gps.device.lib.nut"
+/*
+ * BG96_GPS library
+ * Copyright 2020 Twilio
+ *
+ * MIT License
+ * SPDX-License-Identifier: MIT
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO
+ * EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES
+ * OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+
+/*
+ * Enums
+ */
+enum BG96_ERROR_CODE {
+    IMPOS_TIMEOUT                   = "-1",
+    IMPOS_MODEM_NOT_READY           = "-2",
+    IMPOS_MODEM_IS_BUSY             = "-3",
+    IMPOS_INVALID_PARAM             = "-4",
+    IMPOS_TRANSMISSION_FAIL         = "-5",
+    FILE_INVALID_INPUT              = "400",
+    FILE_SIZE_MISMATCH              = "401",
+    FILE_READ_ZERO_BYTE             = "402",
+    FILE_DRIVE_FULL                 = "403",
+    FILE_NOT_FOUND                  = "405",
+    FILE_INVALID_NAME               = "406",
+    FILE_ALREADY_EXISTS             = "407",
+    FILE_WRITE_FAIL                 = "409",
+    FILE_OPEN_FAIL                  = "410",
+    FILE_READ_FAIL                  = "411",
+    FILE_MAX_OPEN_FILES             = "413",
+    FILE_READ_ONLY                  = "414",
+    FILE_INVALID_DESCRIPTOR         = "416",
+    FILE_LIST_FAIL                  = "417",
+    FILE_DELETE_FAIL                = "418",
+    FILE_GET_DISK_INFO_FAIL         = "419",
+    FILE_NO_SPACE                   = "420",
+    FILE_TIMEOUT                    = "421",
+    FILE_TOO_LARGE                  = "423",
+    FILE_INVALID_PARAM              = "425",
+    FILE_ALREADY_OPEN               = "426",
+    GPS_INVALID_PARAM               = "501",
+    GPS_OPERATION_NOT_SUPPORTED     = "502",
+    GPS_GNSS_SUBSYSTEM_BUSY         = "503",
+    GPS_SESSION_IS_ONGOING          = "504",
+    GPS_SESSION_NOT_ACTIVE          = "505",
+    GPS_OPERATION_TIMEOUT           = "506",
+    GPS_FUNCTION_NOT_ENABLED        = "507",
+    GPS_TIME_INFO_ERROR             = "508",
+    GPS_XTRA_NOT_ENABLED            = "509",
+    GPS_VALIDITY_TIME_OUT_OF_RANGE  = "512",
+    GPS_INTERNAL_RESOURCE_ERROR     = "513",
+    GPS_GNSS_LOCKED                 = "514",
+    GPS_END_BY_E911                 = "515",
+    GPS_NO_FIX_NOW                  = "516",
+    GPS_GEO_FENCE_ID_DOES_NOT_EXIST = "517",
+    GPS_UNKNOWN_ERROR               = "549"
+}
+
+enum BG96_GNSS_ON_DEFAULT {
+    MODE                = 1,    // Stand Alone is the only mode supported (1)
+    MAX_POS_TIME_SEC    = 30,   // Sec max pos time (30)
+    FIX_ACCURACY_METERS = 50,   // Fix accuracy in meters (50)
+    NUM_FIX_CHECKS      = 0,    // Num of checks after fix before powering down GPS (0 - continuous)
+    GET_LOC_FREQ_SEC    = 1,    // Check every x sec (1)
+    RETRY_TIME_SEC      = 1,    // Time to wait for modem to power up
+}
+>>>>>>> main
+
+// Required BG96 AT Commands
+enum AT_COMMAND {
+    // Query the information of neighbour cells (Detailed information of base station)
+    GET_QENG  = "AT+QENG=\"neighbourcell\"",
+    // Query the information of serving cell (Detailed information of base station)
+    GET_QENG_SERV_CELL  = "AT+QENG=\"servingcell\""
+}
+
+<<<<<<< HEAD
+=======
+// Stale location data is often returned immediately after power up
+const BG96_GPS_EN_POLLING_TIMEOUT = 3;
+// Duration (sec) of enabling the assist function of BG96
+const BG96_ASSIST_ENABLE_DURATION = 0.5;
+// Duration (sec) of loading fresh assist data into BG96
+const BG96_ASSIST_LOAD_DURATION = 2.0;
+
+/*
+ * Library
+ */
+BG96_GPS <- {
+
+    VERSION   = "0.1.5_alert_custom_0.1.1",
+
+    /*
+     * PRIVATE PROPERTIES
+     */
+     _locTimer = null,
+    _session   = null,
+    _minSuppportedImpOS = 43.0,
+    _impOSVersion = null,
+    _pollTimer = null,
+
+    /*
+     * PUBLIC FUNCTIONS
+     */
+    isGNSSEnabled = function() {
+        _checkOS();
+
+        if (_session == null) return false;
+
+        try {
+            local resp = _session.getstate();
+            return (resp.state == 1);
+        } catch(e) {
+            _log(e);
+        }
+    },
+
+    enableGNSS = function(opts = {}) {
+        _checkOS();
+        local gnssMode   = ("gnssMode" in opts)   ? opts.gnssMode   : BG96_GNSS_ON_DEFAULT.MODE;
+        local posTime    = ("maxPosTime" in opts) ? opts.maxPosTime : BG96_GNSS_ON_DEFAULT.MAX_POS_TIME_SEC;
+        local accuracy   = ("accuracy" in opts)   ? opts.accuracy   : BG96_GNSS_ON_DEFAULT.FIX_ACCURACY_METERS;
+        local numFixes   = ("numFixes" in opts)   ? opts.numFixes   : BG96_GNSS_ON_DEFAULT.NUM_FIX_CHECKS;
+        local checkFreq  = ("checkFreq" in opts)  ? opts.checkFreq  : BG96_GNSS_ON_DEFAULT.GET_LOC_FREQ_SEC;
+        local retryTime  = ("retryTime" in opts)  ? opts.retryTime  : BG96_GNSS_ON_DEFAULT.RETRY_TIME_SEC;
+        local locMode    = ("locMode" in opts)    ? opts.locMode    : BG96_GNSS_LOCATION_MODE.TWO;
+        local onEnabled  = ("onEnabled" in opts && typeof opts.onEnabled == "function")   ? opts.onEnabled  : null;
+        local onLocation = ("onLocation" in opts && typeof opts.onLocation == "function") ? opts.onLocation : null;
+        local assistData = ("assistData" in opts) ? opts.assistData : null;
+        local useAssist  = ("useAssist" in opts) ? opts.useAssist : false;
+
+        if (!isGNSSEnabled()) {
+            if (_session == null) {
+                try {
+                    local wasReady = false;
+
+                    _session = hardware.gnss.open(function(t) {
+                        _log("Session is " + (t.ready == 0 ? "not ready" : "ready"));
+                        if (!wasReady && t.ready == 1) {
+                            wasReady = true;
+                            enableGNSS(opts);
+                        }
+                    }.bindenv(this));
+                } catch (err) {
+                    _log("Exception was thrown by hardware.gnss.open(): " + err, true);
+                    onEnabled && onEnabled(err);
+                }
+
+                return;
+            }
+
+            if (assistData) {
+                try {
+                    _session.assist.load(function(t) {
+                        _log("Assist data " + (t.status == 0 ? "loaded" : "not loaded"));
+                        if (t.status != 0 && "message" in t) _log("Error: " + t.message, true);
+                        if ("restart" in t) _log("Modem restarted? " + (t.restart == 0 ? "No" : "Yes"));
+
+                        // To let the new assist data be applied, we immediately enable the assist function
+                        try {
+                            _session.assist.enable();
+                        } catch (err) {
+                            // If there is an exception, we just disable assist to not run into an infinite loop
+                            opts.useAssist <- false;
+                            opts.assistData = null;
+                            _log("Exception was thrown by session.assist.enable(): " + err, true);
+                            enableGNSS(opts);
+                            return;
+                        }
+                        // Sleep to let the opration be finished
+                        imp.sleep(BG96_ASSIST_LOAD_DURATION);
+
+                        opts.assistData = null;
+                        if (!("useAssist" in opts)) opts.useAssist <- true;
+                        enableGNSS(opts);
+                    }.bindenv(this), assistData);
+                } catch (err) {
+                    _log("Exception was thrown by session.assist.load(): " + err, true);
+                }
+
+                return;
+            }
+
+            if (useAssist) {
+                // FROM 0.1.5 -- check we have assist data before proceeding
+                // This will be the case if 'enableGNSS()' called with 'useAssist' set true,
+                // but 'assistData' is null or passed bad data
+                if (isAssistDataValid().valid) {
+                    // There is assist data present, so proceed to enable
+                    local res = null;
+                    try {
+                        res = _session.assist.enable();
+                    } catch (err) {
+                        _log("Exception was thrown by session.assist.enable(): " + err, true);
+                    }
+
+                    if (res != null) {
+                        // Sleep to let the opration be finished. Otherwise, session.assist.read() will return zero/empty data
+                        // TODO: Not sure if this is enough to get valid info..
+                        imp.sleep(BG96_ASSIST_ENABLE_DURATION);
+                        _log("Assist " + (res.status == 0 ? "enabled" : "not enabled"));
+                    }
+                } else {
+                    _log("Assist data not present or overdue -- cannot enable Assist", true);
+                }
+            }
+
+            local resp = null;
+            try {
+                resp = _session.enable(gnssMode, posTime, accuracy, numFixes, checkFreq);
+            } catch (err) {
+                _log("Exception was thrown by session.enable(): " + err, true);
+                onEnabled && onEnabled(err);
+                return;
+            }
+
+            if (resp.status != 0) {
+                local status = resp.status.tostring();
+                if (status != BG96_ERROR_CODE.GPS_SESSION_IS_ONGOING) {
+                    _log("Error enabling GNSS: " + resp.status, true);
+                    onEnabled && onEnabled("Error enabling GNSS: " + resp.status);
+                    return;
+                }
+                imp.wakeup(retryTime, function() {
+                    enableGNSS(opts);
+                }.bindenv(this))
+            } else {
+                onEnabled && onEnabled(null);
+                if (onLocation != null) {
+                    // If there is no delay returns stale loc on first 2 (1sec) requests
+                    if (_pollTimer != null) imp.cancelwakeup(_pollTimer);
+                    _pollTimer = imp.wakeup(BG96_GPS_EN_POLLING_TIMEOUT, function() {
+                        _pollLoc(locMode, checkFreq, onLocation, posTime - BG96_GPS_EN_POLLING_TIMEOUT);
+                    }.bindenv(this));
+                }
+            }
+        } else {
+            // TODO: Assist data is not loaded if already enabled
+            _log("Already enabled");
+            onEnabled && onEnabled(null);
+            if (onLocation != null) {
+                if (_pollTimer != null) imp.cancelwakeup(_pollTimer);
+                _pollTimer = imp.wakeup(BG96_GPS_EN_POLLING_TIMEOUT, function() {
+                    _pollLoc(locMode, checkFreq, onLocation, posTime - BG96_GPS_EN_POLLING_TIMEOUT);
+                }.bindenv(this));
+            }
+        }
+    },
+
+    // NOTE Cancels _poll location timer if running
+    disableGNSS = function() {
+        _checkOS();
+
+        // Always cancel location timer
+        _cancelLocTimer();
+        if (_pollTimer != null) imp.cancelwakeup(_pollTimer);
+
+        if (isGNSSEnabled()) {
+            local resp = null;
+            try {
+                resp = _session.disable();
+            } catch (err) {
+                _log("Exception was thrown by session.disable(): " + err, true);
+                return false;
+            }
+
+            if (resp.status != 0) {
+                _log("Error disabling GNSS: " + resp.error);
+                return false;
+            } else {
+                _log("Disabled");
+            }
+        }
+
+        _session = null;
+        return true;
+    },
+
+    getLocation = function(opts = {}) {
+        _checkOS();
+
+        local poll       = ("poll" in opts) ? opts.poll : false;
+        local mode       = ("mode" in opts) ? opts.mode : BG96_GNSS_LOCATION_MODE.ZERO;
+        local checkFreq  = ("checkFreq" in opts) ? opts.checkFreq : BG96_GNSS_ON_DEFAULT.GET_LOC_FREQ_SEC;
+        local onLocation = ("onLocation" in opts && typeof opts.onLocation == "function") ? opts.onLocation : null;
+
+        // If we have no callback just return an error
+        if (onLocation == null) {
+            return { "error" : "onLocation callback required" };
+        }
+
+        if (poll) {
+            _pollLoc(mode, checkFreq, onLocation);
+        } else {
+            _getLoc(mode, function(loc) {
+                if (loc == null) loc = { "error" : "GPS fix not available" };
+                onLocation(loc);
+            });
+        }
+    },
+
+    // Is the assist data good?
+    isAssistDataValid = function() {
+        _checkOS();
+
+        local t = null;
+        try {
+            t = _session.assist.read();
+        } catch (err) {
+            _log("Exception was thrown by session.assist.read(): " + err, true);
+            return {"valid": false};
+        }
+
+        if (t.status == 0) {
+            local validTime = _getValidTime(t.injecteddatatime, t.xtradatadurtime);
+            _log("Assist data is valid for " + validTime + " minutes");
+            _log("Assist data became valid on " + t.injecteddatatime);
+
+            return {
+                "valid": validTime > 0,
+                "time": validTime
+            }
+        }
+
+        return {"valid": false};
+    },
+
+    // Delete any existing assist data
+    // ***** UNTESTED *****
+    deleteAssistData = function(mode = 3) {
+        _checkOS();
+
+        if (isGNSSEnabled()) {
+            // GNSS enabled, so disable before deleting
+            local resp = null;
+            try {
+                resp = _session.disable();
+            } catch (err) {
+                _log("Exception was thrown by session.disable(): " + err, true);
+                return;
+            }
+
+            if (resp.status != 0) {
+                _log(format("Error disabling GNSS: %i -- could not delete assist data" resp.error), true);
+            } else {
+                // GNSS now disabled, so we can proceed with deletion
+                _deleteAssist(mode);
+            }
+        } else {
+            if (_session == null) {
+                // We have to make a session in order to delete the assist data
+                try {
+                    _session = hardware.gnss.open(function(t) {
+                        if (t.ready == 1) _deleteAssist(mode);
+                    }.bindenv(this));
+                } catch (err) {
+                    _log("Exception was thrown by hardware.gnss.open(): " + err, true);
+                }
+            } else {
+                _deleteAssist(mode);
+            }
+        }
+    },
+
+    /*
+     * PRIVATE FUNCTIONS -- DO NOT CALL DIRECTLY
+     */
+
+    // Loop that polls for location, if location data or error (excluding no fix available) is received it is
+    // passed to the onLoc callback
+    _pollLoc = function(mode, checkFreq, onLoc, timeout = null) {
+        // Only allow one schedule timer at a time
+        _cancelLocTimer();
+
+        if (timeout != null) {
+            if (timeout <= 0) {
+                imp.wakeup(0, function() { onLoc({"error": "Positioning timeout"}); }.bindenv(this));
+                return;
+            }
+
+            timeout -= checkFreq;
+        }
+
+        // Schedule next location check
+        _locTimer = imp.wakeup(checkFreq, function() {
+            _pollLoc(mode, checkFreq, onLoc, timeout);
+        }.bindenv(this));
+
+        // Fetch and process location
+        // Returns `null` if GPS error is no fix now, otherwise returns table with keys fix or error
+        _getLoc(mode, function(loc) {
+            if (loc != null) {
+                // Pass error or location fix to main application
+                imp.wakeup(0, function() { onLoc(loc); }.bindenv(this));
+            }
+        });
+    },
+
+    // Sends AT command to get location, mode parameter sets the data lat/lng data format
+    // Calls back with null if no fix is available or the response as a table that may contain slots:
+        // error (string): The error encountered
+        // fix (table/string): response data string if location parsing failed otherwise a table with
+        // slots: cog, alt, fixType, time, numSats, lat, lon, spkm, spkn, utc, data, hdop
+    _getLoc = function(mode, cb) {
+        try {
+            _session.readposition(function(resp) {
+                local data = {};
+                if (resp.status != 0) {
+                    // Look for expected errors
+                    local errorCode = resp.status.tostring();
+                    switch (errorCode) {
+                        case BG96_ERROR_CODE.GPS_NO_FIX_NOW:
+                            _log("GPS fix not available");
+                            return cb(null);
+                        case BG96_ERROR_CODE.GPS_SESSION_NOT_ACTIVE:
+                            _log("GPS not enabled.");
+                            data.error <- "GPS not enabled";
+                            return cb(data);
+                        case BG96_ERROR_CODE.IMPOS_TIMEOUT:
+                        case BG96_ERROR_CODE.IMPOS_MODEM_NOT_READY:
+                        case BG96_ERROR_CODE.IMPOS_MODEM_IS_BUSY:
+                            _log("Trying getting location again...");
+                            return cb(null);
+                        default:
+                            _log("GPS location request failed with error: " + errorCode);
+                            data.error <- "Error code: " + errorCode;
+                            return cb(data);
+                    }
+                }
+
+                if (resp.status == 0 && "quectel" in resp) {
+                    data.fix <- _parseLocData(resp.quectel, mode);
+                }
+
+                cb(data);
+            }.bindenv(this), mode);
+        } catch (err) {
+            _log("Exception was thrown by session.readposition(): " + err, true);
+            cb(null);
+        }
+    },
+
+    // Cancels location polling timer
+    _cancelLocTimer = function() {
+        if (_locTimer != null) {
+            imp.cancelwakeup(_locTimer);
+            _locTimer = null;
+        }
+    },
+
+    // Format GPS timestamp
+    _formatTimeStamp = function(d, utc) {
+        // Input d: DDMMYY, utc HHMMSS.S
+        // Formatted result: YYYY/MM/DD,hh:mm:ss
+        return format("20%s/%s/%s,%s:%s:%s", d.slice(4),
+                                             d.slice(2, 4),
+                                             d.slice(0, 2),
+                                             utc.slice(0, 2),
+                                             utc.slice(2, 4),
+                                             utc.slice(4));
+    },
+
+    // Parses location data into table based on mode
+    _parseLocData = function(parsed, mode) {
+        _log("Parsing location data");
+        try {
+            switch(mode) {
+                case BG96_GNSS_LOCATION_MODE.ZERO:
+                    // 190629.0,3723.7238N,12206.1395W,1.0,16.0,2,188.18,0.0,0.0,031219,09
+                case BG96_GNSS_LOCATION_MODE.TWO:
+                    // 190629.0,37.39540,-122.10232,1.0,16.0,2,188.18,0.0,0.0,031219,09
+                case BG96_GNSS_LOCATION_MODE.ONE:
+                    // 190629.0,3723.723831,N,12206.139526,W,1.0,16.0,2,188.18,0.0,0.0,031219,09
+                     return {
+                        "utc"     : parsed.utc,
+                        "lat"     : parsed.latitude,
+                        "lon"     : parsed.longitude,
+                        "hdop"    : parsed.hdop,
+                        "alt"     : parsed.altitude,
+                        "fixType" : parsed.fix,
+                        "cog"     : parsed.cog,
+                        "spkm"    : parsed.spkm,
+                        "spkn"    : parsed.spkn,
+                        "date"    : parsed.date,
+                        "numSats" : parsed.nsat,
+                        "time"    : _dateToTimestamp(_formatTimeStamp(parsed.date, parsed.utc))
+                    };
+                default:
+                    throw "Unknown mode";
+            }
+        } catch(ex) {
+            _log("Error parsing GPS data " + ex);
+            return parsed;
+        }
+    },
+
+    _log = function(msg, isError = false) {
+        if (isError) {
+            ::error(msg, "BG96_GPS");
+        } else {
+            ::debug(msg, "BG96_GPS");
+        }
+    },
+
+    // Check we're running on a correct system
+    _checkOS = function() {
+        if (_impOSVersion == null) {
+            local n = split(imp.getsoftwareversion(), "-");
+            _impOSVersion = n[2].tofloat();
+        }
+
+        try {
+            assert(_impOSVersion >= _minSuppportedImpOS);
+        } catch (exp) {
+            throw "BG96_GPS 0.1.0 requires impOS 43 or above";
+        }
+    },
+
+    // FROM 0.1.5
+    // Get assist data remaining validity period in mins
+    // 'uploadDate' is a string of format: YYYY/MM/DD,hh:mm:ss
+    _getValidTime = function(uploadDate, duration) {
+        local uploadTs = _dateToTimestamp(uploadDate);
+        local timeRemaining = duration - (time() - uploadTs) / 60;
+        return timeRemaining > 0 ? timeRemaining : 0;
+    },
+
+    // date is a string of format: YYYY/MM/DD,hh:mm:ss
+    _dateToTimestamp = function(date) {
+        try {
+            date = split(date, ",");
+            date[0] = split(date[0], "/");
+            date[1] = split(date[1], ":");
+
+            local y = date[0][0].tointeger();
+            local m = date[0][1].tointeger();
+            local d = date[0][2].tointeger();
+            local hrs = date[1][0].tointeger();
+            local min = date[1][1].tointeger();
+            local sec = date[1][2].tointeger();
+            local ts;
+
+            // January and February are counted as months 13 and 14 of the previous year
+            if (m <= 2) {
+                m += 12;
+                y -= 1;
+            }
+
+            // Convert years to days
+            ts = (365 * y) + (y / 4) - (y / 100) + (y / 400);
+            // Convert months to days
+            ts += (30 * m) + (3 * (m + 1) / 5) + d;
+            // Unix time starts on January 1st, 1970
+            ts -= 719561;
+            // Convert days to seconds
+            ts *= 86400;
+            // Add hours, minutes and seconds
+            ts += (3600 * hrs) + (60 * min) + sec;
+
+            return ts;
+        } catch (err) {
+            _log("Couldn't parse the date: " + err, true);
+            return 0;
+        }
+    },
+
+    // FROM 0.1.5
+    _deleteAssist = function(mode) {
+        local res = null;
+        try {
+            res = _session.assist.reset(mode);
+        } catch (err) {
+            _log("Exception was thrown by session.assist.reset(): " + err, true);
+            return;
+        }
+
+        if (res.status == 0) {
+            _log("Assist data deleted");
+        } else {
+            local err = format("[BG96_GPS] Could not delete assist data (status %i)", res.status);
+            _log(err, true);
+        }
+    }
+}
 //line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/BG96CellInfo.device.nut"
 
 // Required BG96 AT Commands
@@ -1958,6 +2629,7 @@ enum AT_COMMAND {
     GET_QENG_SERV_CELL  = "AT+QENG=\"servingcell\""
 }
 
+>>>>>>> main
 // Class to obtain cell towers info from BG96 modem.
 // This code uses unofficial impOS features
 // and is based on an unofficial example provided by Twilio
@@ -3791,6 +4463,7 @@ class LocationMonitor {
 
     // If true, activate unconditional periodic location reading
     _alwaysReadLocation = false;
+<<<<<<< HEAD
 
     // Geofence settings, state, callback(s), timer(s) and etc.
     _geofence = null;
@@ -4033,6 +4706,113 @@ class LocationMonitor {
             _locReadingTimer && imp.cancelwakeup(_locReadingTimer);
             _locReadingTimer = null;
         }
+=======
+
+    // Geofence settings, state, callback(s), timer(s) and etc.
+    _geofence = null;
+
+    // Repossession mode settings, state, callback(s), timer(s) and etc.
+    _repossession = null;
+
+    /**
+     *  Constructor for Motion Monitor class.
+     *  @param {object} locDriver - Location driver object.
+     */
+    constructor(locDriver) {
+        _ld = locDriver;
+
+        // This table will be augmented by several fields from the configuration: "enabled" and "after"
+        _repossession = {
+            // A flag indicating if the repossession mode is activated
+            "activated": false,
+            // A timer to activate the repossession mode after the time specified in the configuration
+            "timer": null,
+            // Repossession event callback function
+            "eventCb": null
+        };
+
+        // This table will be augmented by several fields from the configuration: "enabled", "lng", "lat" and "radius"
+        _geofence = {
+            // Geofencing state: true (in zone) / false (out of zone) / null (unknown)
+            "inZone": null,
+            // Geofencing event callback function
+            "eventCb": null
+        };
+    }
+
+    /**
+     *  Start motion monitoring.
+     *  @param {table} cfg - Table with the full configuration.
+     *                       For details, please, see the documentation
+     *
+     * @return {Promise} that:
+     * - resolves if the operation succeeded
+     * - rejects if the operation failed
+     */
+    function start(cfg) {
+        updateCfg(cfg);
+
+        // get current location
+        _readLocation();
+
+        return Promise.resolve(null);
+    }
+
+    // TODO: Comment
+    function updateCfg(cfg) {
+        _updCfgGeneral(cfg);
+        _updCfgBLEDevices(cfg);
+        _updCfgGeofence(cfg);
+        _updCfgRepossession(cfg);
+
+        return Promise.resolve(null);
+    }
+
+    // TODO: Comment
+    function getStatus() {
+        local location = _ld.lastKnownLocation() || {
+            "timestamp": 0,
+            "type": "gnss",
+            "accuracy": MM_EARTH_RAD,
+            "longitude": INIT_LONGITUDE,
+            "latitude": INIT_LATITUDE
+        };
+
+        local res = {
+            "flags": {},
+            "location": location
+        };
+
+        (_geofence.inZone != null) && (res.flags.inGeofence <- _geofence.inZone);
+        _repossession.enabled && (res.flags.repossession <- _repossession.activated);
+
+        return res;
+    }
+
+    // TODO: Comment
+    function setLocationCb(locationCb) {
+        _locationCb = locationCb;
+        // This will either:
+        // - Run periodic location reading (if a callback has just been set) OR
+        // - Cancel the timer for periodic location reading (if the callback has just been
+        //   unset and the other conditions don't require to read the location periodically)
+        _managePeriodicLocReading(true);
+    }
+
+    // TODO Comment
+    function setRepossessionEventCb(repossessionEventCb) {
+        _repossession.eventCb = repossessionEventCb;
+    }
+
+    /**
+     *  Set geofencing event callback function.
+     *  @param {function | null} geofencingEventCb - The callback will be called every time the new geofencing event is detected (null - disables the callback)
+     *                 geofencingEventCb(ev), where
+     *                 @param {bool} ev - true: geofence entered, false: geofence exited
+     */
+    function setGeofencingEventCb(geofencingEventCb) {
+        _geofence.eventCb = geofencingEventCb;
+>>>>>>> main
     }
 
     // TODO: Comment
@@ -4041,12 +4821,62 @@ class LocationMonitor {
     }
 
     /**
+<<<<<<< HEAD
      *  Try to determine the current location
      */
     function _readLocation() {
         if (_locReadingPromise) {
             return;
         }
+=======
+     *  Calculate distance between two locations.
+     *
+     *   @param {table} locationFirstPoint - Table with the first location value.
+     *        The table must include parts:
+     *          "longitude": {float} - Longitude, in degrees.
+     *          "latitude":  {float} - Latitude, in degrees.
+     *   @param {table} locationSecondPoint - Table with the second location value.
+     *        The location must include parts:
+     *          "longitude": {float} - Longitude, in degrees.
+     *          "latitude":  {float} - Latitude, in degrees.
+     *
+     *   @return {float} If success - value, else - default value (0).
+     */
+    function greatCircleDistance(locationFirstPoint, locationSecondPoint) {
+        local dist = 0;
+
+        if (locationFirstPoint != null || locationSecondPoint != null) {
+            if ("longitude" in locationFirstPoint &&
+                "longitude" in locationSecondPoint &&
+                "latitude" in locationFirstPoint &&
+                "latitude" in locationSecondPoint) {
+                // https://en.wikipedia.org/wiki/Great-circle_distance
+                local deltaLat = math.fabs(locationFirstPoint.latitude -
+                                           locationSecondPoint.latitude)*PI/180.0;
+                local deltaLong = math.fabs(locationFirstPoint.longitude -
+                                            locationSecondPoint.longitude)*PI/180.0;
+                //  -180___180
+                //     / | \
+                //west|  |  |east   selection of the shortest arc
+                //     \_|_/
+                // Earth 0 longitude
+                if (deltaLong > PI) {
+                    deltaLong = 2*PI - deltaLong;
+                }
+                local deltaSigma = math.pow(math.sin(0.5*deltaLat), 2);
+                deltaSigma += math.cos(locationFirstPoint.latitude*PI/180.0)*
+                              math.cos(locationSecondPoint.latitude*PI/180.0)*
+                              math.pow(math.sin(0.5*deltaLong), 2);
+                deltaSigma = 2*math.asin(math.sqrt(deltaSigma));
+
+                // actual arc length on a sphere of radius r (mean Earth radius)
+                dist = MM_EARTH_RAD*deltaSigma;
+            }
+        }
+
+        return dist;
+    }
+>>>>>>> main
 
         local start = hardware.millis();
 
@@ -4074,6 +4904,7 @@ class LocationMonitor {
         }.bindenv(this));
     }
 
+<<<<<<< HEAD
     /**
      *  Zone border crossing check.
      *
@@ -4117,6 +4948,131 @@ class LocationMonitor {
                 }
             }
         }
+=======
+    // TODO: Comment
+    function _updCfgGeneral(cfg) {
+        local readingPeriod = getValFromTable(cfg, "locationTracking/locReadingPeriod");
+        _alwaysReadLocation = getValFromTable(cfg, "locationTracking/alwaysOn", _alwaysReadLocation);
+        _locReadingPeriod = readingPeriod != null ? readingPeriod : _locReadingPeriod;
+
+        // This will either:
+        // - Run periodic location reading (if it's not running but the new settings require
+        //   this or if the reading period has been changed) OR
+        // - Cancel the timer for periodic location reading (if the new settings and the other conditions don't require this) OR
+        // - Do nothing (if periodic location reading is already running
+        //   (and still should be) and the reading period hasn't been changed)
+        _managePeriodicLocReading(readingPeriod != null);
+    }
+
+    // TODO: Comment
+    function _updCfgBLEDevices(cfg) {
+        local bleDevicesCfg = getValFromTable(cfg, "locationTracking/bleDevices");
+        local enabled = getValFromTable(bleDevicesCfg, "enabled");
+        local knownBLEDevices = nullEmpty(getValsFromTable(bleDevicesCfg, ["generic", "iBeacon"]));
+
+        _ld.configureBLEDevices(enabled, knownBLEDevices);
+    }
+
+    // TODO: Comment
+    function _updCfgGeofence(cfg) {
+        // There can be the following fields: "enabled", "lng", "lat" and "radius"
+        local geofenceCfg = getValFromTable(cfg, "locationTracking/geofence");
+
+        // If there is some change, let's reset _geofence.inZone as we now don't know if we are in the zone
+        if (geofenceCfg) {
+            _geofence.inZone = null;
+        }
+
+        _geofence = mixTables(geofenceCfg, _geofence);
+    }
+
+    // TODO: Comment
+    function _updCfgRepossession(cfg) {
+        // There can be the following fields: "enabled" and "after"
+        local repossessionCfg = getValFromTable(cfg, "locationTracking/repossessionMode");
+
+        if (repossessionCfg) {
+            // repossessionCfg is not null - this means, we have some updates in parameters
+            mixTables(repossessionCfg, _repossession);
+
+            // Let's deactivate everything since the settings changed
+            _repossession.activated = false;
+            _repossession.timer && imp.cancelwakeup(_repossession.timer);
+
+            // And re-activate again if needed
+            if (_repossession.enabled) {
+                ::debug("Enabling repossession mode..", "LocationMonitor");
+
+                local activateRepossession = function() {
+                    ::debug("Repossession mode activated!", "LocationMonitor");
+
+                    _repossession.activated = true;
+                    _repossession.eventCb && _repossession.eventCb();
+                    _readLocation();
+                }.bindenv(this);
+
+                // If "after" is less than the current time, this timer will fire immediately
+                _repossession.timer = imp.wakeup(_repossession.after - time(), activateRepossession);
+            }
+
+            // This will either:
+            // - Cancel the timer for periodic location reading (if the new settings and the other conditions don't require this) OR
+            // - Do nothing (if periodic location reading is already running and still should be)
+            _managePeriodicLocReading();
+        }
+    }
+
+    // TODO: Comment
+    function _managePeriodicLocReading(reset = false) {
+        if (_shouldReadPeriodically()) {
+            // If the location reading timer is not currently set or if we should "reset" the periodic location reading,
+            // let's call _readLocation right now. This will cancel the existing timer (if any) and request the location
+            // (if it's not being obtained right now)
+            (!_locReadingTimer || reset) && _readLocation();
+        } else {
+            _locReadingTimer && imp.cancelwakeup(_locReadingTimer);
+            _locReadingTimer = null;
+        }
+    }
+
+    // TODO: Comment
+    function _shouldReadPeriodically() {
+        return _alwaysReadLocation || _locationCb || _repossession.activated;
+    }
+
+    /**
+     *  Try to determine the current location
+     */
+    function _readLocation() {
+        if (_locReadingPromise) {
+            return;
+        }
+
+        local start = hardware.millis();
+
+        _locReadingTimer && imp.cancelwakeup(_locReadingTimer);
+        _locReadingTimer = null;
+
+        ::debug("Getting location..", "LocationMonitor");
+
+        _locReadingPromise = _ld.getLocation()
+        .then(function(loc) {
+            _locationCb && _locationCb(loc);
+            _procGeofence(loc);
+        }.bindenv(this), function(_) {
+            _locationCb && _locationCb(null);
+        }.bindenv(this))
+        .finally(function(_) {
+            _locReadingPromise = null;
+
+            if (_shouldReadPeriodically()) {
+                // Calculate the delay for the timer according to the time spent on location reading
+                local delay = _locReadingPeriod - (hardware.millis() - start) / 1000.0;
+                ::debug(format("Setting the timer for location reading in %d sec", delay), "LocationMonitor");
+                _locReadingTimer = imp.wakeup(delay, _readLocation.bindenv(this));
+            }
+        }.bindenv(this));
+>>>>>>> main
     }
 }
 
@@ -4170,6 +5126,121 @@ class MotionMonitor {
     _accelDetectMotionParams = null;
 
     /**
+<<<<<<< HEAD
+     *  Constructor for Motion Monitor class.
+     *  @param {object} accelDriver - Accelerometer driver object.
+     *  @param {object} locMonitor - Location Monitor object.
+     */
+    constructor(accelDriver, locMonitor) {
+        _ad = accelDriver;
+        _lm = locMonitor;
+=======
+     *  Zone border crossing check.
+     *
+     *   @param {table} curLocation - Table with the current location.
+     *        The table must include parts:
+     *          "accuracy" : {integer}  - Accuracy, in meters.
+     *          "longitude": {float}    - Longitude, in degrees.
+     *          "latitude" : {float}    - Latitude, in degrees.
+     */
+    function _procGeofence(curLocation) {
+        //              _____GeofenceZone
+        //             /      \
+        //            /__     R\    dist           __Location
+        //           |/\ \  .---|-----------------/- \
+        //           |\__/      |                 \_\/accuracy (radius)
+        //            \ Location/
+        //             \______ /
+        //            in zone                     not in zone
+        // (location with accuracy radius      (location with accuracy radius
+        //  entirely in geofence zone)          entirely not in geofence zone)
+        // TODO: location after reboot/reconfigure - not in geofence zone
+        if (_geofence.enabled) {
+            local center = { "latitude": _geofence.lat, "longitude": _geofence.lng };
+            local dist = greatCircleDistance(center, curLocation);
+            ::debug("Geofence distance: " + dist, "LocationMonitor");
+            if (dist > _geofence.radius) {
+                local distWithoutAccurace = dist - curLocation.accuracy;
+                if (distWithoutAccurace > 0 && distWithoutAccurace > _geofence.radius) {
+                    if (_geofence.inZone != false) {
+                        _geofence.eventCb && _geofence.eventCb(false);
+                        _geofence.inZone = false;
+                    }
+                }
+            } else {
+                local distWithAccurace = dist + curLocation.accuracy;
+                if (distWithAccurace <= _geofence.radius) {
+                    if (_geofence.inZone != true) {
+                        _geofence.eventCb && _geofence.eventCb(true);
+                        _geofence.inZone = false;
+                    }
+                }
+            }
+        }
+>>>>>>> main
+    }
+}
+
+//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/MotionMonitor.device.nut"
+
+// Mean earth radius in meters (https://en.wikipedia.org/wiki/Great-circle_distance)
+const MM_EARTH_RAD = 6371009;
+
+// Motion Monitor class.
+// Starts and stops motion monitoring.
+class MotionMonitor {
+    // Accelerometer driver object
+    _ad = null;
+
+    // Location Monitor object
+    _lm = null;
+
+    // Motion event callback function
+    _motionEventCb = null;
+
+    // Motion stop assumption
+    _motionStopAssumption = false;
+
+    // Motion state: true (in motion) / false (not in motion) / null (feature disabled)
+    _inMotion = null;
+
+    // Current location
+    _curLoc = null;
+
+    // Sign of the current location relevance
+    // True (relevant) / false (not relevant) / null (haven't yet got a location or a failure)
+    _curLocFresh = null;
+
+    // Previous location
+    _prevLoc = null;
+
+    // Sign of the previous location relevance
+    // True (relevant) / false (not relevant) / null (haven't yet got a location or a failure)
+    _prevLocFresh = null;
+
+    // TODO: Comment
+    _motionStopTimeout = null;
+
+    // TODO: Comment
+    _confirmMotionStopTimer = null;
+
+    // TODO: Comment
+    _motionMonitoringEnabled = false;
+
+    // TODO: Comment
+    _accelDetectMotionParams = null;
+
+    /**
+<<<<<<< HEAD
+     *  Start motion monitoring.
+     *  @param {table} cfg - Table with the full configuration.
+     *                       For details, please, see the documentation
+     *
+     * @return {Promise} that:
+     * - resolves if the operation succeeded
+     * - rejects if the operation failed
+     */
+=======
      *  Constructor for Motion Monitor class.
      *  @param {object} accelDriver - Accelerometer driver object.
      *  @param {object} locMonitor - Location Monitor object.
@@ -4188,6 +5259,7 @@ class MotionMonitor {
      * - resolves if the operation succeeded
      * - rejects if the operation failed
      */
+>>>>>>> main
     function start(cfg) {
         _curLoc = _lm.getStatus().location;
         _prevLoc = clone _curLoc;
@@ -4333,8 +5405,11 @@ class MotionMonitor {
         if (!_inMotion) {
             _inMotion = true;
 
+<<<<<<< HEAD
             // TODO: Maybe it's better to copy the latest known location to _curLoc here?
 
+=======
+>>>>>>> main
             // Start getting new locations to check if we are actually moving
             _lm.setLocationCb(_onLocation.bindenv(this));
             _motionEventCb && _motionEventCb(true);
@@ -4486,6 +5561,7 @@ class DataProcessor {
             _dataSend();
         }
     }
+<<<<<<< HEAD
 
     // TODO: Comment
     function _updCfgAlerts(cfg) {
@@ -4495,6 +5571,17 @@ class DataProcessor {
         local temperatureLowCfg  = getValFromTable(alertsCfg, "temperatureLow");
         local batteryLowCfg      = getValFromTable(alertsCfg, "batteryLow");
 
+=======
+
+    // TODO: Comment
+    function _updCfgAlerts(cfg) {
+        local alertsCfg = getValFromTable(cfg, "alerts");
+        local shockDetectedCfg   = getValFromTable(alertsCfg, "shockDetected");
+        local temperatureHighCfg = getValFromTable(alertsCfg, "temperatureHigh");
+        local temperatureLowCfg  = getValFromTable(alertsCfg, "temperatureLow");
+        local batteryLowCfg      = getValFromTable(alertsCfg, "batteryLow");
+
+>>>>>>> main
         if (shockDetectedCfg) {
             _allAlerts.shockDetected = false;
             mixTables(shockDetectedCfg, _alertsSettings.shockDetected);
@@ -5570,7 +6657,11 @@ class LocationDriver {
     }
 }
 
+<<<<<<< HEAD
 //line 49 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
+=======
+//line 48 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
+>>>>>>> main
 
 // Main application on Imp-Device: does the main logic of the application
 
