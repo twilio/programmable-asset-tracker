@@ -1,6 +1,6 @@
 # Prog-X Asset Tracker #
 
-**Version of the Application: 2.0.0 (Field Trial on imp006 Breakout Board)**
+**Version of the Application: 2.1.0 (Field Trial on imp006 Breakout Board)**
 
 An application in Squirrel language for [Electric Imp platform](https://www.electricimp.com/platform) that implements asset tracking functionality.
 
@@ -47,6 +47,7 @@ This version supports:
 - Emergency (recovery) mode.
 - UART logging.
 - LED indication of the application behavior.
+- Device Evaluation UI on Imp-Agent.
 - The cloud [Northbound REST API](./docs/northbound-api.md) simple emulation on another Imp.
 
 ## Source Code ##
@@ -80,10 +81,11 @@ Variables:
 - `LOGGER_LEVEL` - Set logging level ("ERROR", "INFO", "DEBUG") on Imp-Agent/Device which works after the application restart till the application configuration is applied. Optional. Default: **"INFO"**. Note, when the application configuration is applied, the logging level is set according to the configuration. The logging level can be changed in runtime by updating the configuration.
 - `UART_LOGGING` - Enable (`1`) / disable (`0`) [UART logging](#uart-logging) on Imp-Device. Optional. Default: **enabled**
 - `LED_INDICATION` - Enable (`1`) / disable (`0`) [LED indication](#led-indication) of events. Optional. Default: **enabled**
+- `WEB_UI` - Enable (`1`) / disable (`0`) [Device Evaluation UI](#device-evaluation-ui) on Imp-Agent. Optional. Default: **enabled**
 
 ### User-Defined Environment Variables ###
 
-Are used for sensitive settings, eg. credentials.
+Are used for sensitive settings, eg. credentials, in production deployments. Note, if [Device Evaluation UI](#device-evaluation-ui) is enabled, the environment variables are ignored.
 
 Should be passed to [impcentral Device Group Environment Variables](https://developer.electricimp.com/tools/impcentral/environmentvariables#user-defined-environment-variables) in JSON format
 
@@ -117,9 +119,15 @@ Example of JSON with environment variables (when Cloud REST API is [emulated on 
   - Specify [Builder Variables](#builder-variables), if needed.
   - Run [Builder](https://github.com/electricimp/Builder/) for [./src/agent/Main.agent.nut](./src/agent/Main.agent.nut) file to get Imp-Agent preprocessed file.
   - Run [Builder](https://github.com/electricimp/Builder/) for [./src/device/Main.device.nut](./src/device/Main.device.nut) file to get Imp-Device preprocessed file.
-- Specify mandatory [Environment Variables](#user-defined-environment-variables) in the impcentral Device Group where you plan to run the application.
+- For deployments without [Device Evaluation UI](#device-evaluation-ui) specify mandatory [Environment Variables](#user-defined-environment-variables) in the impcentral Device Group where you plan to run the application.
 - Create and build a new deployment in the Device Group and restart Imp.
-- Control the application behavior using logs in the impcentral and/or via [UART logging](#uart-logging) (if enabled), and using [LED indication](#led-indication) (if enabled).
+- Control the application behavior using different ways:
+  - logs in the impcentral,
+  - [UART logging](#uart-logging) (if enabled),
+  - [LED indication](#led-indication) (if enabled),
+  - [Device Evaluation UI](#device-evaluation-ui) (if enabled),
+  - a remote service which implements the [Northbound REST API](./docs/northbound-api.md),
+  - a remote service which interacts with the Asset Tracker application via the [Southbound REST API](./docs/southbound-api.md).
 
 ## Configuration And Behavior ##
 
@@ -161,6 +169,26 @@ There are two LEDs:
     - Temperature is low alert: **blue**
     - Temperature is high alert: **yellow**
   - When the indication is disabled, the User LED is not in use.
+
+### Device Evaluation UI ###
+
+When enabled by the [Builder variable](#builder-variables) Imp-Agent provides a simple Web UI for checking the Asset Tracker application status and allowing its configuration. This is helpful for testing and debugging, and for demo purposes as well.
+
+To access the Web UI open `https://<tracker_api_url>` URL (no additional endpoint) in a Web browser. Where `<tracker_api_url>` - is the Imp-Agent URL. It comprises the base URL `agent.electricimp.com` plus the [agent’s ID](https://developer.electricimp.com/faqs/terminology#agent). Example: `https://agent.electricimp.com/7jiDVu1t_w--`
+
+The Web UI does not require any user credentials to access.
+
+Note, it is recommended to open the UI from a PC/laptop. The UI may not be optimized for smartphone screens. 
+
+The UI includes the following capabilities:
+- Displaying the latest data reported by the Asset Tracker application. Note, in parallel with displaying in this UI the data messages still can be forwarded to a cloud, if the cloud URL and credentials are specified (see below).
+- Displaying a history of alerts reported by the Asset Tracker application (several latest alerts).
+- Requesting, displaying, updating and applying the Asset Tracker application configuration. For the configuration description see the [Southbound REST API](./docs/southbound-api.md).
+- Specifying the Asset Tracker application settings - the same which are specified by the [Environment Variables](#user-defined-environment-variables) for production deployments:
+  - Tokens / Access keys. Note, there are no defaults for these tokens, for the full functionality of the Asset Tracker application the tokens should be manually specified.
+  - URL and credentials of a cloud that implements the [Northbound REST API](./docs/northbound-api.md). Optional. If specified, then the data messages are forwarded to the cloud, in parallel with the Web UI. 
+  - Note, credentials to access the [Southbound REST API](./docs/southbound-api.md) are not needed. It is still possible to access this API from a cloud, in parallel with working via the Web UI. No authentication is needed in this case.
+  - Note, all specified settings are lost after the application redeployment.
 
 ### Emergency Mode ###
 
