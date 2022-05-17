@@ -211,6 +211,8 @@ class MotionMonitor {
         if (!_inMotion) {
             _inMotion = true;
 
+            // TODO: Maybe it's better to copy the latest known location to _curLoc here?
+
             // Start getting new locations to check if we are actually moving
             _lm.setLocationCb(_onLocation.bindenv(this));
             _motionEventCb && _motionEventCb(true);

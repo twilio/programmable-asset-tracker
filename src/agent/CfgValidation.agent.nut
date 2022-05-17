@@ -135,13 +135,13 @@ const CFG_STRING_LENGTH_MAX = 50;
 // validation rules for coordinates
 coordValidationRules <- [{"name":"lng",
                           "required":false,
-                          "validationType":"float",
+                          "validationType":"integer|float",
                           "lowLim":CFG_LONGITUDE_SAFEGUARD_MIN,
                           "highLim":CFG_LONGITUDE_SAFEGUARD_MAX,
                           "dependencies":["lat"]},
                          {"name":"lat",
                           "required":false,
-                          "validationType":"float",
+                          "validationType":"integer|float",
                           "lowLim":CFG_LATITUDE_SAFEGUARD_MIN,
                           "highLim":CFG_LATITUDE_SAFEGUARD_MAX,
                           "dependencies":["lng"]}];
@@ -154,6 +154,8 @@ coordValidationRules <- [{"name":"lng",
  * @return {null | string} null - validation success, otherwise error string.
  */
 function validateCfg(msg) {
+    // TODO: Check if there are extra fields in the cfg
+
     // validate agent configuration
     if ("agentConfiguration" in msg) {
         local agentCfg = msg.agentConfiguration;
@@ -199,7 +201,8 @@ function validateCfg(msg) {
  *        The table fields:
  *          "name": {string} - Parameter name.
  *          "required": {bool} - Availability in the configuration parameters.
- *          "validationType": {string} - Parameter type ("float", "string", "integer").
+ *          "validationType": {string} - Allowed parameter type(s) ("float", "string", "integer").
+                                         Several types can be specified using "|" as a separator.
  *          "lowLim": {float, integer} - Parameter minimum value (for float and integer).
  *          "highLim": {float, integer} - Parameter maximum value (for float and integer).
  *          "minLen": {integer} - Minimal length of the string parameter.
@@ -218,7 +221,8 @@ function _rulesCheck(rules, cfgGroup) {
         foreach (fieldName, field in cfgGroup) {
             if (rule.name == fieldName) {
                 fieldNotExist = false;
-                if (typeof(field) != rule.validationType) {
+                local allowedTypes = split(rule.validationType, "|");
+                if (allowedTypes.find(typeof(field)) == null) {
                     return ("Field: "  + fieldName + " - type mismatch");
                 }
                 if ("lowLim" in rule && "highLim" in rule) {
@@ -272,7 +276,7 @@ function _rulesCheck(rules, cfgGroup) {
             }
         }
         if (rule.required && fieldNotExist) {
-            return ("Field: "  + fieldName + " - not exist");
+            return ("Field: "  + rule.name + " - not exist");
         }
     }
 
@@ -314,15 +318,14 @@ function _validateLogLevel(logLevels) {
  */
 function _validateIndividualField(conf) {
     local validationRules = [];
-    // TODO: Integer values must be allowed
     validationRules.append({"name":"connectingPeriod",
                             "required":false,
-                            "validationType":"float",
+                            "validationType":"integer|float",
                             "lowLim":CFG_CONNECTING_SAFEGUARD_MIN,
                             "highLim":CFG_CONNECTING_SAFEGUARD_MAX});
     validationRules.append({"name":"readingPeriod",
                             "required":false,
-                            "validationType":"float",
+                            "validationType":"integer|float",
                             "lowLim":CFG_READING_SAFEGUARD_MIN,
                             "highLim":CFG_READING_SAFEGUARD_MAX});
     validationRules.append({"name":"updateId",
@@ -355,7 +358,7 @@ function _validateAlerts(alerts) {
                 // charge level [0;100] %
                 validationRules.append({"name":"threshold",
                                         "required":false,
-                                        "validationType":"float",
+                                        "validationType":"integer|float",
                                         "lowLim":CFG_CHARGE_LEVEL_THR_SAFEGUARD_MIN,
                                         "highLim":CFG_CHARGE_LEVEL_THR_SAFEGUARD_MAX});
                 break;
@@ -364,12 +367,12 @@ function _validateAlerts(alerts) {
                 // industrial temperature range
                 validationRules.append({"name":"threshold",
                                         "required":false,
-                                        "validationType":"float",
+                                        "validationType":"integer|float",
                                         "lowLim":CFG_TEMPERATURE_THR_SAFEGUARD_MIN,
                                         "highLim":CFG_TEMPERATURE_THR_SAFEGUARD_MAX});
                 validationRules.append({"name":"hysteresis",
                                         "required":false,
-                                        "validationType":"float",
+                                        "validationType":"integer|float",
                                         "lowLim":CFG_TEMPERATURE_HYST_SAFEGUARD_MIN,
                                         "highLim":CFG_TEMPERATURE_HYST_SAFEGUARD_MAX});
                 break;
@@ -377,7 +380,7 @@ function _validateAlerts(alerts) {
                 // LIS2DH12 maximum shock threshold - 16 g
                 validationRules.append({"name":"threshold",
                                         "required":false,
-                                        "validationType":"float",
+                                        "validationType":"integer|float",
                                         "lowLim":CFG_SHOCK_ACC_SAFEGUARD_MIN,
                                         "highLim":CFG_SHOCK_ACC_SAFEGUARD_MAX});
                 break;
@@ -417,7 +420,7 @@ function _validateLocTracking(locTracking) {
         local validationRules = [];
         validationRules.append({"name":"locReadingPeriod",
                                 "required":false,
-                                "validationType":"float",
+                                "validationType":"integer|float",
                                 "lowLim":CFG_LOC_READING_SAFEGUARD_MIN,
                                 "highLim":CFG_LOC_READING_SAFEGUARD_MAX});
         rulesCheckRes = _rulesCheck(validationRules, locTracking);
@@ -440,41 +443,41 @@ function _validateLocTracking(locTracking) {
         if (checkEnableRes != null) return checkEnableRes;
         validationRules.append({"name":"movementAccMin",
                                 "required":false,
-                                "validationType":"float",
+                                "validationType":"integer|float",
                                 "lowLim":CFG_MOVEMENT_ACC_SAFEGUARD_MIN,
                                 "highLim":CFG_MOVEMENT_ACC_SAFEGUARD_MAX,
                                 "dependencies":["movementAccMax"]});
         validationRules.append({"name":"movementAccMax",
                                 "required":false,
-                                "validationType":"float",
+                                "validationType":"integer|float",
                                 "lowLim":CFG_MOVEMENT_ACC_SAFEGUARD_MIN,
                                 "highLim":CFG_MOVEMENT_ACC_SAFEGUARD_MAX,
                                 "dependencies":["movementAccMin"]});
         // min 1/ODR (current 100 Hz), max INT1_DURATION - 127/ODR
         validationRules.append({"name":"movementAccDur",
                                 "required":false,
-                                "validationType":"float",
+                                "validationType":"integer|float",
                                 "lowLim":CFG_MOVEMENT_ACC_DURATION_SAFEGUARD_MIN,
                                 "highLim":CFG_MOVEMENT_ACC_DURATION_SAFEGUARD_MAX});
         validationRules.append({"name":"motionTime",
                                 "required":false,
-                                "validationType":"float",
+                                "validationType":"integer|float",
                                 "lowLim":CFG_MOTION_TIME_SAFEGUARD_MIN,
                                 "highLim":CFG_MOTION_TIME_SAFEGUARD_MAX});
         validationRules.append({"name":"motionVelocity",
                                 "required":false,
-                                "validationType":"float",
+                                "validationType":"integer|float",
                                 "lowLim":CFG_MOTION_VEL_SAFEGUARD_MIN,
                                 "highLim":CFG_MOTION_VEL_SAFEGUARD_MAX});
         validationRules.append({"name":"motionDistance",
                                 "required":false,
-                                "validationType":"float",
+                                "validationType":"integer|float",
                                 "fixedValues":[CFG_MOTION_DIST_FIXED_VAL],
                                 "lowLim":CFG_MOTION_DIST_SAFEGUARD_MIN,
                                 "highLim":CFG_MOTION_DIST_SAFEGUARD_MAX});
         validationRules.append({"name":"motionStopTimeout",
                                 "required":false,
-                                "validationType":"float",
+                                "validationType":"integer|float",
                                 "lowLim":CFG_MOTION_STOP_SAFEGUARD_MIN,
                                 "highLim":CFG_MOTION_STOP_SAFEGUARD_MAX});
         rulesCheckRes = _rulesCheck(validationRules, motionMon);
@@ -498,19 +501,19 @@ function _validateLocTracking(locTracking) {
         if (checkEnableRes != null) return checkEnableRes;
         validationRules.append({"name":"lng",
                                 "required":false,
-                                "validationType":"float",
+                                "validationType":"integer|float",
                                 "lowLim":CFG_LONGITUDE_SAFEGUARD_MIN,
                                 "highLim":CFG_LONGITUDE_SAFEGUARD_MAX,
                                 "dependencies":["lat", "radius"]});
         validationRules.append({"name":"lat",
                                 "required":false,
-                                "validationType":"float",
+                                "validationType":"integer|float",
                                 "lowLim":CFG_LATITUDE_SAFEGUARD_MIN,
                                 "highLim":CFG_LATITUDE_SAFEGUARD_MAX,
                                 "dependencies":["lng", "radius"]});
         validationRules.append({"name":"radius",
                                 "required":false,
-                                "validationType":"float",
+                                "validationType":"integer|float",
                                 "lowLim":CFG_GEOFENCE_RADIUS_SAFEGUARD_MIN,
                                 "highLim":CFG_GEOFENCE_RADIUS_SAFEGUARD_MAX,
                                 "dependencies":["lng","lat"]});

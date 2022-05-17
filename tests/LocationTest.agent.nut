@@ -18,10 +18,10 @@
 
         LocationAssistant.getGnssAssistData()
         .then(function(data) {
-            ::info("BG96 Assist data downloaded");
+            ::info("GNSS Assist data downloaded");
             ack(data);
         }.bindenv(this), function(err) {
-            ::error("Error during downloading BG96 Assist data: " + err);
+            ::error("Error during downloading GNSS Assist data: " + err);
             ack(null);
         }.bindenv(this));
     }
