@@ -18,6 +18,8 @@
 #require "MAX17055.device.lib.nut:1.0.2"
 @endif
 
+// TODO: Aggregate all constants that should be customized in production in one place?
+
 @include once "../shared/Version.shared.nut"
 @include once "../shared/Constants.shared.nut"
 @include once "../shared/Logger/Logger.shared.nut"
@@ -36,7 +38,6 @@
 @include once "CfgManager.device.nut"
 @include once "CustomConnectionManager.device.nut"
 @include once "CustomReplayMessenger.device.nut"
-@include once "bg96_gps.device.lib.nut"
 @include once "BG96CellInfo.device.nut"
 @include once "ESP32Driver.device.nut"
 @include once "AccelerometerDriver.device.nut"

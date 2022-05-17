@@ -1,5 +1,5 @@
 //line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/agent/Main.agent.nut"
-#require "rocky.class.nut:2.0.2"
+#require "rocky.agent.lib.nut:3.0.1"
 #require "Promise.lib.nut:4.0.0"
 #require "Messenger.lib.nut:0.2.0"
 #require "UBloxAssistNow.agent.lib.nut:1.0.0"
@@ -234,7 +234,7 @@ class GoogleMaps {
 }
 //line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/shared/Version.shared.nut"
 // Application Version
-const APP_VERSION = "2.0.0";
+const APP_VERSION = "2.1.0";
 //line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/shared/Constants.shared.nut"
 // Constants common for the imp-agent and the imp-device
 
@@ -629,6 +629,19 @@ const CLOUD_REST_API_SUCCESS_CODE = 200;
 const CLOUD_REST_API_DATA_ENDPOINT = "/data";
 
 class CloudClient {
+    // TODO: Comment
+    _url = null;
+    // TODO: Comment
+    _user = null;
+    // TODO: Comment
+    _pass = null;
+
+    // TODO: Comment
+    constructor(url, user, pass) {
+        _url = url;
+        _user = user;
+        _pass = pass;
+    }
 
     /**
     * Sends a message to the cloud
@@ -643,9 +656,9 @@ class CloudClient {
         local headers = {
             "Content-Type" : "application/json",
             "Content-Length" : body.len(),
-            "Authorization" : "Basic " + http.base64encode(__VARS.CLOUD_REST_API_USERNAME + ":" + __VARS.CLOUD_REST_API_PASSWORD)
+            "Authorization" : "Basic " + http.base64encode(_user + ":" + _pass)
         };
-        local req = http.post(__VARS.CLOUD_REST_API_URL + CLOUD_REST_API_DATA_ENDPOINT, headers, body);
+        local req = http.post(_url + CLOUD_REST_API_DATA_ENDPOINT, headers, body);
 
         return Promise(function(resolve, reject) {
             req.sendasync(function(resp) {
@@ -663,28 +676,38 @@ class CloudClient {
 
 //line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/agent/LocationAssistant.agent.nut"
 
-// URL to request BG96 Assist data
-const LA_BG96_ASSIST_DATA_URL = "http://xtrapath4.izatcloud.net/xtra3grc.bin";
-
 // Google Maps Geolocation API URL
 const LA_GOOGLE_MAPS_LOCATION_URL = "https://www.googleapis.com/geolocation/v1/geolocate?key=";
 
 // Location Assistant class:
-// - obtains GNSS Assist data for u-blox/BG96
+// - obtains GNSS Assist data for u-blox
 // - obtains the location by cell towers info using Google Maps Geolocation API
 class LocationAssistant {
+    // U-Blox Assist Now instance
+    _ubloxAssistNow = null;
+    // Google Maps instance
+    _gmaps = null;
+
+    // TODO: Comment
+    function setTokens(ubloxAssistToken = null, gmapsKey = null) {
+        ubloxAssistToken && (_ubloxAssistNow = UBloxAssistNow(ubloxAssistToken));
+        gmapsKey         && (_gmaps = GoogleMaps(gmapsKey));
+    }
 
     /**
-     * Obtains GNSS Assist data for u-blox/BG96
+     * Obtains GNSS Assist data for u-blox
      *
      * @return {Promise} that:
-     * - resolves with BG96 Assist data if the operation succeeded
+     * - resolves with u-blox assist data if the operation succeeded
      * - rejects with an error if the operation failed
      */
     function getGnssAssistData() {
+        if (!_ubloxAssistNow) {
+            return Promise.reject("No u-blox Assist Now token set");
+        }
+
         ::debug("Downloading u-blox assist data...", "LocationAssistant");
 
-        local ubxAssist = UBloxAssistNow(__VARS.UBLOX_ASSIST_NOW_TOKEN);
         local assistOfflineParams = {
             "gnss"   : ["gps", "glo"],
             "period" : 1,
@@ -697,7 +720,7 @@ class LocationAssistant {
                     return reject(error);
                 }
 
-                local assistData = ubxAssist.getOfflineMsgByDate(resp);
+                local assistData = _ubloxAssistNow.getOfflineMsgByDate(resp);
 
                 if (assistData.len() == 0) {
                     return reject("No u-blox offline assist data received");
@@ -706,7 +729,7 @@ class LocationAssistant {
                 resolve(assistData);
             }.bindenv(this);
 
-            ubxAssist.requestOffline(assistOfflineParams, onDone.bindenv(this));
+            _ubloxAssistNow.requestOffline(assistOfflineParams, onDone.bindenv(this));
         }.bindenv(this));
     }
 
@@ -720,12 +743,14 @@ class LocationAssistant {
      * - rejects with an error if the operation failed
      */
     function getLocationByCellInfoAndWiFi(locationData) {
-        ::debug("Requesting location from Google Geolocation API..", "LocationAssistant");
+        if (!_gmaps) {
+            return Promise.reject("No Google Geolocation API key set");
+        }
 
+        ::debug("Requesting location from Google Geolocation API..", "LocationAssistant");
         ::debug(http.jsonencode(locationData));
 
-        local apiKey = format("%s", __VARS.GOOGLE_MAPS_API_KEY);
-        return GoogleMaps(apiKey).getGeolocation(locationData);
+        return _gmaps.getGeolocation(locationData);
     }
 }
 
@@ -867,13 +892,13 @@ const CFG_STRING_LENGTH_MAX = 50;
 // validation rules for coordinates
 coordValidationRules <- [{"name":"lng",
                           "required":false,
-                          "validationType":"float",
+                          "validationType":"integer|float",
                           "lowLim":CFG_LONGITUDE_SAFEGUARD_MIN,
                           "highLim":CFG_LONGITUDE_SAFEGUARD_MAX,
                           "dependencies":["lat"]},
                          {"name":"lat",
                           "required":false,
-                          "validationType":"float",
+                          "validationType":"integer|float",
                           "lowLim":CFG_LATITUDE_SAFEGUARD_MIN,
                           "highLim":CFG_LATITUDE_SAFEGUARD_MAX,
                           "dependencies":["lng"]}];
@@ -886,6 +911,8 @@ coordValidationRules <- [{"name":"lng",
  * @return {null | string} null - validation success, otherwise error string.
  */
 function validateCfg(msg) {
+    // TODO: Check if there are extra fields in the cfg
+
     // validate agent configuration
     if ("agentConfiguration" in msg) {
         local agentCfg = msg.agentConfiguration;
@@ -931,7 +958,8 @@ function validateCfg(msg) {
  *        The table fields:
  *          "name": {string} - Parameter name.
  *          "required": {bool} - Availability in the configuration parameters.
- *          "validationType": {string} - Parameter type ("float", "string", "integer").
+ *          "validationType": {string} - Allowed parameter type(s) ("float", "string", "integer").
+                                         Several types can be specified using "|" as a separator.
  *          "lowLim": {float, integer} - Parameter minimum value (for float and integer).
  *          "highLim": {float, integer} - Parameter maximum value (for float and integer).
  *          "minLen": {integer} - Minimal length of the string parameter.
@@ -950,7 +978,8 @@ function _rulesCheck(rules, cfgGroup) {
         foreach (fieldName, field in cfgGroup) {
             if (rule.name == fieldName) {
                 fieldNotExist = false;
-                if (typeof(field) != rule.validationType) {
+                local allowedTypes = split(rule.validationType, "|");
+                if (allowedTypes.find(typeof(field)) == null) {
                     return ("Field: "  + fieldName + " - type mismatch");
                 }
                 if ("lowLim" in rule && "highLim" in rule) {
@@ -1004,7 +1033,7 @@ function _rulesCheck(rules, cfgGroup) {
             }
         }
         if (rule.required && fieldNotExist) {
-            return ("Field: "  + fieldName + " - not exist");
+            return ("Field: "  + rule.name + " - not exist");
         }
     }
 
@@ -1046,15 +1075,14 @@ function _validateLogLevel(logLevels) {
  */
 function _validateIndividualField(conf) {
     local validationRules = [];
-    // TODO: Integer values must be allowed
     validationRules.append({"name":"connectingPeriod",
                             "required":false,
-                            "validationType":"float",
+                            "validationType":"integer|float",
                             "lowLim":CFG_CONNECTING_SAFEGUARD_MIN,
                             "highLim":CFG_CONNECTING_SAFEGUARD_MAX});
     validationRules.append({"name":"readingPeriod",
                             "required":false,
-                            "validationType":"float",
+                            "validationType":"integer|float",
                             "lowLim":CFG_READING_SAFEGUARD_MIN,
                             "highLim":CFG_READING_SAFEGUARD_MAX});
     validationRules.append({"name":"updateId",
@@ -1087,7 +1115,7 @@ function _validateAlerts(alerts) {
                 // charge level [0;100] %
                 validationRules.append({"name":"threshold",
                                         "required":false,
-                                        "validationType":"float",
+                                        "validationType":"integer|float",
                                         "lowLim":CFG_CHARGE_LEVEL_THR_SAFEGUARD_MIN,
                                         "highLim":CFG_CHARGE_LEVEL_THR_SAFEGUARD_MAX});
                 break;
@@ -1096,12 +1124,12 @@ function _validateAlerts(alerts) {
                 // industrial temperature range
                 validationRules.append({"name":"threshold",
                                         "required":false,
-                                        "validationType":"float",
+                                        "validationType":"integer|float",
                                         "lowLim":CFG_TEMPERATURE_THR_SAFEGUARD_MIN,
                                         "highLim":CFG_TEMPERATURE_THR_SAFEGUARD_MAX});
                 validationRules.append({"name":"hysteresis",
                                         "required":false,
-                                        "validationType":"float",
+                                        "validationType":"integer|float",
                                         "lowLim":CFG_TEMPERATURE_HYST_SAFEGUARD_MIN,
                                         "highLim":CFG_TEMPERATURE_HYST_SAFEGUARD_MAX});
                 break;
@@ -1109,7 +1137,7 @@ function _validateAlerts(alerts) {
                 // LIS2DH12 maximum shock threshold - 16 g
                 validationRules.append({"name":"threshold",
                                         "required":false,
-                                        "validationType":"float",
+                                        "validationType":"integer|float",
                                         "lowLim":CFG_SHOCK_ACC_SAFEGUARD_MIN,
                                         "highLim":CFG_SHOCK_ACC_SAFEGUARD_MAX});
                 break;
@@ -1149,7 +1177,7 @@ function _validateLocTracking(locTracking) {
         local validationRules = [];
         validationRules.append({"name":"locReadingPeriod",
                                 "required":false,
-                                "validationType":"float",
+                                "validationType":"integer|float",
                                 "lowLim":CFG_LOC_READING_SAFEGUARD_MIN,
                                 "highLim":CFG_LOC_READING_SAFEGUARD_MAX});
         rulesCheckRes = _rulesCheck(validationRules, locTracking);
@@ -1172,41 +1200,41 @@ function _validateLocTracking(locTracking) {
         if (checkEnableRes != null) return checkEnableRes;
         validationRules.append({"name":"movementAccMin",
                                 "required":false,
-                                "validationType":"float",
+                                "validationType":"integer|float",
                                 "lowLim":CFG_MOVEMENT_ACC_SAFEGUARD_MIN,
                                 "highLim":CFG_MOVEMENT_ACC_SAFEGUARD_MAX,
                                 "dependencies":["movementAccMax"]});
         validationRules.append({"name":"movementAccMax",
                                 "required":false,
-                                "validationType":"float",
+                                "validationType":"integer|float",
                                 "lowLim":CFG_MOVEMENT_ACC_SAFEGUARD_MIN,
                                 "highLim":CFG_MOVEMENT_ACC_SAFEGUARD_MAX,
                                 "dependencies":["movementAccMin"]});
         // min 1/ODR (current 100 Hz), max INT1_DURATION - 127/ODR
         validationRules.append({"name":"movementAccDur",
                                 "required":false,
-                                "validationType":"float",
+                                "validationType":"integer|float",
                                 "lowLim":CFG_MOVEMENT_ACC_DURATION_SAFEGUARD_MIN,
                                 "highLim":CFG_MOVEMENT_ACC_DURATION_SAFEGUARD_MAX});
         validationRules.append({"name":"motionTime",
                                 "required":false,
-                                "validationType":"float",
+                                "validationType":"integer|float",
                                 "lowLim":CFG_MOTION_TIME_SAFEGUARD_MIN,
                                 "highLim":CFG_MOTION_TIME_SAFEGUARD_MAX});
         validationRules.append({"name":"motionVelocity",
                                 "required":false,
-                                "validationType":"float",
+                                "validationType":"integer|float",
                                 "lowLim":CFG_MOTION_VEL_SAFEGUARD_MIN,
                                 "highLim":CFG_MOTION_VEL_SAFEGUARD_MAX});
         validationRules.append({"name":"motionDistance",
                                 "required":false,
-                                "validationType":"float",
+                                "validationType":"integer|float",
                                 "fixedValues":[CFG_MOTION_DIST_FIXED_VAL],
                                 "lowLim":CFG_MOTION_DIST_SAFEGUARD_MIN,
                                 "highLim":CFG_MOTION_DIST_SAFEGUARD_MAX});
         validationRules.append({"name":"motionStopTimeout",
                                 "required":false,
-                                "validationType":"float",
+                                "validationType":"integer|float",
                                 "lowLim":CFG_MOTION_STOP_SAFEGUARD_MIN,
                                 "highLim":CFG_MOTION_STOP_SAFEGUARD_MAX});
         rulesCheckRes = _rulesCheck(validationRules, motionMon);
@@ -1230,19 +1258,19 @@ function _validateLocTracking(locTracking) {
         if (checkEnableRes != null) return checkEnableRes;
         validationRules.append({"name":"lng",
                                 "required":false,
-                                "validationType":"float",
+                                "validationType":"integer|float",
                                 "lowLim":CFG_LONGITUDE_SAFEGUARD_MIN,
                                 "highLim":CFG_LONGITUDE_SAFEGUARD_MAX,
                                 "dependencies":["lat", "radius"]});
         validationRules.append({"name":"lat",
                                 "required":false,
-                                "validationType":"float",
+                                "validationType":"integer|float",
                                 "lowLim":CFG_LATITUDE_SAFEGUARD_MIN,
                                 "highLim":CFG_LATITUDE_SAFEGUARD_MAX,
                                 "dependencies":["lng", "radius"]});
         validationRules.append({"name":"radius",
                                 "required":false,
-                                "validationType":"float",
+                                "validationType":"integer|float",
                                 "lowLim":CFG_GEOFENCE_RADIUS_SAFEGUARD_MIN,
                                 "highLim":CFG_GEOFENCE_RADIUS_SAFEGUARD_MAX,
                                 "dependencies":["lng","lat"]});
@@ -1381,8 +1409,6 @@ enum CFG_REST_API_HTTP_CODES {
 class CfgService {
     // Messenger instance
     _msngr = null;
-    // Rocky instance
-    _rocky = null;
     // HTTP Authorization
     _authHeader = null;
     // Cfg update ("configuration") which waits for successful delivering to the imp-device
@@ -1401,31 +1427,24 @@ class CfgService {
      * Constructor for Configuration Service Class
      *
      * @param {object} msngr - Messenger instance
-     * @param {object} rocky - Rocky instance
+     * TODO: Update
      */
-    constructor(msngr, rocky) {
+    constructor(msngr, user = null, pass = null) {
         _msngr = msngr;
-        _rocky = rocky;
-
-        _authHeader = "Basic " +
-                      http.base64encode(__VARS.CFG_REST_API_USERNAME +
-                      ":" +
-                      __VARS.CFG_REST_API_PASSWORD);
-
         _msngr.on(APP_RM_MSG_NAME.CFG, _cfgCb.bindenv(this));
         _msngr.onAck(_ackCb.bindenv(this));
         _msngr.onFail(_failCb.bindenv(this));
 
-        _rocky.authorize(_authCb.bindenv(this));
-        _rocky.onUnauthorized(_unauthCb.bindenv(this));
-        _rocky.on("GET",
-                  CFG_REST_API_DATA_ENDPOINT,
-                  _getCfgRockyHandler.bindenv(this),
-                  null);
-        _rocky.on("PATCH",
-                  CFG_REST_API_DATA_ENDPOINT,
-                  _patchCfgRockyHandler.bindenv(this),
-                  null);
+        local getRoute = Rocky.on("GET", CFG_REST_API_DATA_ENDPOINT, _getCfgRockyHandler.bindenv(this));
+        local patchRoute = Rocky.on("PATCH", CFG_REST_API_DATA_ENDPOINT, _patchCfgRockyHandler.bindenv(this));
+
+        if (user && pass) {
+            _authHeader = "Basic " + http.base64encode(user + ":" + pass);
+
+            foreach (route in [getRoute, patchRoute]) {
+                route.authorize(_authCb.bindenv(this)).onUnauthorized(_unauthCb.bindenv(this));
+            }
+        }
 
         _loadCfgs();
         _applyAgentCfg(_agentCfg);
@@ -1469,7 +1488,7 @@ class CfgService {
         _saveCfgs();
     }
 
-   /**
+    /**
      * HTTP GET request callback function.
      *
      * @param context - Rocky.Context object.
@@ -1613,7 +1632,7 @@ class CfgService {
     "logLevel": "DEBUG"       // logging level on Imp-Agent ("ERROR", "INFO", "DEBUG")
   }
 }
-//line 247 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/agent/CfgService.agent.nut"
+//line 238 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/agent/CfgService.agent.nut"
         return cfg;
     }
 
@@ -1679,11 +1698,120 @@ class CfgService {
     }
 }
 
-//line 14 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/agent/Main.agent.nut"
+//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/agent/WebUI.agent.nut"
+
+// Configuration API endpoint
+const WEBUI_INDEX_PAGE_ENDPOINT = "/";
+// TODO: Comment
+const WEBUI_DATA_ENDPOINT = "/web-ui/data";
+// TODO: Comment
+const WEBUI_TOKENS_ENDPOINT = "/web-ui/tokens";
+// TODO: Comment
+const WEBUI_CLOUD_SETTINGS_ENDPOINT = "/web-ui/cloud-settings";
+
+// TODO: Comment
+const WEBUI_ALERTS_HISTORY_LEN = 10;
+
+// Web UI class
+class WebUI {
+    // TODO: Comment
+    _latestData = null;
+    // TODO: Comment
+    _alertsHistory = null;
+    // TODO: Comment
+    _tokensSetter = null;
+    // TODO: Comment
+    _cloudConfigurator = null;
+
+    /**
+     * Constructor for Web UI class
+     *
+     * TODO
+     */
+    constructor(tokensSetter, cloudConfigurator) {
+        _tokensSetter = tokensSetter;
+        _cloudConfigurator = cloudConfigurator;
+
+        Rocky.on("GET", WEBUI_INDEX_PAGE_ENDPOINT, _getIndexPageRockyHandler.bindenv(this));
+        Rocky.on("GET", WEBUI_DATA_ENDPOINT, _getDataRockyHandler.bindenv(this));
+        Rocky.on("PATCH", WEBUI_TOKENS_ENDPOINT, _patchTokensRockyHandler.bindenv(this));
+        Rocky.on("PATCH", WEBUI_CLOUD_SETTINGS_ENDPOINT, _patchCloudSettingsRockyHandler.bindenv(this));
+
+        _alertsHistory = [];
+    }
+
+    // TODO: Comment
+    function newData(data) {
+        _latestData = data;
+
+        foreach (alert in data.alerts) {
+            _alertsHistory.insert(0, {
+                "alert": alert,
+                "ts": data.timestamp
+            });
+        }
+
+        if (_alertsHistory.len() > WEBUI_ALERTS_HISTORY_LEN) {
+            _alertsHistory.resize(WEBUI_ALERTS_HISTORY_LEN);
+        }
+    }
+
+    // -------------------- PRIVATE METHODS -------------------- //
+
+    // TODO: Comment
+    function _getIndexPageRockyHandler(context) {
+        ::debug("GET " + WEBUI_INDEX_PAGE_ENDPOINT + " request received", "WebUI");
+
+        // Return the index.html page file
+        context.send(200, _indexHtml());
+    }
+
+    // TODO: Comment
+    function _getDataRockyHandler(context) {
+        ::debug("GET " + WEBUI_DATA_ENDPOINT + " request received", "WebUI");
+
+        local data = {
+            "latestData": _latestData,
+            "alertsHistory": _alertsHistory
+        };
+
+        // Return the data
+        context.send(200, data);
+    }
+
+    // TODO: Comment
+    function _patchTokensRockyHandler(context) {
+        ::debug("PATCH " + WEBUI_TOKENS_ENDPOINT + " request received", "WebUI");
+
+        local tokens = context.req.body;
+        local ubloxToken = "ublox" in tokens ? tokens.ublox : null;
+        local gmapsKey   = "gmaps" in tokens ? tokens.gmaps : null;
+        _tokensSetter(ubloxToken, gmapsKey);
+
+        context.send(200);
+    }
+
+    // TODO: Comment
+    function _patchCloudSettingsRockyHandler(context) {
+        ::debug("PATCH " + WEBUI_CLOUD_SETTINGS_ENDPOINT + " request received", "WebUI");
+
+        local cloudSettings = context.req.body;
+        _cloudConfigurator(cloudSettings.url, cloudSettings.user, cloudSettings.pass);
+
+        context.send(200);
+    }
+
+    // TODO: Comment
+    function _indexHtml() {
+        return "<!DOCTYPE html><html lang=\'en-US\'><meta charset=\'UTF-8\'>\n<html>\n  <head>\n    <title>Asset Tracker Device Evaluation UI</title>\n    <link rel=\'stylesheet\' href=\'https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css\' integrity=\'sha384-9aIt2nRpC12Uk9gS9baDl411NQApFmC26EwAOH8WgZl5MYYxFfc+NcPb1dKGj7Sk\' crossorigin=\'anonymous\'>\n    <link href=\'https://fonts.googleapis.com/css?family=Abel\' rel=\'stylesheet\'>\n    <meta name=\'viewport\' content=\'width=device-width, initial-scale=1.0\'>\n    <style>\n      .center {margin-left: auto; margin-right: auto; margin-bottom: auto; margin-top: auto}\n      body {background-color: #3366cc}\n      textarea {height: auto; font-family: Abel}\n      button {font-family: Abel}\n      p {color: white; font-family: Abel}\n      h1 {color: #ffffff; font-family: Abel; font-weight:bold; padding: 20px}\n      h2 {color: #99ccff; font-family: Abel; font-weight:bold; padding: 20px}\n      h4 {color: white; font-family: Abel}\n      h5 {color: white; font-family: Abel}\n      a:link {color: white; font-family: Abel}\n      a:visited {color: #cccccc; font-family: Abel}\n      a:hover {color: black; font-family: Abel}\n      a:active {color: black; font-family: Abel}\n\n      .alert-inactive {color: #7a7a7a; transition: 1s ease-out}\n      .alert-active {color: #ea4d4d; transition: 1s ease-in; font-size: 18px; font-weight:bold}\n    </style>\n  </head>\n  <body>\n    <h1 class=\'text-center\'>Asset Tracker Device Evaluation UI</h1>\n    <div class=\'container\' style=\'padding: 20px\'>\n      <div style=\'border: 2px solid white\'>\n        <h2 class=\'text-center\'>Latest data from the device</h2>\n        <div class=\'container\' style=\'min-width: 50%; width: fit-content; max-width: 98%\'>\n          <h4 class=\'ld-temperature text-center\'>Temperature: <span></span>&deg;C</h4>\n          <h4 class=\'ld-battery-level text-center\'>Battery Level: <span></span>%</h4>\n          <div class=\'container\' style=\'padding: 10px; border: 2px solid #99ccff\'>\n            <h4 class=\'text-center\'>Location</h4>\n            <h5 class=\'ld-loc-type text-center\'>Type: <span></span></h5>\n            <h5 class=\'ld-loc-lat text-center\'>Latitude: <span></span>&deg;</h5>\n            <h5 class=\'ld-loc-lng text-center\'>Longitude: <span></span>&deg;</h5>\n            <h5 class=\'ld-loc-acc text-center\'>Accuracy: <span></span>m</h5>\n            <p class=\'ld-loc-ts text-center\'>Timestamp: <span></span></p>\n          </div>\n          <div class=\'container\' style=\'margin-top: 10px; padding: 10px; border: 2px solid #99ccff\'>\n            <h4 class=\'text-center\'>Alerts</h4>\n            <div class=\'ld-alerts grid-container\' style=\'display: grid; margin-left: auto; margin-right: auto; grid-template-columns: 50% 50%\'>\n              <p class=\'ld-alerts-temperatureHigh alert-inactive text-center\' style=\'grid-column-start: 1; grid-column-end: 1\'>Temperature high</p>\n              <p class=\'ld-alerts-temperatureLow alert-inactive text-center\' style=\'grid-column-start: 2; grid-column-end: 2\'>Temperature low</p>\n\n              <p class=\'ld-alerts-motionStarted alert-inactive text-center\' style=\'grid-row-start: 2; grid-row-end: 2; grid-column-start: 1; grid-column-end: 1\'>Motion started</p>\n              <p class=\'ld-alerts-motionStopped alert-inactive text-center\' style=\'grid-row-start: 2; grid-row-end: 2; grid-column-start: 2; grid-column-end: 2\'>Motion stopped</p>\n\n              <p class=\'ld-alerts-geofenceEntered alert-inactive text-center\' style=\'grid-row-start: 3; grid-row-end: 3; grid-column-start: 1; grid-column-end: 1\'>Geofence entered</p>\n              <p class=\'ld-alerts-geofenceExited alert-inactive text-center\' style=\'grid-row-start: 3; grid-row-end: 3; grid-column-start: 2; grid-column-end: 2\'>Geofence exited</p>\n\n              <p class=\'ld-alerts-batteryLow alert-inactive text-center\' style=\'grid-row-start: 4; grid-row-end: 4; grid-column-start: 1; grid-column-end: 1\'>Battery low</p>\n              <p class=\'ld-alerts-shockDetected alert-inactive text-center\' style=\'grid-row-start: 4; grid-row-end: 4; grid-column-start: 2; grid-column-end: 2\'>Shock detected</p>\n\n              <p class=\'ld-alerts-tamperingDetected alert-inactive text-center\' style=\'grid-row-start: 5; grid-row-end: 5; grid-column-start: 1; grid-column-end: 1\'>Tampering detected</p>\n              <p class=\'ld-alerts-repossessionActivated alert-inactive text-center\' style=\'grid-row-start: 5; grid-row-end: 5; grid-column-start: 2; grid-column-end: 2\'>Repossession activated</p>\n            </div>\n            <p class=\'text-right\' style=\'margin: 0px; font-size: 14px\'>* active alerts are <span class=\'alert-active\' style=\'font-size: inherit\'>red</span></p>\n          </div>\n          <p class=\'ld-timestamp text-center\' style=\'margin-top: 10px\'>Data timestamp: <span></span></p>\n        </div>\n      </div>\n    </div>\n    <div class=\'container\' style=\'padding: 20px\'>\n      <div class=\'alerts-history container\' style=\'border: 2px solid white; padding: 20px; padding-top: 0px\'>\n        <h2 class=\'text-center\'>Alerts history</h2>\n        <div class=\'alerts-history-grid\' style=\'margin-left: auto; margin-right: auto; width: fit-content; padding-top: 0px\'>\n        </div>\n      </div>\n    </div>\n    <div class=\'container\' style=\'padding: 20px\'>\n      <div style=\'border: 2px solid white\'>\n        <h2 class=\'text-center\'>Configuration</h2>\n        <div class=\'cfg grid-container\' style=\'display: grid; grid-template-columns: auto auto auto; padding: 20px; padding-top: 0px\'>\n          <h4 class=\'text-center\' style=\'grid-column-start: 20; grid-column-end: 26; margin: 10px\'>Get</h4>\n          <h4 class=\'text-center\' style=\'grid-column-start: 74; grid-column-end: 80; margin: 10px\'>Set</h4>\n          <textarea class=\'received-cfg\' readonly style=\'height: 600px; min-height: 300px; grid-column-start: 1; grid-column-end: 46; grid-row-start: 2; grid-row-end: 102\'></textarea>\n          <button type=\'submit\' class=\'copy-cfg btn btn-light btn-sm\' style=\'font-size: 20px; grid-column-start: 47; grid-column-end: 54; grid-row-start: 51\'>&rarr;</button></p>\n          <textarea class=\'new-cfg\' style=\'resize: none; grid-column-start: 55; grid-column-end: 100; grid-row-start: 2; grid-row-end: 102\'></textarea>\n          <button type=\'submit\' class=\'request-cfg btn btn-light btn-sm\' style=\'grid-column-start: 20; grid-column-end: 26; margin-top: 10px\'>Request cfg</button></p>\n          <button type=\'submit\' class=\'send-cfg btn btn-light btn-sm\' style=\'grid-column-start: 74; grid-column-end: 80; margin-top: 10px\'>Send cfg</button></p>\n        </div>\n      </div>\n    </div>\n    <div class=\'container\' style=\'padding: 20px\'>\n      <div style=\'border: 2px solid white\'>\n        <h2 class=\'text-center\'>Tokens</h2>\n        <div class=\'tokens\'>\n          <p class=\'text-center\'>U-blox Assist Now token<br /><input class=\'ublox-token\' style=\'width:200px\'></input><br />\n          <p class=\'text-center\'>Google Geolocation API key<br /><input class=\'gmaps-token\' style=\'width:200px\'></input><br />\n          <button type=\'submit\' class=\'set-tokens btn btn-light btn-sm\' style=\'font-family:Abel; margin-top: 10px\'>Set tokens</button></p>\n        </div>\n      </div>\n    </div>\n    <div class=\'container\' style=\'padding: 20px\'>\n      <div style=\'border: 2px solid white\'>\n        <h2 class=\'text-center\'>Cloud settings</h2>\n        <div class=\'cloud-settings\'>\n          <p class=\'text-center\'>Cloud REST API URL<br /><input class=\'cloud-url\' style=\'width:200px\'></input><br />\n          <p class=\'text-center\'>Cloud REST API Username<br /><input class=\'cloud-user\' style=\'width:200px\'></input><br />\n          <p class=\'text-center\'>Cloud REST API Password<br /><input type=\'password\' class=\'cloud-pass\' style=\'width:200px\'></input><br />\n          <button type=\'submit\' class=\'set-cloud-settings btn btn-light btn-sm\' style=\'font-family:Abel; margin-top: 10px\'>Set cloud settings</button></p>\n        </div>\n      </div>\n    </div>\n    <script src=\'https://code.jquery.com/jquery-3.5.1.min.js\'></script>\n    <script>\n      // The period of getting data from the device, in msec\n      const GET_DATA_PERIOD = 30000;\n      // Imp-agent data endpooint\n      const DATA_ENDPOINT = \'/web-ui/data\';\n      // Imp-agent cfg endpooint\n      const CFG_ENDPOINT = \'/cfg\';\n      // Imp-agent tokens endpooint\n      const TOKENS_ENDPOINT = \'/web-ui/tokens\';\n      // Imp-agent cloud settings endpooint\n      const CLOUD_SETTINGS_ENDPOINT = \'/web-ui/cloud-settings\';\n      // Store the agent URL\n      const AGENT_URL = window.location.href;\n\n      // Here the received from the agent configuration will be saved\n      var receivedCfg;\n\n      // Buttons for operations with configuration\n      $(\'.cfg button.request-cfg\').click(getCfg);\n      $(\'.cfg button.copy-cfg\').click(copyCfg);\n      $(\'.cfg button.send-cfg\').click(sendCfg);\n\n      // Buttons for operations with tokens\n      $(\'.tokens button.set-tokens\').click(setTokens);\n\n      // Buttons for operations with cloud settings\n      $(\'.cloud-settings button.set-cloud-settings\').click(setCloudSettings);\n\n      // Request data and display it\n      get(DATA_ENDPOINT, onDataReceived);\n\n      // Request cfg from the agent\n      function getCfg(_) {\n        get(CFG_ENDPOINT, onCfgReceived);\n      }\n\n      // Copy cfg (excluding \'description\' section) from \'get\' field to \'set\' field (on the page)\n      function copyCfg(_) {\n        if (receivedCfg) {\n          let cutCfg = JSON.parse(receivedCfg);\n          delete cutCfg.description;\n          $(\'.cfg textarea.new-cfg\').val(JSON.stringify(cutCfg, null, 4));\n        }\n      }\n\n      // Send the cfg composed in \'set\' field on the page to the agent\n      function sendCfg(_) {\n        let newCfg = $(\'.cfg textarea.new-cfg\').val();\n\n        try {\n          JSON.parse(newCfg);\n        } catch (err) {\n          alert(\'The new cfg is not a valid JSON: \' + err);\n          return;\n        }\n\n        let onCfgSent = function(err, data) {\n          if (err) {\n            alert(\'Failed to send cfg: an error occurred (\' + err.responseText + \')\');\n            console.log(err);\n          } else {\n            alert(\'Cfg sent successfully\');\n          }\n        };\n\n        patch(CFG_ENDPOINT, newCfg, onCfgSent);\n      }\n\n      // Callback called when cfg received from the agent.\n      // Update the display: configuration\n      function onCfgReceived(err, cfg) {\n        if (err) {\n          console.log(\'Could not get cfg\');\n          console.log(err);\n          return;\n        }\n\n        receivedCfg = JSON.stringify(JSON.parse(cfg), null, 4);\n        $(\'.cfg textarea.received-cfg\').val(receivedCfg);\n      }\n\n      // Callback called when data received from the device.\n      // Update the display: latest data and alerts history\n      function onDataReceived(err, data) {\n        // Auto-update every 10 sec\n        setTimeout(function() {\n          get(DATA_ENDPOINT, onDataReceived);\n        }, GET_DATA_PERIOD);\n\n        if (err) {\n          console.log(\'Could not get data\');\n          console.log(err);\n          return;\n        }\n\n        displayLatestData(data.latestData);\n        displayAlertsHistory(data.alertsHistory);\n      }\n\n      // Update the display (latest data) when we receive data from the device\n      function displayLatestData(data) {\n        // Update the data from sensors\n        $(\'.ld-temperature span\').text(data.sensors.temperature.toFixed(2));\n        $(\'.ld-battery-level span\').text(data.sensors.batteryLevel.toFixed(2));\n\n        // Update location info\n        $(\'.ld-loc-type span\').text(data.location.type);\n        $(\'.ld-loc-lat span\').text(data.location.lat);\n        $(\'.ld-loc-lng span\').text(data.location.lng);\n        $(\'.ld-loc-acc span\').text(data.location.accuracy.toFixed(2));\n        let date = new Date(data.location.timestamp * 1000);\n        $(\'.ld-loc-ts span\').text(date.toUTCString());\n\n        // Display the time and date of the data creation\n        date = new Date(data.timestamp * 1000);\n        $(\'.ld-timestamp span\').text(date.toUTCString());\n\n        // Reset all alerts (make them \'inactive\')\n        $(\'.ld-alerts p\').each(function(index, value) {\n          $(this).removeClass(\'alert-active\');\n        });\n\n        // Set active alerts to the \'active\' state\n        data.alerts.forEach(alert => {\n          $(\'.ld-alerts p.ld-alerts-\' + alert).addClass(\'alert-active\');\n        });\n      }\n\n      // Update the display (alerts history) when we receive data from the device\n      function displayAlertsHistory(alerts) {\n        $(\'.alerts-history-grid p\').remove();\n\n        let alertToText = function(alert) {\n          switch (alert) {\n            case \'temperatureHigh\': return \'Temperature high\';\n            case \'temperatureLow\': return \'Temperature low\';\n            case \'motionStarted\': return \'Motion started\';\n            case \'motionStopped\': return \'Motion stopped\';\n            case \'geofenceEntered\': return \'Geofence entered\';\n            case \'geofenceExited\': return \'Geofence exited\';\n            case \'batteryLow\': return \'Battery low\';\n            case \'shockDetected\': return \'Shock detected\';\n            case \'tamperingDetected\': return \'Tampering detected\';\n            case \'repossessionActivated\': return \'Repossession activated\';\n            default: return alert;\n          }\n        };\n\n        alerts.forEach(alertData => {\n          let date = new Date(alertData.ts * 1000).toUTCString();\n          let alertText = alertToText(alertData.alert);\n          let newEl = `<p class=\'text-left\' style=\'margin: 0px\'>${date}: ${alertText}</p>`;\n          $(\'.alerts-history-grid\').append(newEl);\n        });\n      }\n\n      // Send the tokens to the agent\n      function setTokens(_) {\n        let ubloxToken = $(\'.tokens input.ublox-token\').val();\n        let gmapsToken = $(\'.tokens input.gmaps-token\').val();\n        let payload = {};\n\n        ubloxToken.length && (payload.ublox = ubloxToken);\n        gmapsToken.length && (payload.gmaps = gmapsToken);\n\n        if (Object.keys(payload).length > 0) {\n          let onTokensSet = function(err, data) {\n            if (err) {\n              alert(\'Failed to set token(s): an error occurred\');\n              console.log(err);\n            } else {\n              alert(\'Token(s) set successfully\');\n            }\n          };\n\n          patch(TOKENS_ENDPOINT, JSON.stringify(payload), onTokensSet);\n        } else {\n          alert(\'Type in, at least, one token\');\n        }\n      }\n\n      // Send cloud settings to the agent\n      function setCloudSettings(_) {\n        let url = $(\'.cloud-settings input.cloud-url\').val();\n        let user = $(\'.cloud-settings input.cloud-user\').val();\n        let pass = $(\'.cloud-settings input.cloud-pass\').val();\n\n        if (url.length * user.length * pass.length === 0) {\n          alert(\'Type in all cloud settings, please\');\n          return;\n        }\n\n        let payload = {\n          \'url\': url,\n          \'user\': user,\n          \'pass\': pass\n        };\n\n        let onCloudSet = function(err, data) {\n          if (err) {\n            alert(\'Failed to set cloud settings: an error occurred\');\n            console.log(err);\n          } else {\n            alert(\'Cloud settings have been set successfully\');\n          }\n        };\n\n        patch(CLOUD_SETTINGS_ENDPOINT, JSON.stringify(payload), onCloudSet);\n      }\n\n      // GET request to the agent\n      function get(path, callback) {\n        $.ajax({\n          url : AGENT_URL + path,\n          type: \'GET\',\n          success : function(data) {\n            callback(null, data);\n          },\n          error : function(err) {\n            callback(err, null);\n          }\n        });\n      }\n\n      // PATCH request to the agent\n      function patch(path, data, callback = null) {\n        $.ajax({\n          url : AGENT_URL + path,\n          data: data,\n          type: \'PATCH\',\n          headers : {\n              \'Content-Type\' : \'application/json\'\n          },\n          success : function(data) {\n            callback && callback(null, data);\n          },\n          error : function(err) {\n            callback && callback(err, null);\n          }\n        });\n      }\n    </script>\n  </body>\n</html>";
+    }
+}
+
+//line 15 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/agent/Main.agent.nut"
 
 // Main application on Imp-Agent:
 // - Forwards Data messages from Imp-Device to Cloud REST API
-// - Obtains GNSS Assist data for BG96 from server and returns it to Imp-Device
+// - Obtains GNSS Assist data for u-blox from server and returns it to Imp-Device
 // - Obtains the location by cell towers and wifi networks info using Google Maps Geolocation API
 //   and returns it to Imp-Device
 // - Implements REST API for the tracker configuration
@@ -1693,10 +1821,14 @@ class CfgService {
 class Application {
     // Messenger instance
     _msngr = null;
-    // Rocky instance
-    _rocky = null;
     // Configuration service instance
-    _cfgService =null;
+    _cfgService = null;
+    // Location Assistant instance
+    _locAssistant = null;
+    // Cloud Client instance
+    _cloudClient = null;
+    // Web UI instance. If disabled, null
+    _webUI = null;
 
     /**
      * Application Constructor
@@ -1707,6 +1839,13 @@ class Application {
         _initMsngr();
         // Initialize configuration service
         _initCfgService();
+        // Initialize Location Assistant
+        _initLocAssistant();
+
+        // Initialize configuration service with no authentication
+        _initCfgService();
+        // Initialize Web UI
+        _initWebUI();
 
         // TODO: Make a build-flag to allow erasing the agent's memory?
     }
@@ -1725,10 +1864,35 @@ class Application {
 
     /**
      * Create and initialize configuration service instance
+     * TODO: Update
      */
-    function _initCfgService() {
-        _rocky = Rocky();
-        _cfgService = CfgService(_msngr, _rocky);
+    function _initCfgService(user = null, pass = null) {
+        Rocky.init();
+        _cfgService = CfgService(_msngr, user, pass);
+    }
+
+    /**
+     * Create and initialize Location Assistant instance
+     */
+    function _initLocAssistant() {
+        _locAssistant = LocationAssistant();
+    }
+
+    /**
+     * Create and initialize Cloud Client instance
+     * TODO: Update
+     */
+    function _initCloudClient(url, user, pass) {
+        _cloudClient = CloudClient(url, user, pass);
+    }
+
+    /**
+     * Create and initialize Web UI
+     */
+    function _initWebUI() {
+        local tokensSetter = _locAssistant.setTokens.bindenv(_locAssistant);
+        local cloudConfigurator = _initCloudClient.bindenv(this);
+        _webUI = WebUI(tokensSetter, cloudConfigurator);
     }
 
     /**
@@ -1741,13 +1905,20 @@ class Application {
         ::debug("Data received from imp-device, msgId = " + msg.id);
         local data = http.jsonencode(msg.data);
 
-        CloudClient.send(data)
-        .then(function(_) {
-            ::info("Data has been successfully sent to the cloud: " + data);
-        }.bindenv(this), function(err) {
-            ::error("Cloud reported an error while receiving data: " + err);
-            ::error("The data caused this error: " + data);
-        }.bindenv(this));
+        // If Web UI is enabled, pass there the latest data
+        _webUI && _webUI.newData(msg.data);
+
+        if (_cloudClient) {
+            _cloudClient.send(data)
+            .then(function(_) {
+                ::info("Data has been successfully sent to the cloud: " + data);
+            }.bindenv(this), function(err) {
+                ::error("Cloud reported an error while receiving data: " + err);
+                ::error("The data caused this error: " + data);
+            }.bindenv(this));
+        } else {
+            ::info("No cloud configured. Data received but not sent further: " + data);
+        }
     }
 
     /**
@@ -1759,7 +1930,7 @@ class Application {
     function _onGnssAssist(msg, customAck) {
         local ack = customAck();
 
-        LocationAssistant.getGnssAssistData()
+        _locAssistant.getGnssAssistData()
         .then(function(data) {
             ::info("Assist data downloaded");
             ack(data);
@@ -1779,7 +1950,7 @@ class Application {
     function _onLocationCellAndWiFi(msg, customAck) {
         local ack = customAck();
 
-        LocationAssistant.getLocationByCellInfoAndWiFi(msg.data)
+        _locAssistant.getLocationByCellInfoAndWiFi(msg.data)
         .then(function(location) {
             ::info("Location obtained using Google Geolocation API");
             ack(location);
@@ -1788,7 +1959,6 @@ class Application {
             ack(null);
         }.bindenv(this));
     }
-
 }
 
 // ---------------------------- THE MAIN CODE ---------------------------- //

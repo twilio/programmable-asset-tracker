@@ -16,6 +16,19 @@ const CLOUD_REST_API_SUCCESS_CODE = 200;
 const CLOUD_REST_API_DATA_ENDPOINT = "/data";
 
 class CloudClient {
+    // TODO: Comment
+    _url = null;
+    // TODO: Comment
+    _user = null;
+    // TODO: Comment
+    _pass = null;
+
+    // TODO: Comment
+    constructor(url, user, pass) {
+        _url = url;
+        _user = user;
+        _pass = pass;
+    }
 
     /**
     * Sends a message to the cloud
@@ -30,9 +43,9 @@ class CloudClient {
         local headers = {
             "Content-Type" : "application/json",
             "Content-Length" : body.len(),
-            "Authorization" : "Basic " + http.base64encode(__VARS.CLOUD_REST_API_USERNAME + ":" + __VARS.CLOUD_REST_API_PASSWORD)
+            "Authorization" : "Basic " + http.base64encode(_user + ":" + _pass)
         };
-        local req = http.post(__VARS.CLOUD_REST_API_URL + CLOUD_REST_API_DATA_ENDPOINT, headers, body);
+        local req = http.post(_url + CLOUD_REST_API_DATA_ENDPOINT, headers, body);
 
         return Promise(function(resolve, reject) {
             req.sendasync(function(resp) {
