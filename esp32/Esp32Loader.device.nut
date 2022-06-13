@@ -179,6 +179,18 @@ class ESP32Loader {
                                   data[ESP32_LOADER_RESP_STATUS_IND] == 0;
     }
 
+    /**
+     * Load firmware to ESP flash.
+     * 
+     * @param {integer} impFlashAddr - Firmware address in imp flash.
+     * @param {integer} espFlashAddr - Firmware address in ESP flash.
+     * @param {integer} fwImgLen - Firmware length.
+     * @param {string} fwMD5 - Firmware MD5. Optional.
+     *
+     * @return {Promise} that:
+     * - resolves if the operation succeeded
+     * - rejects if the operation failed
+     */
     function load(impFlashAddr, espFlashAddr, fwImgLen, fwMD5 = null) {
         return _prepare(impFlashAddr, espFlashAddr, fwImgLen)
         .then(function(_) {
@@ -215,7 +227,7 @@ class ESP32Loader {
     }
 
     /**
-     *  Send flash end command with argument reboot ESP
+     *  Send flash end command with argument reboot ESP.
      */
     function inLoaderReboot() {
         // flash end request (reboot)
@@ -346,6 +358,13 @@ class ESP32Loader {
         return Promise.serial(promiseFuncs);
     }
 
+    /**
+     * Send data packets from imp flash to ESP flash
+     *
+     * @return {Promise} that:
+     *  - resolves if the operation succeeded
+     *  - rejects if the operation failed
+     */
     function _sendDataPackets() {
         local continueFunction = function() {
             return (_fwImgLen > 0);
@@ -363,6 +382,13 @@ class ESP32Loader {
                               }.bindenv(this));
     }
 
+    /**
+     * Send data packet. Cmd FLASH_DATA.
+     *
+     * @return {Promise} that:
+     *  - resolves if the operation succeeded
+     *  - rejects if the operation failed
+     */
     function _sendDataPacket() {
         ::info("Send packet. Sequnce number: " + _seqNumb, "@{CLASS_NAME}");
         // data packet
@@ -440,8 +466,6 @@ class ESP32Loader {
         }.bindenv(this));
     }
 
-
-
     /**
      * Communicate with the ESP32 board: send a command (if passed) and wait for a reply
      *
@@ -465,7 +489,7 @@ class ESP32Loader {
             try {
                 _serial.write(_checkSLIPPack(blobCmd));
             } catch(exp) {
-                ::error("Exception during UART write", "@{CLASS_NAME}");
+                ::error("Exception during UART write. " + exp, "@{CLASS_NAME}");
                 return Promise.reject("UART write failure.");
             } 
         }
@@ -485,8 +509,6 @@ class ESP32Loader {
      * - resolves with the data received if the operation succeeded
      * - rejects if the operation failed
      */
-    // TODO: On-the-fly data processing may be required. And memory consumption optimization.
-    //       If we wait for all data to be received before processing, we can face OOM due to the need of keeping all raw recevied data
     function _waitForData(validator) {
         // Data check/read period, in seconds
         const ESP32_LOADER_DATA_CHECK_PERIOD = 0.1;
