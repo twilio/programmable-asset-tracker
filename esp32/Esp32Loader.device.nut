@@ -86,7 +86,7 @@ const ESP32_LOADER_MAX_DATA_LEN = 12288;
 // Maximum time allowed for waiting for data, in seconds
 const ESP32_LOADER_WAIT_DATA_TIMEOUT = 3;
 // Checksum start seed
-const ESP32_LOADER_CHECKSUM_SEED = 0xef;
+const ESP32_LOADER_CHECKSUM_SEED = 0xEF;
 // Each SLIP packet begins and ends with 0xC0
 const ESP32_LOADER_SLIP_PACK_IDENT = 0xC0;
 // start 0xC0 index
@@ -124,7 +124,7 @@ const ESP32_LOADER_FLASH_DATA_CFG_FIELD_LEN = 16;
 
 // ESP32 Loader Driver class.
 // The class provides the ability to change the 
-// firmware of the ESP32 MCU.
+// firmware of the ESP32/ESP32C3 MCU.
 class ESP32Loader {
     // Power switch pin
     _switchPin = null;
@@ -160,7 +160,6 @@ class ESP32Loader {
      * @param {object} uart - UART object connected to a ESP32 board.
      * @param {integer} espFlashSize - External ESP32 SPI flash size (value from ESP32_LOADER_FLASH_SIZE enum). 
      * @param {object} switchPin - Hardware pin object connected to load switch.
-     * An exception will be thrown in case of settings or UART configuration error.
      */
     constructor(bootPins, uart, espFlashSize, switchPin = null) {
         _switchPin = switchPin;
@@ -185,7 +184,7 @@ class ESP32Loader {
      * @param {integer} impFlashAddr - Firmware address in imp flash.
      * @param {integer} espFlashAddr - Firmware address in ESP flash.
      * @param {integer} fwImgLen - Firmware length.
-     * @param {string} fwMD5 - Firmware MD5. Optional.
+     * @param {string}  fwMD5 - Firmware MD5. Optional.
      *
      * @return {Promise} that:
      * - resolves if the operation succeeded
@@ -229,7 +228,7 @@ class ESP32Loader {
     /**
      *  Send flash end command with argument reboot ESP.
      */
-    function inLoaderReboot() {
+    function reboot() {
         // flash end request (reboot)
         local flashEndStr = "C0000404000000000000000000C0";
         // flash end validator
@@ -251,9 +250,11 @@ class ESP32Loader {
     // ---------------- PRIVATE METHODS ---------------- //
 
     /**
-     * Prepare to load firmware to ESP32.
+     * Preparing ROM loader to receive firmware.
      *
-     * @param {integer} addr - Firmware image address (in SPI flash).
+     * @param {integer} impFlashAddr - Firmware image address (in imp flash).
+     * @param {integer} espFlashAddr - Firmware image address (in ESP flash).
+     * @param {integer} fwImgLen     - Firmware image length.
      *
      * @return {Promise} that:
      * - resolves if the operation succeeded
@@ -283,7 +284,7 @@ class ESP32Loader {
         // sync packet response validate
         // wait for answer
         // C0010804000712205500000000C0
-        // the first 2 sync packets usually come with no result
+        // the first 4 sync packets usually come with no result
         local dummyValidator = @(data, _) null;
         local syncMsgValidator = @(data, _) (_basicRespCheck(data) &&
                                             data[ESP32_LOADER_RESP_CMD_IND] == ESP32_LOADER_CMD.SYNC_FRAME) ?
@@ -295,12 +296,21 @@ class ESP32Loader {
         // identify chip
         // wait for answer for ESP32 eg.
         // C0010a0400831DF00000000000C0
+@if ESP32C3
+        local chipNameValidator = @(data, _) (_basicRespCheck(data) &&
+                                              data[ESP32_LOADER_RESP_CMD_IND] == ESP32_LOADER_CMD.READ_REG &&
+                                              !data.seek(ESP32_LOADER_RESP_REG_VAL_IND, 'b') &&
+                                              data.readn('i') == ESP32_LOADER_ESP32C3_CHIP_DETECT_MAGIC_VALUE) ?
+                                              null :
+                                              "Chip name identify failure";
+@else
         local chipNameValidator = @(data, _) (_basicRespCheck(data) &&
                                               data[ESP32_LOADER_RESP_CMD_IND] == ESP32_LOADER_CMD.READ_REG &&
                                               !data.seek(ESP32_LOADER_RESP_REG_VAL_IND, 'b') &&
                                               data.readn('i') == ESP32_LOADER_ESP32_CHIP_DETECT_MAGIC_VALUE) ?
                                               null :
                                               "Chip name identify failure";
+@endif
         // attach spi flash
         local spiFlashAttachStr = "C0000D0800000000000000000000000000C0";
         // check attach flash
@@ -359,7 +369,7 @@ class ESP32Loader {
     }
 
     /**
-     * Send data packets from imp flash to ESP flash
+     * Send data packets from imp flash to the ESP flash.
      *
      * @return {Promise} that:
      *  - resolves if the operation succeeded
@@ -441,6 +451,17 @@ class ESP32Loader {
         return _communicate(flashData, flashDataValidator, null, false);
     }
 
+    /**
+     * Check MD5 of downloaded firmware image.
+     *
+     * @param {integer} espFlashAddr - Firmware image address (in ESP flash).
+     * @param {integer} fwImgLen     - Firmware image length.
+     * @param {string}  fwMD5        - Firmware MD5.
+     *
+     * @return {Promise} that:
+     * - resolves if the operation succeeded
+     * - rejects if the operation failed
+     */
     function _checkHash(espFlashAddr, fwImgLen, fwMD5) {
         if (fwMD5 == null) {
             return Promise.resolve("Verification MD5 checksum not transmitted in ESP32 loader from cloud");
@@ -552,7 +573,7 @@ class ESP32Loader {
     }
 
     /**
-     * Start ROM loader function (set strapping pins)
+     * Start ROM loader function (set strapping pins, configure UART)
      */
     function _go2ROMLoader() {
 

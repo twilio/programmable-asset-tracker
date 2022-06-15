@@ -28,7 +28,7 @@ APP_STRAP_PIN1 <- hardware.pinXR;
 // Strap pin 2
 APP_STRAP_PIN2 <- hardware.pinXH;
 
-// ESP32 loader example application
+// ESP32 loader example device application
 class Application {
     // Messenger instance
     _msngr = null;
@@ -105,7 +105,7 @@ class Application {
             return;
         }
 
-        _espLoader.inLoaderReboot()
+        _espLoader.reboot()
         .finally(function(resOrErr) {
             _msngr.send(APP_M_MSG_NAME.STATUS, resOrErr);
         }.bindenv(this));
@@ -162,7 +162,7 @@ class Application {
     function _onData(msg, customAck) {
         local ack = customAck();
         local data = msg.data;
-        // ::debug("_onData");
+
         if (_isActive) {
             ack();
             ::info(format("Load active. Try again later."));
@@ -187,6 +187,8 @@ class Application {
                        .finally(function(resOrErr) {
                             _msngr.send(APP_M_MSG_NAME.STATUS, resOrErr);
                             _isActive = false;
+                            _writeAddr = APP_FLASH_START_ADDR;
+                            _writeLen = 0;
                        }.bindenv(this));
         ack(_writeLen);
     }
@@ -204,7 +206,7 @@ class Application {
     }
 
     /**
-     * Erase flash
+     * Erase Imp-Device flash
      *
      * @param {integer} size - Erased size.
      *
@@ -244,27 +246,3 @@ class Application {
 ::info("ESP32 loader example device start");
 // Run the application
 app <- Application();
-
-// local pack = utilities.hexStringToBlob("C0000404000000000000C0DBC0");
-// ::debug(pack);
-// ::debug(app._espLoader._checkSLIPPack(pack));
-
-// espLoader <- ESP32Loader({
-//                                     "strappingPin1" : APP_STRAP_PIN1,
-//                                     "strappingPin2" : APP_STRAP_PIN2
-//                                  },
-//                                  APP_ESP_UART,
-//                                  ESP32_LOADER_FLASH_SIZE.SZ4MB,
-//                                  APP_SWITCH_PIN
-//                                 );
-//         espLoader.load(APP_FLASH_START_ADDR, 
-//                        0x1000, 
-//                        24528).then(function(res) {
-//                             ::info("Load firmware success!");
-//                             // _msngr.send(APP_M_MSG_NAME.STATUS, "Load firmware success!");
-//                             // _isActive = false;
-//                        }.bindenv(this)).fail(function(err){
-//                             ::error(err);
-//                             // _msngr.send(APP_M_MSG_NAME.STATUS, err);
-//                             // _isActive = false;
-//                        }.bindenv(this));

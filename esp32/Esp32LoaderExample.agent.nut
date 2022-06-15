@@ -9,13 +9,26 @@ const APP_REST_API_DATA_ENDPOINT_PREFIX = "/esp32-";
 // Reboot ESP32 if in loader
 const APP_REST_API_DATA_ENDPOINT_REBOOT = "reboot";
 // Example API endpoint (file name and offset in ESP flash)
-APP_REST_API_DATA_ENDPOINTS <- {"bootloader"        : 0x1000,
-                                "partition-table"   : 0x8000,
-                                "application"       : 0x10000};
+APP_REST_API_DATA_ENDPOINTS <- {"partition-table"   : 0x8000,
+                                "ota_data_initial"  : 0x10000, 
+                                "phy_init_data"     : 0xf000,
+                                "bootloader"        : 0x1000, 
+                                "esp-at"            : 0x100000,
+                                "at_customize"      : 0x20000,
+                                "ble_data"          : 0x21000,
+                                "server_cert"       : 0x24000,
+                                "server_key"        : 0x26000,
+                                "server_ca"         : 0x28000,
+                                "client_cert"       : 0x2a000,
+                                "client_key"        : 0x2c000,
+                                "client_ca"         : 0x2e000,
+                                "mqtt_cert"         : 0x37000,
+                                "mqtt_key"          : 0x39000,
+                                "mqtt_ca"           : 0x3B000,
+                                "factory_param"     : 0x30000};
 
 // Firmware flash address length
 const APP_FW_ADDR_LEN = 4;
-
 // Timeout to re-check connection with imp-device, in seconds
 const APP_CHECK_IMP_CONNECT_TIMEOUT = 15;
 // Firmware image portion send size
@@ -36,7 +49,7 @@ enum APP_M_MSG_NAME {
     ESP_REBOOT = "reboot"
 };
 
-// ESP32 loader example application
+// ESP32 loader example agent application
 class Application {
     // Messenger instance
     _msngr = null;
@@ -56,7 +69,7 @@ class Application {
     _offsets = null;
     // firmware image length
     _lens = null;
-    // data portion
+    // firmware image data portion
     _portion = null;
 
     /**
