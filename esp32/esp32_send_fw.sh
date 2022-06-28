@@ -1,13 +1,23 @@
 #!/bin/bash
-# Send PUT erquest with firmware to the imp-agent
+# Send PUT request with firmware to the imp-agent
 agentUrl=$1
 agentEndPoint=$2
-fileName=$3
 
-val=$(md5sum $fileName | awk '{ print $1 }')
-base64Val=$(echo $val | base64)
-curl -H "Content-MD5: $base64Val" -T $fileName $agentUrl$agentEndPoint
+if [[ "$agentEndPoint" == "reboot" ]]; then
+    curl -X PUT ${agentUrl}/esp32-${agentEndPoint}
+fi
+
+if [[ "$agentEndPoint" == "load" ]]; then
+    flashOffs=$3
+    fileName=$4
+
+    md5val=$(md5sum $fileName | awk '{ print $1 }')
+    fileLen=$(ls -la $fileName | awk '{ print $5 }')
+
+    curl -X PUT -T ${fileName} ${agentUrl}/esp32-${agentEndPoint}?fileName=${fileName}'&'fileLen=${fileLen}'&'flashOffset=${flashOffs}'&'deflate=false'&'md5=${md5val}
+fi
 
 # Example: 
-# esp32_send_fw.sh https://agent.electricimp.com/D7u-XXXXx6j1 /esp32-bootloader bootloader.bin 
-# esp32_send_fw.sh https://agent.electricimp.com/D7u-XXXXx6j1 /esp32-partition-table partition-table.bin 
+# esp32_send_fw.sh https://agent.electricimp.com/D7u-XXXXx6j1 load 0x00 bootloader.bin 
+# esp32_send_fw.sh https://agent.electricimp.com/D7u-XXXXx6j1 load 0x8000 partition-table.bin 
+# esp32_send_fw.sh https://agent.electricimp.com/D7u-XXXXx6j1 reboot

@@ -1,5 +1,4 @@
 #require "rocky.agent.lib.nut:3.0.1"
-#require "Promise.lib.nut:4.0.0"
 #require "Messenger.lib.nut:0.2.0"
 
 @include once "../src/shared/Logger/Logger.shared.nut"
@@ -8,37 +7,23 @@
 const APP_REST_API_DATA_ENDPOINT_PREFIX = "/esp32-";
 // Reboot ESP32 if in loader
 const APP_REST_API_DATA_ENDPOINT_REBOOT = "reboot";
-// Example API endpoint (file name and offset in ESP flash)
-APP_REST_API_DATA_ENDPOINTS <- {"partition-table"   : 0x8000,
-                                "ota_data_initial"  : 0x10000, 
-                                "phy_init_data"     : 0xf000,
-                                "bootloader"        : 0x1000, 
-                                "esp-at"            : 0x100000,
-                                "at_customize"      : 0x20000,
-                                "ble_data"          : 0x21000,
-                                "server_cert"       : 0x24000,
-                                "server_key"        : 0x26000,
-                                "server_ca"         : 0x28000,
-                                "client_cert"       : 0x2a000,
-                                "client_key"        : 0x2c000,
-                                "client_ca"         : 0x2e000,
-                                "mqtt_cert"         : 0x37000,
-                                "mqtt_key"          : 0x39000,
-                                "mqtt_ca"           : 0x3B000,
-                                "factory_param"     : 0x30000};
-
+// Endpoint firmware load
+const APP_REST_API_DATA_ENDPOINT_LOAD = "load";
 // Firmware flash address length
 const APP_FW_ADDR_LEN = 4;
 // Timeout to re-check connection with imp-device, in seconds
 const APP_CHECK_IMP_CONNECT_TIMEOUT = 15;
 // Firmware image portion send size
-const APP_DATA_PORTION_SIZE = 100; 
+const APP_DATA_PORTION_SIZE = 8192; 
+// MD5 string length
+const APP_DATA_MD5_LEN = 32;
+
 
 // Returned HTTP codes
 enum APP_REST_API_HTTP_CODES {
     OK = 200,           // Cfg update is accepted (enqueued)
     INVALID_REQ = 400,  // Incorrect cfg
-    TO_MANY_REQ = 429   // Too many requests
+    TOO_MANY_REQ = 429  // Too many requests
 };
 
 // Messenger message names
@@ -55,20 +40,20 @@ class Application {
     _msngr = null;
     // Timer to re-check connection with imp-device
     _timerSending = null;
-    // MD5 values of firmware images
-    _md5Sums = null;
-    // Firmware files
-    _fwImages = null;
+    // MD5 values of firmware image
+    _md5Sum = null;
+    // Firmware file
+    _fwImage = null;
     // load process is active 
     _isActive = null;
     // Timer to re-check connection with imp-device
     _timerSending = null;
-    // Current work endpoint
-    _workEndpoint = null;
+    // Current file name
+    _fileName = null;
     // ESP32 flash address 
-    _offsets = null;
+    _offset = null;
     // firmware image length
-    _lens = null;
+    _fileLen = null;
     // firmware image data portion
     _portion = null;
 
@@ -76,10 +61,6 @@ class Application {
      * Application Constructor
      */
     constructor() {
-        _md5Sums = {};
-        _fwImages = {};
-        _offsets = {};
-        _lens = {};
         // inactive
         _isActive = false;
         // Initialize library for communication with Imp-Device
@@ -107,66 +88,91 @@ class Application {
         Rocky.init();
         Rocky.on("PUT", 
                  APP_REST_API_DATA_ENDPOINT_PREFIX + 
+                 APP_REST_API_DATA_ENDPOINT_LOAD, 
+                 _putRockyHandlerLoad.bindenv(this));
+        Rocky.on("PUT", 
+                 APP_REST_API_DATA_ENDPOINT_PREFIX + 
                  APP_REST_API_DATA_ENDPOINT_REBOOT, 
-                 _putRockyHandler.bindenv(this));
-        foreach (name, offs in APP_REST_API_DATA_ENDPOINTS) {
-            Rocky.on("PUT", 
-                     APP_REST_API_DATA_ENDPOINT_PREFIX + 
-                     name, 
-                     _putRockyHandler.bindenv(this));
-        }
+                 _putRockyHandlerReboot.bindenv(this));
     }
 
     /**
-     * HTTP PUT request callback function.
+     * HTTP PUT request callback function load endpoint.
      *
      * @param context - Rocky.Context object
      */
-    function _putRockyHandler(context) {
+    function _putRockyHandlerLoad(context) {
         ::info("PUT " + context.req.path + " request from cloud");
 
+        local req = context.req;
         // firmware loaded
         if (_isActive) {
             ::info("Previous request in progress");
-            context.send(APP_REST_API_HTTP_CODES.TO_MANY_REQ);
+            context.send(APP_REST_API_HTTP_CODES.TOO_MANY_REQ);
             return;
         }
 
-        _isActive = true;
-        _workEndpoint = context.req.path.slice(APP_REST_API_DATA_ENDPOINT_PREFIX.len());
+        if (!("content-length" in req.headers)) {
+            ::error("Content length is unknown");
+            context.send(APP_REST_API_HTTP_CODES.INVALID_REQ);
+            return;
+        }
 
-        if (_workEndpoint == APP_REST_API_DATA_ENDPOINT_REBOOT) {
+        local ok = true;
+
+        try {
+            // set file name
+            if ("fileName" in req.query) {
+                _fileName = req.query.fileName;
+            } else {
+                ok = false;
+            }
+
+            // set length
+            if ("fileLen" in req.query) {
+                _fileLen = req.query.fileLen.tointeger();;
+            } else {
+                ok = false;    
+            }
+
+            // firmware offset in flash
+            if ("flashOffset" in req.query) {
+                _offset = req.query.flashOffset.tointeger();
+            } else {
+                ok = false;
+            }
+
+            if ("md5" in req.query && 
+                req.query.md5.len() == APP_DATA_MD5_LEN) {
+                _md5Sum = req.query.md5;    
+            } else {
+                _md5Sum = null;
+            }
+        } catch (err) {
+            ::error("Firmware description set failure: " + err);
+            ok = false;
+        }
+        // Return response to the cloud if error
+        if (!ok) {
             _isActive = false;
-            _sendReboot();
-            context.send(APP_REST_API_HTTP_CODES.OK);
+            context.send(APP_REST_API_HTTP_CODES.INVALID_REQ);
             return;
         }
 
-        local req = context.req;
-        // extract MD5 if exist
-        if ("content-md5" in req.headers) {
-            _md5Sums[_workEndpoint] <- http.base64decode(req.headers["content-md5"]).tostring();
-        } else {
-            _md5Sums[_workEndpoint] <- null;
-        }
         local fwLen = req.headers["content-length"].tointeger();
         local fwBlob = blob();
         fwBlob.writestring(req.body);
         fwBlob.seek(0, 'b');
 
-        local offs = _endpoint2offs();
-        if (offs < 0) {
+        if (fwLen != fwBlob.len()) {
             _isActive = false;
+            ::error("Content length field not equil blob length");
             context.send(APP_REST_API_HTTP_CODES.INVALID_REQ);
             return;
         }
-        // set length
-        _lens[_workEndpoint] <- fwLen;
-        // firmware offset in flash
-        _offsets[_workEndpoint] <- offs;
-        // save firmware image
-        _fwImages[_workEndpoint] <- fwBlob;
 
+        // save firmware image
+        _fwImage = fwBlob;
         // Return response to the cloud
         context.send(APP_REST_API_HTTP_CODES.OK);
         // send to imp-device
@@ -174,29 +180,28 @@ class Application {
     }
 
     /**
-     * Get offset value from endpoint name.
+     * HTTP PUT request callback function reboot endpoint.
      *
-     * @return {integer} - Offset value in ESP32 flash.
+     * @param context - Rocky.Context object
      */
-    function _endpoint2offs() {
-        local offs = -1;
-        foreach (name, val in APP_REST_API_DATA_ENDPOINTS) {
-            if (_workEndpoint == name) {
-                offs = val;
-                break;
-            }
+    function _putRockyHandlerReboot(context) {
+        ::info("PUT " + context.req.path + " request from cloud");
+
+        // firmware loaded
+        if (_isActive) {
+            ::info("Previous request in progress");
+            context.send(APP_REST_API_HTTP_CODES.TOO_MANY_REQ);
+            return;
         }
 
-        if (offs == -1) ::error("Unknown offset!");
-
-        return offs;
+        _sendReboot();
+        context.send(APP_REST_API_HTTP_CODES.OK);
     }
 
     /**
      * Send reboot command to the ESP32.
      */
     function _sendReboot() {
-        
         if (device.isconnected()) {
             _msngr.send(APP_M_MSG_NAME.ESP_REBOOT, null);
         } else {
@@ -214,10 +219,10 @@ class Application {
     function _sendInfo() {
         
         if (device.isconnected()) {
-            _msngr.send(APP_M_MSG_NAME.INFO, {"fileName" : _workEndpoint, 
-                                              "fileLen"  : _lens[_workEndpoint],
-                                              "offs"     : _offsets[_workEndpoint],
-                                              "md5"      : _md5Sums[_workEndpoint]});
+            _msngr.send(APP_M_MSG_NAME.INFO, {"fileName" : _fileName, 
+                                              "fileLen"  : _fileLen,
+                                              "offs"     : _offset,
+                                              "md5"      : _md5Sum});
         } else {
             // Device is disconnected =>
             // check the connection again after the timeout
@@ -244,7 +249,7 @@ class Application {
     }
 
     /**
-     * Handler for status received from Imp-Agent
+     * Handler for status received from Imp-Device
      *
      * @param {table} msg - Received message payload.
      * @param customAck - Custom acknowledgment function.
@@ -282,12 +287,10 @@ class Application {
     function _ackCb(msg, ackData) {
         local name = msg.payload.name;
         if (name != APP_M_MSG_NAME.ESP_REBOOT) {
-            local remain = _lens[_workEndpoint] - 
-                           _fwImages[_workEndpoint].tell();
+            local remain = _fileLen - 
+                           _fwImage.tell();
             if (remain > 0) {
-                _portion = _fwImages[_workEndpoint].readblob(remain > APP_DATA_PORTION_SIZE ? 
-                            APP_DATA_PORTION_SIZE : 
-                            remain);
+                _portion = _fwImage.readblob(APP_DATA_PORTION_SIZE);
                 _sendData();
             }
         }

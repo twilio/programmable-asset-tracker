@@ -19,14 +19,79 @@ enum APP_M_MSG_NAME {
     ESP_REBOOT = "reboot"
 };
 
+@if ESP32
 // Imp UART connected to the ESP32
 APP_ESP_UART <- hardware.uartYABCD;
 // ESP32 power on/off pin
 APP_SWITCH_PIN <- hardware.pinXU;
-// Strap pin 1
+// Strap pin 1 (ESP32WROOM32 IO0)
 APP_STRAP_PIN1 <- hardware.pinXR;
-// Strap pin 2
+// Strap pin 2 (ESP32WROOM32 EN)
 APP_STRAP_PIN2 <- hardware.pinXH;
+// Strap pin 3 
+APP_STRAP_PIN3 <- null;
+// Flash parameters
+APP_ESP_FLASH_PARAM <- {"id"         : 0x00,
+                        "totSize"    : ESP32_LOADER_FLASH_SIZE.SZ4MB,
+                        "blockSize"  : 65536,
+                        "sectSize"   : 4096,
+                        "pageSize"   : 256,
+                        "statusMask" : 65535};
+@else
+
+class FlipFlop {
+    _clkPin = null;
+    _switchPin = null;
+
+    constructor(clkPin, switchPin) {
+        _clkPin = clkPin;
+        _switchPin = switchPin;
+    }
+
+    function _get(key) {
+        if (!(key in _switchPin)) {
+            throw null;
+        }
+
+        // We want to clock the flip-flop after every change on the pin. This will trigger clocking even when the pin is being read.
+        // But this shouldn't affect anything. Moreover, it's assumed that DIGITAL_OUT pins are read rarely.
+        // To "attach" clocking to every pin's function, we return a wrapper-function that calls the requested original pin's
+        // function and then clocks the flip-flop. This will make it transparent for the other components/modules.
+        // All members of hardware.pin objects are functions. Hence we can always return a function here
+        return function(...) {
+            // Let's call the requested function with the arguments passed
+            vargv.insert(0, _switchPin);
+            // Also, we save the value returned by the original pin's function
+            local res = _switchPin[key].acall(vargv);
+
+            // Then we clock the flip-flop assuming that the default pin value is LOW (externally pulled-down)
+            _clkPin.configure(DIGITAL_OUT, 1);
+            _clkPin.disable();
+
+            // Return the value returned by the original pin's function
+            return res;
+        };
+    }
+}
+
+// Imp UART connected to the ESP32C3
+APP_ESP_UART <- hardware.uartPQRS;
+// ESP32 power on/off pin
+APP_SWITCH_PIN <- FlipFlop(hardware.pinYD, hardware.pinS);
+// Strap pin 1 (ESP32C3 GP9 BOOT)
+APP_STRAP_PIN1 <- hardware.pinH;
+// Strap pin 2 (ESP32C3 EN CHIP_EN)
+APP_STRAP_PIN2 <- hardware.pinE;
+// Strap pin 3 (ESP32C3 GP8 PRINTF_EN)
+APP_STRAP_PIN3 <- hardware.pinJ;
+// Flash parameters
+APP_ESP_FLASH_PARAM <- {"id"         : 0x00,
+                        "totSize"    : ESP32_LOADER_FLASH_SIZE.SZ8MB,
+                        "blockSize"  : 131072,
+                        "sectSize"   : 8192,
+                        "pageSize"   : 2048,
+                        "statusMask" : 65535};
+@endif
 
 // ESP32 loader example device application
 class Application {
@@ -81,10 +146,11 @@ class Application {
     function _initESPLoader() {
         _espLoader = ESP32Loader({
                                     "strappingPin1" : APP_STRAP_PIN1,
-                                    "strappingPin2" : APP_STRAP_PIN2
+                                    "strappingPin2" : APP_STRAP_PIN2,
+                                    "strappingPin3" : APP_STRAP_PIN3
                                  },
                                  APP_ESP_UART,
-                                 ESP32_LOADER_FLASH_SIZE.SZ4MB,
+                                 APP_ESP_FLASH_PARAM,
                                  APP_SWITCH_PIN
                                 );
     }
@@ -128,7 +194,6 @@ class Application {
         local data = msg.data;
 
         if (_isActive) {
-            ack();
             ::info(format("Load active. Try again later."));
             return;
         }
@@ -142,9 +207,8 @@ class Application {
         _len = data.fileLen;
         ::info(format("Firmware image length: %d", _len));
         if (!_erase(data.fileLen)) {
-            ack();
             _isActive = false;
-            ::info(format("Erase failure."));
+            ::error(format("Erase failure."));
             return;
         }
         ::info("Start write to imp-device flash.");
@@ -164,7 +228,6 @@ class Application {
         local data = msg.data;
 
         if (_isActive) {
-            ack();
             ::info(format("Load active. Try again later."));
             return;
         }
