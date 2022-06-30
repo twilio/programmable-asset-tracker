@@ -18,6 +18,7 @@ if [[ "$agentEndPoint" == "load" ]]; then
 fi
 
 # Example: 
-# esp32_send_fw.sh https://agent.electricimp.com/D7u-XXXXx6j1 load 0x00 bootloader.bin 
-# esp32_send_fw.sh https://agent.electricimp.com/D7u-XXXXx6j1 load 0x8000 partition-table.bin 
+# esp32_send_fw.sh https://agent.electricimp.com/D7u-XXXXx6j1 load 0x00 bootloader/bootloader.bin 
+# esp32_send_fw.sh https://agent.electricimp.com/D7u-XXXXx6j1 load 0x8000 partition_table/partition-table.bin 
+# esp32_send_fw.sh https://agent.electricimp.com/D7u-XXXXx6j1 load 0x100000 esp-at.bin 
 # esp32_send_fw.sh https://agent.electricimp.com/D7u-XXXXx6j1 reboot
