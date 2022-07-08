@@ -96,10 +96,10 @@ APP_STRAP_PIN2 <- hardware.pinE;
 APP_STRAP_PIN3 <- hardware.pinJ;
 // Flash parameters
 APP_ESP_FLASH_PARAM <- {"id"         : 0x00,
-                        "totSize"    : ESP32_LOADER_FLASH_SIZE.SZ8MB,
-                        "blockSize"  : 131072,
-                        "sectSize"   : 8192,
-                        "pageSize"   : 2048,
+                        "totSize"    : ESP32_LOADER_FLASH_SIZE.SZ4MB,
+                        "blockSize"  : 65536,
+                        "sectSize"   : 4096,
+                        "pageSize"   : 256,
                         "statusMask" : 65535};
 
 server.log("Simple test ESP loader");
@@ -159,9 +159,6 @@ espLoader.load(APP_IMP_FLASH_START_ADDR,
                .finally(function(resOrErr) {
                    server.log(resOrErr);
                    espLoader.reboot().then(function(res) {
-                       APP_SWITCH_PIN.write(0);
-                       imp.sleep(1);
-                       APP_SWITCH_PIN.write(1);
                        APP_ESP_UART.disable();
                        APP_ESP_UART.setrxfifosize(APP_RX_FIFO_SIZE);
                        APP_ESP_UART.configure(APP_DEFAULT_BAUDRATE, 

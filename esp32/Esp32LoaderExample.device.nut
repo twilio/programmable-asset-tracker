@@ -84,12 +84,13 @@ APP_STRAP_PIN1 <- hardware.pinH;
 APP_STRAP_PIN2 <- hardware.pinE;
 // Strap pin 3 (ESP32C3 GP8 PRINTF_EN)
 APP_STRAP_PIN3 <- hardware.pinJ;
+
 // Flash parameters
 APP_ESP_FLASH_PARAM <- {"id"         : 0x00,
-                        "totSize"    : ESP32_LOADER_FLASH_SIZE.SZ8MB,
-                        "blockSize"  : 131072,
-                        "sectSize"   : 8192,
-                        "pageSize"   : 2048,
+                        "totSize"    : ESP32_LOADER_FLASH_SIZE.SZ4MB,
+                        "blockSize"  : 65536,
+                        "sectSize"   : 4096,
+                        "pageSize"   : 256,
                         "statusMask" : 65535};
 @endif
 

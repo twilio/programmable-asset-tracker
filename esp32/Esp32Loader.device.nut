@@ -84,7 +84,7 @@ const ESP32_LOADER_DEFAULT_RX_FIFO_SZ = 4096;
 // Maximum amount of data expected to be received, in bytes
 const ESP32_LOADER_MAX_DATA_LEN = 12288;
 // Maximum time allowed for waiting for data, in seconds
-const ESP32_LOADER_WAIT_DATA_TIMEOUT = 3;
+const ESP32_LOADER_WAIT_DATA_TIMEOUT = 5;
 // Checksum start seed
 const ESP32_LOADER_CHECKSUM_SEED = 0xEF;
 // Each SLIP packet begins and ends with 0xC0
@@ -226,18 +226,45 @@ class ESP32Loader {
 
     /**
      *  Send flash end command with argument reboot ESP.
+     *
+     *  @param {bool} hard - If true - hard reset.
+     *
+     *  @return {Promise} that:
+     *  - resolves if the operation succeeded
+     *  - rejects if the operation failed
      */
-    function reboot() {
+    function reboot(hard = true) {
+        const HARD_RESET_DELAY = 1;
+        // check in loader flag
+        if (!_inLoader) {
+            return Promise.resolve("Chip not in loader mode");
+        }
+
+        if (hard) {
+            if (_switchPin) {
+                _switchPin.write(ESP32_LOADER_POWER.OFF);
+                imp.sleep(HARD_RESET_DELAY);
+                _switchPin.write(ESP32_LOADER_POWER.ON);
+                return Promise.resolve("Reboot success");
+            } else if ("strappingPin2" in _bootPins && _bootPins.strappingPin2 != null) {
+                _bootPins.strappingPin2.write(0);
+                imp.sleep(HARD_RESET_DELAY);
+                _bootPins.strappingPin2.write(1);
+                return Promise.resolve("Reboot success");
+            } else {
+                return Promise.reject("Chip hard reset failure");
+            }
+        }
+
         // flash end request (reboot)
         local flashEndStr = "C0000404000000000000000000C0";
         // flash end validator
-        local dummyValidator = @(data, _) null;
-        // Functions that return promises which will be executed serially
-        local promiseFuncs = [];
+        local flashEndValidator = @(data, _) (_basicRespCheck(data) &&
+                                              data[ESP32_LOADER_RESP_CMD_IND] == ESP32_LOADER_CMD.FLASH_END) ?
+                                              null :
+                                              "Chip reboot failure";
         // final reboot board
-        promiseFuncs.append(_communicate(flashEndStr, dummyValidator));
-
-        return Promise.serial(promiseFuncs)
+        return _communicate(flashEndStr, flashEndValidator, null, false)
         .then(function(_) {
             return "Reboot success";
         }.bindenv(this));
@@ -334,11 +361,23 @@ class ESP32Loader {
         local numberOfDataPackets = fwImgLen % ESP32_LOADER_TRANSMIT_PACKET_LEN ? 
                                     ((fwImgLen + ESP32_LOADER_TRANSMIT_PACKET_LEN) / ESP32_LOADER_TRANSMIT_PACKET_LEN) :
                                     (fwImgLen / ESP32_LOADER_TRANSMIT_PACKET_LEN);
+@if ESP32
+        // https://docs.espressif.com/projects/esptool/en/latest/esp32/advanced-topics/serial-protocol.html
         local flashBeginStr = format("C00002100000000000%08X%08X%08X%08XC0", 
                                      swap4(fwImgLen), 
                                      swap4(numberOfDataPackets), 
                                      swap4(ESP32_LOADER_TRANSMIT_PACKET_LEN), 
                                      swap4(espFlashAddr));
+@else
+        // DOES NOT MATCH THE DOCUMENTATION!!!
+        // 4 BYTES DIFFERENCE
+        // https://docs.espressif.com/projects/esptool/en/latest/esp32c3/advanced-topics/serial-protocol.html
+        local flashBeginStr = format("C00002140000000000%08X%08X%08X%08X00000000C0", 
+                                     swap4(fwImgLen), 
+                                     swap4(numberOfDataPackets), 
+                                     swap4(ESP32_LOADER_TRANSMIT_PACKET_LEN), 
+                                     swap4(espFlashAddr));
+@endif
         // flash begin command validator
         local flashBeginValidator =  @(data, _) (_basicRespCheck(data) &&
                                                  data[ESP32_LOADER_RESP_CMD_IND] == ESP32_LOADER_CMD.FLASH_BEGIN) ?
