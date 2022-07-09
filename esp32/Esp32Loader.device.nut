@@ -24,8 +24,8 @@ enum ESP32_LOADER_ERR {
     MSG_INV   = 0x05, // “Received message is invalid” (parameters or length field is invalid)
     FAIL_ACT  = 0x06, // “Failed to act on received message”
     INV_CRC   = 0x07, // “Invalid CRC in message”
-    FLASH_WR  = 0x08, // “flash write error” - after writing a block of data to flash, 
-                      // the ROM loader reads the value back and the 8-bit CRC is compared 
+    FLASH_WR  = 0x08, // “flash write error” - after writing a block of data to flash,
+                      // the ROM loader reads the value back and the 8-bit CRC is compared
                       // to the data read from flash. If they don’t match, this error is returned.
     FLASH_RD  = 0x09, // “flash read error” - SPI read failed
     FLASH_LEN = 0x0a, // “flash read length error” - SPI read request length is too long
@@ -34,35 +34,35 @@ enum ESP32_LOADER_ERR {
 
 // Supported ROM loader commands
 enum ESP32_LOADER_CMD {
-    FLASH_BEGIN      = 0x02, // Begin Flash Download. Four 32-bit words: size to erase, number of data packets, 
+    FLASH_BEGIN      = 0x02, // Begin Flash Download. Four 32-bit words: size to erase, number of data packets,
                              // data size in one packet, flash offset.
-    FLASH_DATA       = 0x03, // Flash Download Data. Four 32-bit words: data size, sequence number, 
+    FLASH_DATA       = 0x03, // Flash Download Data. Four 32-bit words: data size, sequence number,
                              // 0, 0, then data. Uses Checksum.
-    FLASH_END        = 0x04, // Finish Flash Download. One 32-bit word: 0 to reboot, 1 “run to user code”. 
+    FLASH_END        = 0x04, // Finish Flash Download. One 32-bit word: 0 to reboot, 1 “run to user code”.
                              // Not necessary to send this command if you wish to stay in the loader.
-    MEM_BEGIN        = 0x05, // Begin RAM Download Start. Total size, number of data packets, 
+    MEM_BEGIN        = 0x05, // Begin RAM Download Start. Total size, number of data packets,
                              // data size in one packet, memory offset.
     MEM_END          = 0x06, // Finish RAM Download. Two 32-bit words: execute flag, entry point address.
-    MEM_DATA         = 0x07, // RAM Download Data. Four 32-bit words: data size, sequence number, 0, 0, then data. 
+    MEM_DATA         = 0x07, // RAM Download Data. Four 32-bit words: data size, sequence number, 0, 0, then data.
                              // Uses Checksum.
     SYNC_FRAME       = 0x08, // Sync Frame. 36 bytes: 0x07 0x07 0x12 0x20, followed by 32 x 0x55.
     WRITE_REG        = 0x09, // Write 32-bit memory address. Four 32-bit words: address, value, mask and delay (in microseconds).
     READ_REG         = 0x0a, // Read 32-bit memory address. Address as 32-bit word. Read data as 32-bit word in value field.
-    SPI_SET_PARAMS   = 0x0b, // Configure SPI flash. Six 32-bit words: id, total size in bytes, block size, sector size, 
+    SPI_SET_PARAMS   = 0x0b, // Configure SPI flash. Six 32-bit words: id, total size in bytes, block size, sector size,
                              // page size, status mask.
     SPI_ATTACH       = 0x0d, // Attach SPI flash. 32-bit word: Zero for normal SPI flash. A second 32-bit word (should be 0) is passed
                              // to ROM loader only.
     CHANGE_BAUDRATE  = 0x0f, // Change Baud rate. Two 32-bit words: new baud rate, 0 if we are talking to the ROM flasher or
                              // the current/old baud rate if we are talking to the software stub flasher.
-    FLASH_DEFL_BEGIN = 0x10, // Begin compressed flash download. Four 32-bit words: uncompressed size, number of data packets, 
-                             // data packet size, flash offset. With stub loader the uncompressed size is exact byte count to be written, 
+    FLASH_DEFL_BEGIN = 0x10, // Begin compressed flash download. Four 32-bit words: uncompressed size, number of data packets,
+                             // data packet size, flash offset. With stub loader the uncompressed size is exact byte count to be written,
                              // whereas on ROM bootloader it is rounded up to flash erase block size.
     FLASH_DEFL_DATA  = 0x11, // Compressed flash download data. Four 32-bit words: data size, sequence number, 0, 0, then data. Uses Checksum.
                              // Error code 0xC1 on checksum error.
-    FLASH_DEFL_END   = 0x12, // End compressed flash download. One 32-bit word: 0 to reboot, 1 to “run user code”. 
+    FLASH_DEFL_END   = 0x12, // End compressed flash download. One 32-bit word: 0 to reboot, 1 to “run user code”.
                              // Not necessary to send this command if you wish to stay in the loader.
     SPI_FLASH_MD5    = 0x13  // Calculate MD5 of flash region. Four 32-bit words: address, size, 0, 0.
-                             // Body contains 16 raw bytes of MD5 followed by 2 status bytes (stub loader) or 
+                             // Body contains 16 raw bytes of MD5 followed by 2 status bytes (stub loader) or
                              // 32 hex-coded ASCII (ROM loader) of calculated MD5.
 };
 
@@ -82,7 +82,7 @@ const ESP32_LOADER_DEFAULT_FLAGS = 4;
 const ESP32_LOADER_DEFAULT_RX_FIFO_SZ = 4096;
 
 // Maximum amount of data expected to be received, in bytes
-const ESP32_LOADER_MAX_DATA_LEN = 12288;
+const ESP32_LOADER_MAX_DATA_LEN = 4096;
 // Maximum time allowed for waiting for data, in seconds
 const ESP32_LOADER_WAIT_DATA_TIMEOUT = 5;
 // Checksum start seed
@@ -119,13 +119,13 @@ const ESP32_LOADER_ESP32C3_CHIP_DETECT_MAGIC_VALUE = 0x1B31506F;
 const ESP32_LOADER_TRANSMIT_PACKET_LEN = 1024;
 // md5 length (ascii)
 const ESP32_LOADER_MD5_ASCII_LEN = 32;
-// Four 32-bit words: data size, sequence number, 0, 0, then data (16 bytes). 
+// Four 32-bit words: data size, sequence number, 0, 0, then data (16 bytes).
 const ESP32_LOADER_FLASH_DATA_CFG_FIELD_LEN = 16;
 // Go to loader timeout
 const ESP32_ROM_LOADER_START_TIMEOUT = 0.5;
 
 // ESP32 Loader Driver class.
-// The class provides the ability to change the 
+// The class provides the ability to change the
 // firmware of the ESP32/ESP32C3 MCU.
 class ESP32Loader {
     // Power switch pin
@@ -179,7 +179,7 @@ class ESP32Loader {
 
     /**
      * Load firmware to ESP flash.
-     * 
+     *
      * @param {integer} impFlashAddr - Firmware address in imp flash.
      * @param {integer} espFlashAddr - Firmware address in ESP flash.
      * @param {integer} fwImgLen - Firmware length.
@@ -207,19 +207,18 @@ class ESP32Loader {
             }.bindenv(this));
         }.bindenv(this))
         .fail(function(err) {
+            // TODO: Exactly prepare failure? We can get here if, e.g., _sendDataPackets() failed
             ::error("Prepare failure", "@{CLASS_NAME}");
+
             _inLoader = false;
             _serial.disable();
-            if (_switchPin) _switchPin.disable();
-            if ("strappingPin1" in _bootPins && _bootPins.strappingPin1 != null) {
-                if (_bootPins.strappingPin1) _bootPins.strappingPin1.disable();
+            // TODO: Should it be disabled in case of a successful load?
+            _switchPin && _switchPin.disable();
+
+            foreach (pin in _bootPins) {
+                pin.disable();
             }
-            if ("strappingPin2" in _bootPins && _bootPins.strappingPin2 != null) {
-                if (_bootPins.strappingPin2) _bootPins.strappingPin2.disable();
-            }
-            if ("strappingPin3" in _bootPins && _bootPins.strappingPin3 != null) {
-                if (_bootPins.strappingPin3) _bootPins.strappingPin3.disable();
-            }
+
             throw err;
         }.bindenv(this));
     }
@@ -227,7 +226,7 @@ class ESP32Loader {
     /**
      *  Send flash end command with argument reboot ESP.
      *
-     *  @param {bool} hard - If true - hard reset.
+     *  @param {bool} [hard = true] - If true - hard reset.
      *
      *  @return {Promise} that:
      *  - resolves if the operation succeeded
@@ -235,10 +234,13 @@ class ESP32Loader {
      */
     function reboot(hard = true) {
         const HARD_RESET_DELAY = 1;
+
         // check in loader flag
         if (!_inLoader) {
-            return Promise.resolve("Chip not in loader mode");
+            return Promise.resolve("Chip is not in loader mode");
         }
+
+        // TODO: Should the _inLoader flag be reset here?
 
         if (hard) {
             if (_switchPin) {
@@ -260,6 +262,7 @@ class ESP32Loader {
         local flashEndStr = "C0000404000000000000000000C0";
         // flash end validator
         local flashEndValidator = @(data, _) (_basicRespCheck(data) &&
+                                              // TODO: Move the cmd check into the _basicRespCheck method? (also in many places below)
                                               data[ESP32_LOADER_RESP_CMD_IND] == ESP32_LOADER_CMD.FLASH_END) ?
                                               null :
                                               "Chip reboot failure";
@@ -284,8 +287,8 @@ class ESP32Loader {
      * - rejects if the operation failed
      *
      * Esptool example:
-     * esptool.py -t -p /dev/ttyUSB0 -b 115200 --no-stub --before=default_reset 
-     * --after=hard_reset write_flash --flash_mode dio --flash_freq 40m --flash_size 4MB 
+     * esptool.py -t -p /dev/ttyUSB0 -b 115200 --no-stub --before=default_reset
+     * --after=hard_reset write_flash --flash_mode dio --flash_freq 40m --flash_size 4MB
      * 0x8000 partition_table/partition-table.bin
      */
     function _prepare(impFlashAddr, espFlashAddr, fwImgLen) {
@@ -300,7 +303,7 @@ class ESP32Loader {
         // SYNC packet:
         // C00008240000000000070712205555555555555555555555555
         // 555555555555555555555555555555555555555C0
-        // The checksum field is ignored (can be zero) for all comands 
+        // The checksum field is ignored (can be zero) for all comands
         // except for MEM_DATA, FLASH_DATA, and FLASH_DEFL_DATA.
         local syncStr = "C0000824000000000007071220" +
                         "5555555555555555555555555555555555555555555555555555555555555555C0";
@@ -314,7 +317,7 @@ class ESP32Loader {
                                             null :
                                             "Sync message failure";
         // read chip identify register
-        local identChipStr = format("C0000A040000000000%08XC0", 
+        local identChipStr = format("C0000A040000000000%08XC0",
                                     swap4(ESP32_LOADER_CHIP_DETECT_MAGIC_REG_ADDR));
         // identify chip
         // wait for answer for ESP32 eg.
@@ -322,10 +325,13 @@ class ESP32Loader {
 @if ESP32
         local chipNameValidator = @(data, _) (_basicRespCheck(data) &&
                                               data[ESP32_LOADER_RESP_CMD_IND] == ESP32_LOADER_CMD.READ_REG &&
+                                              // TODO: Move these two lines to the _basicRespCheck() method (as optional check)?
+                                              //       It will be like this: _basicRespCheck(data, ESP32_LOADER_ESP32_CHIP_DETECT_MAGIC_VALUE)
+                                              //       (the second param is optional)
                                               !data.seek(ESP32_LOADER_RESP_REG_VAL_IND, 'b') &&
                                               data.readn('i') == ESP32_LOADER_ESP32_CHIP_DETECT_MAGIC_VALUE) ?
                                               null :
-                                              "Chip name identify failure";   
+                                              "Chip name identify failure";
 @else
         local chipNameValidator = @(data, _) (_basicRespCheck(data) &&
                                               data[ESP32_LOADER_RESP_CMD_IND] == ESP32_LOADER_CMD.READ_REG &&
@@ -345,7 +351,7 @@ class ESP32Loader {
                                                     "Flash attach failure";
         // set spi flash parameters (id, total size in bytes, block size, sector size, page size, status mask)
         // everything except the flash size is fixed
-        local spiSetParamStr = format("C0000B180000000000%08X%08X%08X%08X%08X%08XC0", 
+        local spiSetParamStr = format("C0000B180000000000%08X%08X%08X%08X%08X%08XC0",
                                       swap4(_espFlashParam.id),
                                       swap2(_espFlashParam.totSize),
                                       swap4(_espFlashParam.blockSize),
@@ -358,24 +364,24 @@ class ESP32Loader {
                                                    null :
                                                    "Flash parameter set failure";
         // FLASH_BEGIN - erasing flash (size to erase, number of data packets, data size in one packet, flash offset)
-        local numberOfDataPackets = fwImgLen % ESP32_LOADER_TRANSMIT_PACKET_LEN ? 
+        local numberOfDataPackets = fwImgLen % ESP32_LOADER_TRANSMIT_PACKET_LEN ?
                                     ((fwImgLen + ESP32_LOADER_TRANSMIT_PACKET_LEN) / ESP32_LOADER_TRANSMIT_PACKET_LEN) :
                                     (fwImgLen / ESP32_LOADER_TRANSMIT_PACKET_LEN);
 @if ESP32
         // https://docs.espressif.com/projects/esptool/en/latest/esp32/advanced-topics/serial-protocol.html
-        local flashBeginStr = format("C00002100000000000%08X%08X%08X%08XC0", 
-                                     swap4(fwImgLen), 
-                                     swap4(numberOfDataPackets), 
-                                     swap4(ESP32_LOADER_TRANSMIT_PACKET_LEN), 
+        local flashBeginStr = format("C00002100000000000%08X%08X%08X%08XC0",
+                                     swap4(fwImgLen),
+                                     swap4(numberOfDataPackets),
+                                     swap4(ESP32_LOADER_TRANSMIT_PACKET_LEN),
                                      swap4(espFlashAddr));
 @else
-        // DOES NOT MATCH THE DOCUMENTATION!!!
+        // NOTE: THIS DOES NOT MATCH THE DOCUMENTATION!!!
         // 4 BYTES DIFFERENCE
         // https://docs.espressif.com/projects/esptool/en/latest/esp32c3/advanced-topics/serial-protocol.html
-        local flashBeginStr = format("C00002140000000000%08X%08X%08X%08X00000000C0", 
-                                     swap4(fwImgLen), 
-                                     swap4(numberOfDataPackets), 
-                                     swap4(ESP32_LOADER_TRANSMIT_PACKET_LEN), 
+        local flashBeginStr = format("C00002140000000000%08X%08X%08X%08X00000000C0",
+                                     swap4(fwImgLen),
+                                     swap4(numberOfDataPackets),
+                                     swap4(ESP32_LOADER_TRANSMIT_PACKET_LEN),
                                      swap4(espFlashAddr));
 @endif
         // flash begin command validator
@@ -404,7 +410,7 @@ class ESP32Loader {
             // erasing flash
             _communicate(flashBeginStr, flashBeginValidator)
         ];
-        
+
         return Promise.serial(promiseFuncs);
     }
 
@@ -416,20 +422,9 @@ class ESP32Loader {
      *  - rejects if the operation failed
      */
     function _sendDataPackets() {
-        local continueFunction = function() {
-            return (_fwImgLen > 0);
-        };
-        return  Promise.loop(continueFunction.bindenv(this),
-                             function() {
-                                return Promise(function(resolve, reject) {
-                                      _sendDataPacket()
-                                      .then(function(res) {
-                                          resolve(res);
-                                      }.bindenv(this), function(err) {
-                                          reject(err);
-                                      }.bindenv(this));
-                                }.bindenv(this));
-                             }.bindenv(this));
+        local continueFunction = @() _fwImgLen > 0;
+        return Promise.loop(continueFunction.bindenv(this),
+                            _sendDataPacket.bindenv(this));
     }
 
     /**
@@ -442,10 +437,10 @@ class ESP32Loader {
     function _sendDataPacket() {
         ::info("Send packet. Sequnce number: " + _seqNumb, "@{CLASS_NAME}");
         // data packet
-        local flashData = utilities.hexStringToBlob(format("C00003%04X00000000%08X%08X0000000000000000", 
-                                                           swap2(ESP32_LOADER_TRANSMIT_PACKET_LEN + 
+        local flashData = utilities.hexStringToBlob(format("C00003%04X00000000%08X%08X0000000000000000",
+                                                           swap2(ESP32_LOADER_TRANSMIT_PACKET_LEN +
                                                                  ESP32_LOADER_FLASH_DATA_CFG_FIELD_LEN),
-                                                           swap4(ESP32_LOADER_TRANSMIT_PACKET_LEN), 
+                                                           swap4(ESP32_LOADER_TRANSMIT_PACKET_LEN),
                                                            swap4(_seqNumb)));
         // flash data validator
         local flashDataValidator = @(data, _) (_basicRespCheck(data) &&
@@ -453,28 +448,29 @@ class ESP32Loader {
                                                null :
                                                "Write data failure";
         local dataLen = 0;
-        local addBlobLen = 0;
+        local tailLen = 0;
+
         if (_fwImgLen >= ESP32_LOADER_TRANSMIT_PACKET_LEN) {
             dataLen = ESP32_LOADER_TRANSMIT_PACKET_LEN;
         } else {
             dataLen = _fwImgLen;
-            addBlobLen = ESP32_LOADER_TRANSMIT_PACKET_LEN - dataLen;
+            tailLen = ESP32_LOADER_TRANSMIT_PACKET_LEN - dataLen;
         }
-        // set to end        
+
+        // set to end
         flashData.seek(0, 'e');
+        // TODO: It may be safer to enable the SPI flash right before usage and (optionally) disable right after the usage.
+        //       This is due to possible conflicts with the other components that use SPI flash. They may disable it unexpectedly for us
         hardware.spiflash.readintoblob(_impFlashAddr, flashData, dataLen);
-        // set to end        
+        // TODO: Required?
+        // set to end
         flashData.seek(0, 'e');
-        // supplement the package 0xFFFFFFFF.....FFFFF to ESP32_LOADER_TRANSMIT_PACKET_LEN 
-        if (addBlobLen > 0) {
-            local addBlob = blob(addBlobLen);
-            for (local i = 0; i < addBlobLen; i++) {
-                addBlob[i] = 0xFF;
-            }
-            flashData.writeblob(addBlob);
-            // set to end        
-            flashData.seek(0, 'e');
+
+        // supplement the package 0xFFFFFFFF.....FFFFF to ESP32_LOADER_TRANSMIT_PACKET_LEN
+        for (local i = 0; i < tailLen; i++) {
+            flashData.writen(0xFF, 'b');
         }
+
         // add last C0
         flashData.writen(ESP32_LOADER_SLIP_PACK_IDENT, 'b');
         // set to begin
@@ -484,7 +480,7 @@ class ESP32Loader {
         // increase flash address
         _impFlashAddr += dataLen;
         // decrease firmware image length
-        if (_fwImgLen > 0) _fwImgLen -= dataLen;
+        _fwImgLen -= dataLen;
         // increase sequence number
         _seqNumb++;
 
@@ -506,22 +502,21 @@ class ESP32Loader {
         if (fwMD5 == null) {
             return Promise.resolve("Verification MD5 checksum not transmitted in ESP32 loader from cloud");
         }
+
         ::info("Verification MD5.", "@{CLASS_NAME}");
+
         // hash verify request
-        local hashVerifyStr = format("C00013100000000000%08X%08X0000000000000000C0", 
+        local hashVerifyStr = format("C00013100000000000%08X%08X0000000000000000C0",
                                      swap4(espFlashAddr),
                                      swap4(fwImgLen));
         // hash validator
         local hashValidator =  @(data, _) (!data.seek(ESP32_LOADER_RESP_MD5_IND, 'b') &&
+                                           // TODO: Is it enough to just check the presence of this substring? Should it start from some exact index, for example?
                                            fwMD5.find(data.readstring(ESP32_LOADER_MD5_ASCII_LEN)) != null) ?
                                            null :
                                            "MD5 check failure";
-        // Functions that return promises which will be executed serially
-        local promiseFuncs = [];
-        // hash verify if fwMD5 not null
-        promiseFuncs.append(_communicate(hashVerifyStr, hashValidator));
-        
-        return Promise.serial(promiseFuncs)
+
+        return _communicate(hashVerifyStr, hashValidator, null, false)
         .then(function(_) {
             return "Load firmware success";
         }.bindenv(this));
@@ -550,9 +545,9 @@ class ESP32Loader {
             try {
                 _serial.write(_checkSLIPPack(blobCmd));
             } catch(exp) {
-                ::error("Exception during UART write. " + exp, "@{CLASS_NAME}");
-                return Promise.reject("UART write failure.");
-            } 
+                ::error("Exception during UART write: " + exp, "@{CLASS_NAME}");
+                return Promise.reject("UART write failure");
+            }
         }
 
         return _waitForData(validator)
@@ -584,7 +579,7 @@ class ESP32Loader {
             check = function() {
                 local chunk = _serial.readblob(ESP32_LOADER_DATA_READ_CHUNK_LEN);
                 // Read until FIFO is empty and accumulate to the result string
-                while (chunk.len() > 0 && 
+                while (chunk.len() > 0 &&
                        data.len() < ESP32_LOADER_MAX_DATA_LEN) {
                     data.writeblob(chunk);
                     chunk = _serial.readblob(ESP32_LOADER_DATA_READ_CHUNK_LEN);
@@ -592,7 +587,7 @@ class ESP32Loader {
 
                 local timeElapsed = (hardware.millis() - start) / 1000.0;
 
-                local valResult = validator(data, timeElapsed); 
+                local valResult = validator(data, timeElapsed);
                 if (valResult == null) {
                     return resolve(data);
                 }
@@ -616,34 +611,30 @@ class ESP32Loader {
      * Start ROM loader (set strapping pins, configure UART).
      */
     function _go2ROMLoader() {
+        if (_inLoader) {
+            return;
+        }
 
-        if (_inLoader) return;
         _inLoader = true;
 
-        if (_switchPin) _switchPin.configure(DIGITAL_OUT, ESP32_LOADER_POWER.ON);
+        _switchPin && _switchPin.configure(DIGITAL_OUT, ESP32_LOADER_POWER.ON);
         imp.sleep(ESP32_ROM_LOADER_START_TIMEOUT);
 
-        if ("strappingPin3" in _bootPins && _bootPins.strappingPin3 != null) {
-            _bootPins.strappingPin3.configure(DIGITAL_OUT, 1);
-        }
-        if ("strappingPin1" in _bootPins && _bootPins.strappingPin1 != null) {
-            _bootPins.strappingPin1.configure(DIGITAL_OUT, 1);
-        }
-        if ("strappingPin2" in _bootPins && _bootPins.strappingPin2 != null) {
-            _bootPins.strappingPin2.configure(DIGITAL_OUT, 0);
-        }
-        
+        local strappingPin3 = "strappingPin3" in _bootPins ? _bootPins.strappingPin3 : null;
+        local strappingPin1 = "strappingPin1" in _bootPins ? _bootPins.strappingPin1 : null;
+        local strappingPin2 = "strappingPin2" in _bootPins ? _bootPins.strappingPin2 : null;
+
+        strappingPin3 && strappingPin3.configure(DIGITAL_OUT, 1);
+        strappingPin1 && strappingPin1.configure(DIGITAL_OUT, 1);
+        strappingPin2 && strappingPin2.configure(DIGITAL_OUT, 0);
         imp.sleep(ESP32_ROM_LOADER_START_TIMEOUT);
-        if ("strappingPin1" in _bootPins && _bootPins.strappingPin1 != null) {
-            _bootPins.strappingPin1.write(0);
-        }
-        if ("strappingPin2" in _bootPins && _bootPins.strappingPin2 != null) {
-            _bootPins.strappingPin2.write(1);
-        }
+
+        strappingPin1 && strappingPin1.write(0);
+        strappingPin2 && strappingPin2.write(1);
         imp.sleep(ESP32_ROM_LOADER_START_TIMEOUT);
-        if ("strappingPin1" in _bootPins && _bootPins.strappingPin1 != null) {
-            _bootPins.strappingPin1.write(1);
-        }
+
+        strappingPin1 && strappingPin1.write(1);
+
         _serial.setrxfifosize(ESP32_LOADER_DEFAULT_RX_FIFO_SZ);
         _serial.configure(ESP32_LOADER_DEFAULT_BAUDRATE,
                           ESP32_LOADER_DEFAULT_WORD_SIZE,
@@ -664,11 +655,12 @@ class ESP32Loader {
              i++) {
             val = (val ^ data[ESP32_LOADER_FLASH_DATA_IND + i]);
         }
+        // TODO: Is it necessary to do "& 0xFF"?
         data[ESP32_LOADER_CHECKSUM_IND] = val & 0xFF;
     }
 
     /**
-     * Within the packet, all occurrences of 0xC0 and 0xDB are 
+     * Within the packet, all occurrences of 0xC0 and 0xDB are
      * replaced with 0xDB 0xDC and 0xDB 0xDD, respectively.
      *
      * @param {blob} data - Flash data packet.
@@ -696,7 +688,7 @@ class ESP32Loader {
 
     /**
      * Check main packet content.
-     * Return true if packet is complete (C0...C0), 
+     * Return true if packet is complete (C0...C0),
      * status is ok (0), response - 1, req. cmd. == resp. cmd.
      *
      * @param {blob} data - Flash data packet.
@@ -704,9 +696,11 @@ class ESP32Loader {
      * @return {bool} True if OK, otherwise - false.
      */
     function _basicRespCheck(data) {
+        // TODO: Replace with "data.len() >= ESP32_LOADER_RESP_END_IND + 1"?
         return (data.len() > 0 &&
-                data[ESP32_LOADER_RESP_START_IND] == ESP32_LOADER_SLIP_PACK_IDENT && 
+                data[ESP32_LOADER_RESP_START_IND] == ESP32_LOADER_SLIP_PACK_IDENT &&
                 data[ESP32_LOADER_RESP_END_IND] == ESP32_LOADER_SLIP_PACK_IDENT &&
+                // TODO: What does 0x01 mean here? Should it be a const?
                 data[ESP32_LOADER_RESP_INDIC_IND] == 0x01 &&
                 data[ESP32_LOADER_RESP_STATUS_IND] == 0);
     }
