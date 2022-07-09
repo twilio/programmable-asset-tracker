@@ -43,6 +43,8 @@ A simple Squirrel example which flashes ESP32C3 chip:
 - [script example linux bash](./esp32_send_fw.sh)(bash script to calculate file length and MD5, and send REST API requests)
 - [script example windows cmd](./esp32_send_fw.bat)(cmd script to calculate file length and MD5, and send REST API requests)
 
+For windows script example should be installed [curl](https://curl.se/windows/).
+
 ### REST API ###
 
 `PUT https://<api_url><endpoint>`:
