@@ -65,13 +65,12 @@ Parameters:
 ```
 "flashOffset"  : 1000,              // ESP flash offset
 "fileName"     : "e.g. bootloader", // name of firmware file (exact name is not important - used for logging only)
-"fileLen"      : 8756,              // not deflated firmware file size
 "md5"          : "8fe9e52b3e17d01fd06990f4f5381f5f" // firmware file MD5
 ```
 
 For example: 
 ```
-curl -X PUT -T ~/Develop/esp32/esp-at/build/partition_table/partition-table.bin "https://agent.electricimp.com/D7u-IqX1x6j1/esp32-load?fileName=partition-table.bin&fileLen=3072&flashOffset=0x8000&md5=76bc3722dae4b1f2e66c9f5649b31e02"
+curl -X PUT -T ~/Develop/esp32/esp-at/build/partition_table/partition-table.bin "https://agent.electricimp.com/D7u-IqX1x6j1/esp32-load?fileName=partition-table.bin&flashOffset=0x8000&md5=76bc3722dae4b1f2e66c9f5649b31e02"
 ```
 
 Log output example:
@@ -119,16 +118,16 @@ Log output example:
 
 **For the next reflashings:** only files modified in the following versions should be written.
 
-#### PUT /esp32-reboot ####
+#### PUT /esp32-finish ####
 
-Reboots esp32c3 chip. Needed to start the new uploaded firmware.
+Power off esp32c3 chip.
 
-Argument is software or hardware reboot flag (type boolean). Recomended and default value is `true` (hardware reboot).
+No arguments.
 
 Log output example:
 ```
-2022-06-29T21:14:13.359 +00:00 	[Agent] 	[INFO] PUT /esp32-reboot request from cloud
-2022-06-29T21:14:16.506 +00:00 	[Agent] 	[INFO] Reboot success
+2022-06-29T21:14:13.359 +00:00 	[Agent] 	[INFO] PUT /esp32-finist request from cloud
+2022-06-29T21:14:16.506 +00:00 	[Agent] 	[INFO] Chip power off success
 ```
 
 ## Flash Firmware Using External Tool ##
@@ -163,8 +162,9 @@ Interacts with the hardware ROM loader of the ESP32 chip over [Serial Protocol](
 
 Class usage:
 1) Create ESP32Loader class object.
-2) Load firmware file/files (firmware file should be located on the Imp-Device SPI flash).
-3) Reboot ESP32 chip.
+2) Start ROM loader.
+3) Load firmware file/files (firmware file should be located on the Imp-Device SPI flash).
+4) Reboot ESP32 chip.
 
 #### Constructor ####
 
@@ -217,6 +217,12 @@ For example:
     hardware.pinXU
 ```
 
+#### Start chip ROM loader ####
+
+Method `startROMLoader()` start ROM loader on chip. 
+
+No arguments.
+
 #### Load Firmware File ####
 
 Method `load()` writes firmware file from the Imp-Device flash to the ESP flash.
@@ -234,11 +240,11 @@ The method is synchronous. No more than one load procedure should be called at a
 If MD5 is specified: after writing firmware file is completed ROM loader calculate and compare MD5 checksum. Mismatch of MD5 checksum causes an error - `MD5 check failure`. 
 If an MD5 check error occurs, repeat the file writing procedure.
 
-#### Reboot ESP32 ####
+#### Power off ESP32 ####
 
-Method `reboot()` resets the ESP32 chip and transfers control to the downloaded firmware.
+Method `finish()` resets the ESP32 chip and transfers control to the downloaded firmware.
 
-Argument is software or hardware reboot flag (type boolean). Recomended and default value: true (hardware reboot).
+No arguments.
 
 #  Possible Improvements #
 

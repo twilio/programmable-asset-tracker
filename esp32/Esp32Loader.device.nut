@@ -168,7 +168,15 @@ class ESP32Loader {
      *          "statusMask": {integer} Status mask.
      * @param {object} switchPin - Hardware pin object connected to load switch.
      */
-    constructor(bootPins, uart, espFlashParam, switchPin = null) {
+    constructor(bootPins, uart, espFlashParam, switchPin) {
+
+        if (bootPins == null || 
+            uart == null ||
+            espFlashParam == null || 
+            switchPin == null) {
+            throw "Check constructor parameters";
+        }
+
         _switchPin = switchPin;
         _bootPins = bootPins;
         _serial = uart;
@@ -261,12 +269,9 @@ class ESP32Loader {
 
             _inLoader = false;
             _serial.disable();
-            _switchPin && _switchPin.disable();
 
             foreach (pin in _bootPins) {
-                if (pin != null) {
-                    pin.disable();
-                }
+                pin.disable();
             }
 
             throw err;
@@ -275,6 +280,7 @@ class ESP32Loader {
 
     /**
      *  Send flash end command with argument reboot ESP.
+     *  NOTE: It's assumed that if the switch pin is disabled, the ES32 module is off.
      *
      *  @return {Promise} that:
      *  - resolves if the operation succeeded
@@ -283,15 +289,9 @@ class ESP32Loader {
     function finish() {
 
         _inLoader = false;
+        _switchPin.disable();
 
-        if (_switchPin) {
-            _switchPin.write(ESP32_LOADER_POWER.OFF);
-            _switchPin.disable();
-
-            return Promise.resolve("Chip poweroff success");
-        } else {
-            return Promise.reject("Chip poweroff failure");
-        }
+        return Promise.resolve("Chip power off success");
     }
 
     // ---------------- PRIVATE METHODS ---------------- //
@@ -343,15 +343,15 @@ class ESP32Loader {
         // wait for answer for ESP32 eg.
         // C0010a0400831DF00000000000C0
 @if ESP32
-        local chipNameValidator = @(data, _)  (_basicRespCheck(data, ESP32_LOADER_CMD.READ_REG) &&
-                                              !data.seek(ESP32_LOADER_RESP_REG_VAL_IND, 'b') &&
-                                              data.readn('i') == ESP32_LOADER_ESP32_CHIP_DETECT_MAGIC_VALUE) ?
+        local chipNameValidator = @(data, _)  _basicRespCheck(data, 
+                                                              ESP32_LOADER_CMD.READ_REG,
+                                                              ESP32_LOADER_ESP32_CHIP_DETECT_MAGIC_VALUE) ?
                                               null :
                                               "Chip name identify failure";
 @else
-        local chipNameValidator = @(data, _) (_basicRespCheck(data, ESP32_LOADER_CMD.READ_REG) &&
-                                              !data.seek(ESP32_LOADER_RESP_REG_VAL_IND, 'b') &&
-                                              data.readn('i') == ESP32_LOADER_ESP32C3_CHIP_DETECT_MAGIC_VALUE) ?
+        local chipNameValidator = @(data, _) _basicRespCheck(data, 
+                                                             ESP32_LOADER_CMD.READ_REG,
+                                                             ESP32_LOADER_ESP32C3_CHIP_DETECT_MAGIC_VALUE) ?
                                               null :
                                               "Chip name identify failure";
 @endif
@@ -514,9 +514,9 @@ class ESP32Loader {
         local hashVerifyStr = format("C00013100000000000%08X%08X0000000000000000C0",
                                      swap4(espFlashAddr),
                                      swap4(fwImgLen));
-        // hash validator
+        // hash validator (compare MD5 values)
         local hashValidator =  @(data, _) (!data.seek(ESP32_LOADER_RESP_MD5_IND, 'b') &&
-                                           fwMD5.find(data.readstring(ESP32_LOADER_MD5_ASCII_LEN), 0) != null) ?
+                                           data.readstring(ESP32_LOADER_MD5_ASCII_LEN) == fwMD5) ?
                                            null :
                                            "MD5 check failure";
 
@@ -660,17 +660,20 @@ class ESP32Loader {
      * status is ok (0), response flag value - 1, req. cmd. == resp. cmd.
      *
      * @param {blob} data - Flash data packet.
-     * @param {integer} checkCmd - Loader command. Optional.
+     * @param {integer} checkCmd - Loader command.
+     * @param {integer} chipId - Chip id. Optional.
      *
      * @return {bool} True if OK, otherwise - false.
      */
-    function _basicRespCheck(data, checkCmd = null) {
-        return (data.len() > (ESP32_LOADER_RESP_END_IND + 1) &&
+    function _basicRespCheck(data, checkCmd, chipId = null) {
+        return (data.len() > 0 &&
                 data[ESP32_LOADER_RESP_START_IND] == ESP32_LOADER_SLIP_PACK_IDENT &&
                 data[ESP32_LOADER_RESP_END_IND] == ESP32_LOADER_SLIP_PACK_IDENT &&
                 data[ESP32_LOADER_RESP_INDIC_IND] == ESP32_LOADER_RESP_INDIC_VALUE &&
-                data[ESP32_LOADER_RESP_STATUS_IND] == 0) &&
-                checkCmd != null ? data[ESP32_LOADER_RESP_CMD_IND] == checkCmd : true ;
+                data[ESP32_LOADER_RESP_STATUS_IND] == 0 &&
+                data[ESP32_LOADER_RESP_CMD_IND] == checkCmd &&
+                (chipId != null ? (!data.seek(ESP32_LOADER_RESP_REG_VAL_IND, 'b') &&
+                                   data.readn('i') == chipId) : true));
     }
 }
 

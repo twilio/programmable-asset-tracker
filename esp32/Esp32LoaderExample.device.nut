@@ -27,8 +27,6 @@ APP_SWITCH_PIN <- hardware.pinXU;
 APP_STRAP_PIN1 <- hardware.pinXR;
 // Strap pin 2 (ESP32WROOM32 EN)
 APP_STRAP_PIN2 <- hardware.pinXH;
-// Strap pin 3 
-APP_STRAP_PIN3 <- null;
 // Flash parameters
 APP_ESP_FLASH_PARAM <- {"id"         : 0x00,
                         "totSize"    : ESP32_LOADER_FLASH_SIZE.SZ4MB,
@@ -144,6 +142,16 @@ class Application {
      * Create and initialize ESP32 loader instance
      */
     function _initESPLoader() {
+@if ESP32
+        _espLoader = ESP32Loader({
+                                    "strappingPin1" : APP_STRAP_PIN1,
+                                    "strappingPin2" : APP_STRAP_PIN2
+                                 },
+                                 APP_ESP_UART,
+                                 APP_ESP_FLASH_PARAM,
+                                 APP_SWITCH_PIN
+                                );
+@else
         _espLoader = ESP32Loader({
                                     "strappingPin1" : APP_STRAP_PIN1,
                                     "strappingPin2" : APP_STRAP_PIN2,
@@ -153,6 +161,7 @@ class Application {
                                  APP_ESP_FLASH_PARAM,
                                  APP_SWITCH_PIN
                                 );
+@endif
     }
 
     /**
