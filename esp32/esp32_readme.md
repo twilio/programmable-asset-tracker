@@ -41,9 +41,8 @@ A simple Squirrel example which flashes ESP32C3 chip:
 - [imp-device part](./Esp32LoaderExample.device.nut)
 - [ESP32Loader class](./Esp32Loader.device.nut) (implements esp32 reflashing over [Serial Protocol](https://docs.espressif.com/projects/esptool/en/latest/esp32c3/advanced-topics/serial-protocol.html))
 - [script example linux bash](./esp32_send_fw.sh)(bash script to calculate file length and MD5, and send REST API requests)
-- [script example windows cmd](./esp32_send_fw.bat)(cmd script to calculate file length and MD5, and send REST API requests)
 
-For windows script example should be installed [curl](https://curl.se/windows/).
+For using script esp32_send_fw.sh on Windows system required to install [git](http://git-scm.com/download/win)  and execute this script with git bash terminal.
 
 ### REST API ###
 
