@@ -95,6 +95,8 @@ const ESP32_LOADER_RESP_START_IND = 0x00;
 const ESP32_LOADER_RESP_END_IND = 0x0D;
 // response indication
 const ESP32_LOADER_RESP_INDIC_IND = 0x01;
+// response flag value
+const ESP32_LOADER_RESP_INDIC_VALUE = 0x01;
 // cmd index
 const ESP32_LOADER_RESP_CMD_IND = 0x02;
 // register value start index
@@ -178,6 +180,53 @@ class ESP32Loader {
     }
 
     /**
+     * Start ROM loader (set strapping pins, configure UART).
+     *
+     * @return {Promise} that:
+     * - resolves if the operation succeeded
+     * - rejects if the operation failed
+     */
+    function startROMLoader() {
+
+        if (_inLoader) {
+            return Promise.resolve("Already in loader");
+        }
+
+        _inLoader = true;
+
+        try {
+            _switchPin && _switchPin.configure(DIGITAL_OUT, ESP32_LOADER_POWER.ON);
+            imp.sleep(ESP32_ROM_LOADER_START_TIMEOUT);
+
+            local strappingPin3 = "strappingPin3" in _bootPins ? _bootPins.strappingPin3 : null;
+            local strappingPin1 = "strappingPin1" in _bootPins ? _bootPins.strappingPin1 : null;
+            local strappingPin2 = "strappingPin2" in _bootPins ? _bootPins.strappingPin2 : null;
+
+            strappingPin3 && strappingPin3.configure(DIGITAL_OUT, 1);
+            strappingPin1 && strappingPin1.configure(DIGITAL_OUT, 1);
+            strappingPin2 && strappingPin2.configure(DIGITAL_OUT, 0);
+            imp.sleep(ESP32_ROM_LOADER_START_TIMEOUT);
+
+            strappingPin1 && strappingPin1.write(0);
+            strappingPin2 && strappingPin2.write(1);
+            imp.sleep(ESP32_ROM_LOADER_START_TIMEOUT);
+
+            strappingPin1 && strappingPin1.write(1);
+
+            _serial.setrxfifosize(ESP32_LOADER_DEFAULT_RX_FIFO_SZ);
+            _serial.configure(ESP32_LOADER_DEFAULT_BAUDRATE,
+                              ESP32_LOADER_DEFAULT_WORD_SIZE,
+                              ESP32_LOADER_DEFAULT_PARITY,
+                              ESP32_LOADER_DEFAULT_STOP_BITS,
+                              ESP32_LOADER_DEFAULT_FLAGS);
+        } catch(err) {
+            return Promise.reject("Start ROM loader failure: " + err);
+        }
+
+        return Promise.resolve("Start ROM loader success");
+    }
+
+    /**
      * Load firmware to ESP flash.
      *
      * @param {integer} impFlashAddr - Firmware address in imp flash.
@@ -190,33 +239,34 @@ class ESP32Loader {
      * - rejects if the operation failed
      */
     function load(impFlashAddr, espFlashAddr, fwImgLen, fwMD5 = null) {
+
+        if (!_inLoader) {
+            return Promise.reject("ROM loader is not started");
+        }
+
         return _prepare(impFlashAddr, espFlashAddr, fwImgLen)
         .then(function(_) {
             ::info("Prepare success", "@{CLASS_NAME}");
             // send data packets
             return _sendDataPackets()
             .then(function(_) {
-                // disable imp flash
-                hardware.spiflash.disable();
                 return _checkHash(espFlashAddr, fwImgLen, fwMD5);
             }.bindenv(this))
             .fail(function(err) {
-                // disable imp flash
-                hardware.spiflash.disable();
                 throw err;
             }.bindenv(this));
         }.bindenv(this))
         .fail(function(err) {
-            // TODO: Exactly prepare failure? We can get here if, e.g., _sendDataPackets() failed
-            ::error("Prepare failure", "@{CLASS_NAME}");
+            ::error("Failure: " + err, "@{CLASS_NAME}");
 
             _inLoader = false;
             _serial.disable();
-            // TODO: Should it be disabled in case of a successful load?
             _switchPin && _switchPin.disable();
 
             foreach (pin in _bootPins) {
-                pin.disable();
+                if (pin != null) {
+                    pin.disable();
+                }
             }
 
             throw err;
@@ -226,51 +276,22 @@ class ESP32Loader {
     /**
      *  Send flash end command with argument reboot ESP.
      *
-     *  @param {bool} [hard = true] - If true - hard reset.
-     *
      *  @return {Promise} that:
      *  - resolves if the operation succeeded
      *  - rejects if the operation failed
      */
-    function reboot(hard = true) {
-        const HARD_RESET_DELAY = 1;
+    function finish() {
 
-        // check in loader flag
-        if (!_inLoader) {
-            return Promise.resolve("Chip is not in loader mode");
+        _inLoader = false;
+
+        if (_switchPin) {
+            _switchPin.write(ESP32_LOADER_POWER.OFF);
+            _switchPin.disable();
+
+            return Promise.resolve("Chip poweroff success");
+        } else {
+            return Promise.reject("Chip poweroff failure");
         }
-
-        // TODO: Should the _inLoader flag be reset here?
-
-        if (hard) {
-            if (_switchPin) {
-                _switchPin.write(ESP32_LOADER_POWER.OFF);
-                imp.sleep(HARD_RESET_DELAY);
-                _switchPin.write(ESP32_LOADER_POWER.ON);
-                return Promise.resolve("Reboot success");
-            } else if ("strappingPin2" in _bootPins && _bootPins.strappingPin2 != null) {
-                _bootPins.strappingPin2.write(0);
-                imp.sleep(HARD_RESET_DELAY);
-                _bootPins.strappingPin2.write(1);
-                return Promise.resolve("Reboot success");
-            } else {
-                return Promise.reject("Chip hard reset failure");
-            }
-        }
-
-        // flash end request (reboot)
-        local flashEndStr = "C0000404000000000000000000C0";
-        // flash end validator
-        local flashEndValidator = @(data, _) (_basicRespCheck(data) &&
-                                              // TODO: Move the cmd check into the _basicRespCheck method? (also in many places below)
-                                              data[ESP32_LOADER_RESP_CMD_IND] == ESP32_LOADER_CMD.FLASH_END) ?
-                                              null :
-                                              "Chip reboot failure";
-        // final reboot board
-        return _communicate(flashEndStr, flashEndValidator, null, false)
-        .then(function(_) {
-            return "Reboot success";
-        }.bindenv(this));
     }
 
     // ---------------- PRIVATE METHODS ---------------- //
@@ -312,8 +333,7 @@ class ESP32Loader {
         // C0010804000712205500000000C0
         // the first 4 sync packets usually come with no result
         local dummyValidator = @(data, _) null;
-        local syncMsgValidator = @(data, _) (_basicRespCheck(data) &&
-                                            data[ESP32_LOADER_RESP_CMD_IND] == ESP32_LOADER_CMD.SYNC_FRAME) ?
+        local syncMsgValidator = @(data, _) _basicRespCheck(data, ESP32_LOADER_CMD.SYNC_FRAME) ?
                                             null :
                                             "Sync message failure";
         // read chip identify register
@@ -323,18 +343,13 @@ class ESP32Loader {
         // wait for answer for ESP32 eg.
         // C0010a0400831DF00000000000C0
 @if ESP32
-        local chipNameValidator = @(data, _) (_basicRespCheck(data) &&
-                                              data[ESP32_LOADER_RESP_CMD_IND] == ESP32_LOADER_CMD.READ_REG &&
-                                              // TODO: Move these two lines to the _basicRespCheck() method (as optional check)?
-                                              //       It will be like this: _basicRespCheck(data, ESP32_LOADER_ESP32_CHIP_DETECT_MAGIC_VALUE)
-                                              //       (the second param is optional)
+        local chipNameValidator = @(data, _)  (_basicRespCheck(data, ESP32_LOADER_CMD.READ_REG) &&
                                               !data.seek(ESP32_LOADER_RESP_REG_VAL_IND, 'b') &&
                                               data.readn('i') == ESP32_LOADER_ESP32_CHIP_DETECT_MAGIC_VALUE) ?
                                               null :
                                               "Chip name identify failure";
 @else
-        local chipNameValidator = @(data, _) (_basicRespCheck(data) &&
-                                              data[ESP32_LOADER_RESP_CMD_IND] == ESP32_LOADER_CMD.READ_REG &&
+        local chipNameValidator = @(data, _) (_basicRespCheck(data, ESP32_LOADER_CMD.READ_REG) &&
                                               !data.seek(ESP32_LOADER_RESP_REG_VAL_IND, 'b') &&
                                               data.readn('i') == ESP32_LOADER_ESP32C3_CHIP_DETECT_MAGIC_VALUE) ?
                                               null :
@@ -345,8 +360,7 @@ class ESP32Loader {
         // check attach flash
         // wait for answer for ESP32 eg.
         // C0010D040038FF122A00000000C0
-        local spiFlashAttachValidator = @(data, _) (_basicRespCheck(data) &&
-                                                    data[ESP32_LOADER_RESP_CMD_IND] == ESP32_LOADER_CMD.SPI_ATTACH) ?
+        local spiFlashAttachValidator = @(data, _) _basicRespCheck(data, ESP32_LOADER_CMD.SPI_ATTACH) ?
                                                     null :
                                                     "Flash attach failure";
         // set spi flash parameters (id, total size in bytes, block size, sector size, page size, status mask)
@@ -359,8 +373,7 @@ class ESP32Loader {
                                       swap4(_espFlashParam.pageSize),
                                       swap4(_espFlashParam.statusMask));
         // check spi flash parameters
-        local spiFlashParamValidator = @(data, _) (_basicRespCheck(data) &&
-                                                   data[ESP32_LOADER_RESP_CMD_IND] == ESP32_LOADER_CMD.SPI_SET_PARAMS) ?
+        local spiFlashParamValidator = @(data, _) _basicRespCheck(data, ESP32_LOADER_CMD.SPI_SET_PARAMS) ?
                                                    null :
                                                    "Flash parameter set failure";
         // FLASH_BEGIN - erasing flash (size to erase, number of data packets, data size in one packet, flash offset)
@@ -385,14 +398,9 @@ class ESP32Loader {
                                      swap4(espFlashAddr));
 @endif
         // flash begin command validator
-        local flashBeginValidator =  @(data, _) (_basicRespCheck(data) &&
-                                                 data[ESP32_LOADER_RESP_CMD_IND] == ESP32_LOADER_CMD.FLASH_BEGIN) ?
+        local flashBeginValidator =  @(data, _) _basicRespCheck(data, ESP32_LOADER_CMD.FLASH_BEGIN) ?
                                                  null :
                                                  "ESP flash erase failure";
-        // start ROM loader
-        _go2ROMLoader();
-        // enable imp flash
-        hardware.spiflash.enable();
         // Functions that return promises which will be executed serially
         local promiseFuncs = [
             // Wait for response sync message (5 attempts)
@@ -443,8 +451,7 @@ class ESP32Loader {
                                                            swap4(ESP32_LOADER_TRANSMIT_PACKET_LEN),
                                                            swap4(_seqNumb)));
         // flash data validator
-        local flashDataValidator = @(data, _) (_basicRespCheck(data) &&
-                                               data[ESP32_LOADER_RESP_CMD_IND] == ESP32_LOADER_CMD.FLASH_DATA) ?
+        local flashDataValidator = @(data, _) _basicRespCheck(data, ESP32_LOADER_CMD.FLASH_DATA) ?
                                                null :
                                                "Write data failure";
         local dataLen = 0;
@@ -459,12 +466,10 @@ class ESP32Loader {
 
         // set to end
         flashData.seek(0, 'e');
-        // TODO: It may be safer to enable the SPI flash right before usage and (optionally) disable right after the usage.
-        //       This is due to possible conflicts with the other components that use SPI flash. They may disable it unexpectedly for us
+        // enable imp flash
+        hardware.spiflash.enable();
         hardware.spiflash.readintoblob(_impFlashAddr, flashData, dataLen);
-        // TODO: Required?
-        // set to end
-        flashData.seek(0, 'e');
+        hardware.spiflash.disable();
 
         // supplement the package 0xFFFFFFFF.....FFFFF to ESP32_LOADER_TRANSMIT_PACKET_LEN
         for (local i = 0; i < tailLen; i++) {
@@ -511,8 +516,7 @@ class ESP32Loader {
                                      swap4(fwImgLen));
         // hash validator
         local hashValidator =  @(data, _) (!data.seek(ESP32_LOADER_RESP_MD5_IND, 'b') &&
-                                           // TODO: Is it enough to just check the presence of this substring? Should it start from some exact index, for example?
-                                           fwMD5.find(data.readstring(ESP32_LOADER_MD5_ASCII_LEN)) != null) ?
+                                           fwMD5.find(data.readstring(ESP32_LOADER_MD5_ASCII_LEN), 0) != null) ?
                                            null :
                                            "MD5 check failure";
 
@@ -608,42 +612,6 @@ class ESP32Loader {
     }
 
     /**
-     * Start ROM loader (set strapping pins, configure UART).
-     */
-    function _go2ROMLoader() {
-        if (_inLoader) {
-            return;
-        }
-
-        _inLoader = true;
-
-        _switchPin && _switchPin.configure(DIGITAL_OUT, ESP32_LOADER_POWER.ON);
-        imp.sleep(ESP32_ROM_LOADER_START_TIMEOUT);
-
-        local strappingPin3 = "strappingPin3" in _bootPins ? _bootPins.strappingPin3 : null;
-        local strappingPin1 = "strappingPin1" in _bootPins ? _bootPins.strappingPin1 : null;
-        local strappingPin2 = "strappingPin2" in _bootPins ? _bootPins.strappingPin2 : null;
-
-        strappingPin3 && strappingPin3.configure(DIGITAL_OUT, 1);
-        strappingPin1 && strappingPin1.configure(DIGITAL_OUT, 1);
-        strappingPin2 && strappingPin2.configure(DIGITAL_OUT, 0);
-        imp.sleep(ESP32_ROM_LOADER_START_TIMEOUT);
-
-        strappingPin1 && strappingPin1.write(0);
-        strappingPin2 && strappingPin2.write(1);
-        imp.sleep(ESP32_ROM_LOADER_START_TIMEOUT);
-
-        strappingPin1 && strappingPin1.write(1);
-
-        _serial.setrxfifosize(ESP32_LOADER_DEFAULT_RX_FIFO_SZ);
-        _serial.configure(ESP32_LOADER_DEFAULT_BAUDRATE,
-                          ESP32_LOADER_DEFAULT_WORD_SIZE,
-                          ESP32_LOADER_DEFAULT_PARITY,
-                          ESP32_LOADER_DEFAULT_STOP_BITS,
-                          ESP32_LOADER_DEFAULT_FLAGS);
-    }
-
-    /**
      * Calculate and add checksum to the packet.
      *
      * @param {blob} data - Flash data packet.
@@ -655,8 +623,8 @@ class ESP32Loader {
              i++) {
             val = (val ^ data[ESP32_LOADER_FLASH_DATA_IND + i]);
         }
-        // TODO: Is it necessary to do "& 0xFF"?
-        data[ESP32_LOADER_CHECKSUM_IND] = val & 0xFF;
+
+        data[ESP32_LOADER_CHECKSUM_IND] = val;
     }
 
     /**
@@ -689,20 +657,20 @@ class ESP32Loader {
     /**
      * Check main packet content.
      * Return true if packet is complete (C0...C0),
-     * status is ok (0), response - 1, req. cmd. == resp. cmd.
+     * status is ok (0), response flag value - 1, req. cmd. == resp. cmd.
      *
      * @param {blob} data - Flash data packet.
+     * @param {integer} checkCmd - Loader command. Optional.
      *
      * @return {bool} True if OK, otherwise - false.
      */
-    function _basicRespCheck(data) {
-        // TODO: Replace with "data.len() >= ESP32_LOADER_RESP_END_IND + 1"?
-        return (data.len() > 0 &&
+    function _basicRespCheck(data, checkCmd = null) {
+        return (data.len() > (ESP32_LOADER_RESP_END_IND + 1) &&
                 data[ESP32_LOADER_RESP_START_IND] == ESP32_LOADER_SLIP_PACK_IDENT &&
                 data[ESP32_LOADER_RESP_END_IND] == ESP32_LOADER_SLIP_PACK_IDENT &&
-                // TODO: What does 0x01 mean here? Should it be a const?
-                data[ESP32_LOADER_RESP_INDIC_IND] == 0x01 &&
-                data[ESP32_LOADER_RESP_STATUS_IND] == 0);
+                data[ESP32_LOADER_RESP_INDIC_IND] == ESP32_LOADER_RESP_INDIC_VALUE &&
+                data[ESP32_LOADER_RESP_STATUS_IND] == 0) &&
+                checkCmd != null ? data[ESP32_LOADER_RESP_CMD_IND] == checkCmd : true ;
     }
 }
 

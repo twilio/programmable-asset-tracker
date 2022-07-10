@@ -14,9 +14,8 @@ const APP_SECTOR_SIZE = 0x1000;
 // Messenger message names
 enum APP_M_MSG_NAME {
     INFO = "info",
-    DATA = "data",
-    STATUS = "status",
-    ESP_REBOOT = "reboot"
+    DATA = "data",    
+    ESP_FINISH = "finish"
 };
 
 @if ESP32
@@ -138,7 +137,7 @@ class Application {
         _msngr = Messenger();
         _msngr.on(APP_M_MSG_NAME.INFO, _onInfo.bindenv(this));
         _msngr.on(APP_M_MSG_NAME.DATA, _onData.bindenv(this));
-        _msngr.on(APP_M_MSG_NAME.ESP_REBOOT, _onESPInLoaderReboot.bindenv(this));
+        _msngr.on(APP_M_MSG_NAME.ESP_FINISH, _onESPInLoaderFinish.bindenv(this));
     }
 
     /**
@@ -163,18 +162,18 @@ class Application {
      *
      * @param customAck - Custom acknowledgment function.
      */
-    function _onESPInLoaderReboot(msg, customAck) {
+    function _onESPInLoaderFinish(msg, customAck) {
         local ack = customAck();
 
         if (_isActive) {
-            ack();
             ::info(format("Load active. Try again later."));
             return;
         }
 
-        _espLoader.reboot()
+        _espLoader.finish()
         .finally(function(resOrErr) {
-            _msngr.send(APP_M_MSG_NAME.STATUS, resOrErr);
+            ::info(resOrErr);
+            _isActive = false;
         }.bindenv(this));
         ack("Flash end reboot");
     }
@@ -198,7 +197,7 @@ class Application {
             ::info(format("Load active. Try again later."));
             return;
         }
-        _isActive = true;
+        
         _md5Sum = data.md5;
         ::info(format("Save MD5: %s", data.md5));
         _fwName = data.fileName;
@@ -208,13 +207,10 @@ class Application {
         _len = data.fileLen;
         ::info(format("Firmware image length: %d", _len));
         if (!_erase(data.fileLen)) {
-            _isActive = false;
             ::error(format("Erase failure."));
             return;
         }
         ::info("Start write to imp-device flash.");
-        hardware.spiflash.enable();
-        _isActive = false;
         ack(data.fileName);
     }
 
@@ -233,27 +229,34 @@ class Application {
             return;
         }
 
+        hardware.spiflash.enable();
         _write(data);
+        hardware.spiflash.disable();
+
         _writeLen += data.len();
 
         if (_writeLen < _len) {
             ack(_writeLen);
             return;
         }
-        hardware.spiflash.disable();
-
+        
         ::info("Write to imp flash success. Load to the ESP32 started.");
         _isActive = true;
-        _espLoader.load(APP_FLASH_START_ADDR, 
-                       _offset, 
-                       _len,
-                       _md5Sum)
-                       .finally(function(resOrErr) {
-                            _msngr.send(APP_M_MSG_NAME.STATUS, resOrErr);
-                            _isActive = false;
-                            _writeAddr = APP_FLASH_START_ADDR;
-                            _writeLen = 0;
-                       }.bindenv(this));
+        _espLoader.startROMLoader().then(function(res) {
+            _espLoader.load(APP_FLASH_START_ADDR, 
+                            _offset, 
+                            _len,
+                            _md5Sum).finally(function(resOrErr) {
+                                 ::info(resOrErr);
+                                 _isActive = false;
+                                 _writeAddr = APP_FLASH_START_ADDR;
+                                 _writeLen = 0;
+                            }.bindenv(this));
+        }.bindenv(this))
+        .fail(function(err){
+            ::error(err);
+            _isActive = false;
+        }.bindenv(this));
         ack(_writeLen);
     }
 
@@ -264,8 +267,7 @@ class Application {
      */
     function _write(portion) {
         local len = portion.len();
-        local spiFlash = hardware.spiflash;
-        spiFlash.write(_writeAddr, portion);
+        hardware.spiflash.write(_writeAddr, portion);
         _writeAddr += len;
     }
 
@@ -291,14 +293,13 @@ class Application {
         ::info(format("Start erasing SPI flash from 0x%x to 0x%x", 
                       APP_FLASH_START_ADDR, 
                       (APP_FLASH_START_ADDR + sectorCount*APP_SECTOR_SIZE)));
-        local spiFlash = hardware.spiflash;
-        spiFlash.enable();
+        hardware.spiflash.enable();
         for (local addr = APP_FLASH_START_ADDR; 
              addr < (APP_FLASH_START_ADDR + sectorCount*APP_SECTOR_SIZE); 
              addr += APP_SECTOR_SIZE) {
-            spiFlash.erasesector(addr);
+            hardware.spiflash.erasesector(addr);
         }
-        spiFlash.disable();
+        hardware.spiflash.disable();
         
         ::info("Erasing finished!");
         return true;

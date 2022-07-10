@@ -6,7 +6,7 @@ fileMaxLen=262144 # 256 KByte
 splitSize=262144  # 256 KByte
 splitDirName="splitDir"
 
-if [[ "$agentEndPoint" == "reboot" ]]; then
+if [[ "$agentEndPoint" == "finish" ]]; then
     curl -X PUT ${agentUrl}/esp32-${agentEndPoint}
 fi
 
@@ -47,4 +47,4 @@ fi
 # esp32_send_fw.sh https://agent.electricimp.com/D7u-XXXXx6j1 load 0x00 bootloader/bootloader.bin 
 # esp32_send_fw.sh https://agent.electricimp.com/D7u-XXXXx6j1 load 0x8000 partition_table/partition-table.bin 
 # esp32_send_fw.sh https://agent.electricimp.com/D7u-XXXXx6j1 load 0x60000 esp-at.bin 
-# esp32_send_fw.sh https://agent.electricimp.com/D7u-XXXXx6j1 reboot
+# esp32_send_fw.sh https://agent.electricimp.com/D7u-XXXXx6j1 finish
