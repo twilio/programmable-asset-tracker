@@ -18,24 +18,6 @@ enum APP_M_MSG_NAME {
     ESP_FINISH = "finish"
 };
 
-@if ESP32
-// Imp UART connected to the ESP32
-APP_ESP_UART <- hardware.uartYABCD;
-// ESP32 power on/off pin
-APP_SWITCH_PIN <- hardware.pinXU;
-// Strap pin 1 (ESP32WROOM32 IO0)
-APP_STRAP_PIN1 <- hardware.pinXR;
-// Strap pin 2 (ESP32WROOM32 EN)
-APP_STRAP_PIN2 <- hardware.pinXH;
-// Flash parameters
-APP_ESP_FLASH_PARAM <- {"id"         : 0x00,
-                        "totSize"    : ESP32_LOADER_FLASH_SIZE.SZ4MB,
-                        "blockSize"  : 65536,
-                        "sectSize"   : 4096,
-                        "pageSize"   : 256,
-                        "statusMask" : 65535};
-@else
-
 class FlipFlop {
     _clkPin = null;
     _switchPin = null;
@@ -89,7 +71,6 @@ APP_ESP_FLASH_PARAM <- {"id"         : 0x00,
                         "sectSize"   : 4096,
                         "pageSize"   : 256,
                         "statusMask" : 65535};
-@endif
 
 // ESP32 loader example device application
 class Application {
@@ -142,16 +123,6 @@ class Application {
      * Create and initialize ESP32 loader instance
      */
     function _initESPLoader() {
-@if ESP32
-        _espLoader = ESP32Loader({
-                                    "strappingPin1" : APP_STRAP_PIN1,
-                                    "strappingPin2" : APP_STRAP_PIN2
-                                 },
-                                 APP_ESP_UART,
-                                 APP_ESP_FLASH_PARAM,
-                                 APP_SWITCH_PIN
-                                );
-@else
         _espLoader = ESP32Loader({
                                     "strappingPin1" : APP_STRAP_PIN1,
                                     "strappingPin2" : APP_STRAP_PIN2,
@@ -161,7 +132,6 @@ class Application {
                                  APP_ESP_FLASH_PARAM,
                                  APP_SWITCH_PIN
                                 );
-@endif
     }
 
     /**
@@ -251,7 +221,7 @@ class Application {
         
         ::info("Write to imp flash success. Load to the ESP32 started.");
         _isActive = true;
-        _espLoader.startROMLoader().then(function(res) {
+        _espLoader.start().then(function(res) {
             _espLoader.load(APP_FLASH_START_ADDR, 
                             _offset, 
                             _len,

@@ -152,7 +152,7 @@ espLoader <- ESP32Loader({
                          APP_ESP_UART,
                          APP_ESP_FLASH_PARAM,
                          APP_SWITCH_PIN);
-espLoader.startROMLoader().then(function(res) {
+espLoader.start().then(function(res) {
     // load firmware to ESP flash
     espLoader.load(APP_IMP_FLASH_START_ADDR, 
                    APP_SIMPLE_TEST_ESP_FLASH_ADDR, 

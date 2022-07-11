@@ -113,8 +113,6 @@ const ESP32_LOADER_CHECKSUM_IND = 0x05;
 const ESP32_LOADER_FLASH_DATA_IND = 0x19;
 // This ROM address has a different value on each chip model
 const ESP32_LOADER_CHIP_DETECT_MAGIC_REG_ADDR = 0x40001000
-// ESP32WROOM32 chip detect value
-const ESP32_LOADER_ESP32_CHIP_DETECT_MAGIC_VALUE = 0x00f01d83;
 // ESP32C3 chip detect value
 const ESP32_LOADER_ESP32C3_CHIP_DETECT_MAGIC_VALUE = 0x1B31506F;
 // Transmit packet length
@@ -194,7 +192,7 @@ class ESP32Loader {
      * - resolves if the operation succeeded
      * - rejects if the operation failed
      */
-    function startROMLoader() {
+    function start() {
 
         if (_inLoader) {
             return Promise.resolve("Already in loader");
@@ -342,19 +340,11 @@ class ESP32Loader {
         // identify chip
         // wait for answer for ESP32 eg.
         // C0010a0400831DF00000000000C0
-@if ESP32
-        local chipNameValidator = @(data, _)  _basicRespCheck(data, 
-                                                              ESP32_LOADER_CMD.READ_REG,
-                                                              ESP32_LOADER_ESP32_CHIP_DETECT_MAGIC_VALUE) ?
-                                              null :
-                                              "Chip name identify failure";
-@else
         local chipNameValidator = @(data, _) _basicRespCheck(data, 
                                                              ESP32_LOADER_CMD.READ_REG,
                                                              ESP32_LOADER_ESP32C3_CHIP_DETECT_MAGIC_VALUE) ?
                                               null :
                                               "Chip name identify failure";
-@endif
         // attach spi flash
         local spiFlashAttachStr = "C0000D0800000000000000000000000000C0";
         // check attach flash
