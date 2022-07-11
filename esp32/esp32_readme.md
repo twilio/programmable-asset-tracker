@@ -4,7 +4,7 @@ How to flash/reflash ESP-AT firmware for the [esp32-c3fn4 chip (ESP32-C3 Series)
 
 ## Check Current Firmware ##
 
-A simple Squirrel test which gets a version from ESP32 - [./Esp32Test.device.nut](./Esp32Test.device.nut)
+A simple Squirrel test for imp-device which gets a version from ESP32 - [Esp32Test.device.nut](./Esp32Test.device.nut)
 
 Example of the correct log after running the test:
 ```
@@ -17,12 +17,18 @@ Example of the correct log after running the test:
 2022-07-07T14:14:17.847 +00:00 	[Device] 	OK
 ```
 
-If ESP32 chip has no firmware:
+A log when ESP32 chip has no firmware:
 ```
 2022-07-01 02:43:31+0400 [Device] Send request
 2022-07-01 02:44:31+0400 [Device] Send request
 2022-07-01 02:45:31+0400 [Device] Send request
 ```
+
+## ESP32Loader Class ##
+
+A Squirrel class for imp-device which implements esp32c3 reflashing over [Serial Protocol](https://docs.espressif.com/projects/esptool/en/latest/esp32c3/advanced-topics/serial-protocol.html) - [ESP32Loader.device.nut](./Esp32Loader.device.nut) - this is the main class which is utilized by the firmware reflashing example and other (eg. factory) applications.
+
+A simple Squirrel test for ESP32Loader class - [Esp32LoaderSimpleTest.device.nut](./Esp32LoaderSimpleTest.device.nut)
 
 ## Obtain Firmware ##
 
@@ -39,10 +45,9 @@ It is already compiled and available [here](https://github.com/espressif/esp-at/
 A simple Squirrel example which flashes ESP32C3 chip:
 - [imp-agent part](./Esp32LoaderExample.agent.nut) (provides REST API for firmware loading/reflashing)
 - [imp-device part](./Esp32LoaderExample.device.nut)
-- [ESP32Loader class](./Esp32Loader.device.nut) (implements esp32 reflashing over [Serial Protocol](https://docs.espressif.com/projects/esptool/en/latest/esp32c3/advanced-topics/serial-protocol.html))
-- [script example linux bash](./esp32_send_fw.sh)(bash script to calculate file length and MD5, and send REST API requests)
-
-For using script esp32_send_fw.sh on Windows system required to install [git](http://git-scm.com/download/win)  and execute this script with git bash terminal.
+- [bash script](./esp32_send_fw.sh) which calculates a firmware file length and MD5, splits the file into parts and sends REST API requests.
+  - Originally the script is intended for Linux bash.
+  - To run the script eg. on Windows, install [git (with bash component)](http://git-scm.com/download/win) and execute the script with git bash terminal.
 
 ### REST API ###
 
@@ -53,8 +58,7 @@ For using script esp32_send_fw.sh on Windows system required to install [git](ht
 
 Flashing procedure contains two steps:
 1) Uploading needed binary files: `/esp32-load` endpoint - may be called several times for different files. But it is possible to transfer only one firmware file at a time.
-Attantion! Binary files with length more then 256 kB should be splitted to parts. Split example [here](./esp32_send_fw.sh) and [here](./esp32_send_fw.bat).
-2) Reboot esp32c3 chip to start the new uploaded firmware: `/esp32-reboot` endpoint - should be called once after all files are successfully uploaded.
+2) Finishing the procedure (reboot esp32c3 chip to start the new uploaded firmware): `/esp32-finish` endpoint - should be called once after all files are successfully uploaded.
 
 #### PUT /esp32-load ####
 
@@ -62,9 +66,9 @@ Uploads a firmware binary file.
 
 Parameters:
 ```
-"flashOffset"  : 1000,              // ESP flash offset
-"fileName"     : "e.g. bootloader", // name of firmware file (exact name is not important - used for logging only)
-"md5"          : "8fe9e52b3e17d01fd06990f4f5381f5f" // firmware file MD5
+flashOffset=<number> - offset in the ESP flash memory where to load the file, eg. 0000
+fileName=<string> - name of the file, eg. bootloader. Exact name is not important, it is used for logging purpose only.
+md5=<string> - MD5 of the file, eg. 8fe9e52b3e17d01fd06990f4f5381f5f
 ```
 
 For example: 
@@ -93,6 +97,8 @@ Log output example:
 
 ##### Firmware Files #####
 
+The files to flash and the corresponding offsets in the ESP32C3 flash memory for the used/tested firmware version:
+
 | ESP Flash Offset | File |
 | ---------------- | ---- |
 | 0x0000  | bootloader/bootloader.bin |
@@ -115,17 +121,24 @@ Log output example:
 
 **For the first flashing:** all files should be flashed. They can be flashed in any order but strictly one after another (not in parallel).
 
-**For the next reflashings:** only files modified in the following versions should be written.
+**For the next reflashings:** only files modified in the new versions need to be reflashed (no need to reflash unmodified files if their offsets are not changed).
+
+**Attention!** The example may not accept files with the length more than 256 KBytes:
+- In this case the file should be split into parts before uploading.
+- Every part should be uploaded as an individual file.
+- Note: a correspondingly adjusted ESP Flash Offset should be specified for every part.
+
+Note, the provided [script](./esp32_send_fw.sh) does the needed splitting (as well as the length and MD5 calculations).
 
 #### PUT /esp32-finish ####
 
-Power off esp32c3 chip.
+Finishes the reflashing procedure, restarts esp32 chip, new firmware is run after that.
 
-No arguments.
+No parameters.
 
 Log output example:
 ```
-2022-06-29T21:14:13.359 +00:00 	[Agent] 	[INFO] PUT /esp32-finist request from cloud
+2022-06-29T21:14:13.359 +00:00 	[Agent] 	[INFO] PUT /esp32-finish request from cloud
 2022-06-29T21:14:16.506 +00:00 	[Agent] 	[INFO] Chip power off success
 ```
 
@@ -133,47 +146,47 @@ Log output example:
 
 The following is needed for the flashing:
 - A usb-uart converter (e.g. FT2232 FTDI).
-- A flash utility. For Windows platform - [Flash download tool](https://www.espressif.com/sites/default/files/tools/flash_download_tool_3.9.2.zip), [another download tool](https://github.com/espressif/esptool).
+- A flash utility
+  - [Flash download tool for Windows](https://www.espressif.com/sites/default/files/tools/flash_download_tool_3.9.2.zip),
+  - [Esptool (Python-based)](https://github.com/espressif/esptool).
+- Switch ESP32 to the loading mode.
 
-ROM bootloader start for ESP32C3 is described [here](https://www.espressif.com/sites/default/files/documentation/esp32-c3_datasheet_en.pdf).
+How to switch ESP32C3 to the loading mode is described [here](https://www.espressif.com/sites/default/files/documentation/esp32-c3_datasheet_en.pdf).
+
 How to flash a firmware is described [here](https://docs.espressif.com/projects/esp-at/en/latest/Get_Started/Downloading_guide.html) and [here](https://docs.espressif.com/projects/esptool/en/latest/esp32c3/index.html).
 
 Esptool command example:
+```
 esptool.py -t -p /dev/ttyUSB0 -b 115200 --no-stub --before=default_reset 
  --after=hard_reset write_flash --flash_mode dio --flash_freq 40m --flash_size 4MB 
  0x8000 partition_table/partition-table.bin
+```
 
 ## Implementation Notes ##
 
-Technical documentation for ESP32 is [here](https://www.espressif.com/en/support/documents/technical-documents).
-
-### Example Settings ###
-
-- Imp-device UART connected to the ESP ROM loader UART: `APP_ESP_UART` variable.
-
-- Imp-device pins connected to the ESP chip strap pins: `APP_STRAP_PIN1`, `APP_STRAP_PIN2`, `APP_STRAP_PIN3` variables. These pins are used to switch ESP to the loading mode.
-
-- Imp-device pin connected to the ESP ROM loader power enable pin: `APP_SWITCH_PIN` variable.
+Technical documentation for ESP32 is [here](https://www.espressif.com/en/support/documents/technical-documents) (choose "ESP32-C3 Series").
 
 ### ESP32Loader Class Usage ###
 
 Interacts with the hardware ROM loader of the ESP32 chip over [Serial Protocol](https://docs.espressif.com/projects/esptool/en/latest/esp32c3/advanced-topics/serial-protocol.html)
 
-Class usage:
-1) Create ESP32Loader class object.
-2) Start ROM loader.
-3) Load firmware file/files (firmware file should be located on the Imp-Device SPI flash).
-4) Reboot ESP32 chip.
+Firmware loading procedure contains three steps:
+1) Start loading procedure - method start().
+2) Load firmware file/files - method load(). Firmware file should be located on the Imp-Device SPI flash. Several files can be loaded, but strictly one after another (not in parallel).
+3) Finish loading procedure - method finish(). It reboots ESP32 chip and run the new loaded firmware.
+
+Every new loading procedure should be initiated by the start() method.
 
 #### Constructor ####
 
-**First parameter**: Imp-Device pins connected to the ESP32 chip strapping pins:
+**First parameter**: Imp-Device pins connected to the ESP32 chip strapping pins - are used to switch ESP to the loading mode.
 ```
    - "strappingPin1" Strapping pin 1 (for ESP32C3 GP9 BOOT)
    - "strappingPin2" Strapping pin 2 (for ESP32C3 EN  CHIP_EN)
    - "strappingPin3" Strapping pin 3 (for ESP32C3 GP8 PRINTF_EN)
 ```
-For example:
+
+Example for the Prog-X Asset Tracker module:
 ```
     {
         "strappingPin1" : hardware.pinH,
@@ -183,23 +196,23 @@ For example:
 ```
 
 **Second parameter**: Imp-Device UART connected to the ESP32 ROM loader UART.
-For example:
+
+Example for the Prog-X Asset Tracker module:
 ```
     hardware.uartPQRS
 ```
 
 **Third parameter**: ESP32 chip SPI flash configuration.
-
-Elements:
 ```
-    - "id" Flash id (if not exist 0).
+    - "id" Flash id (0 if does not exist).
     - "totSize" Total flash size. (enum ESP32_LOADER_FLASH_SIZE).
     - "blockSize" Flash block size.
     - "sectSize" Flash sector size.
     - "pageSize" Flash page size.
     - "statusMask" Status mask (Default 65535).
 ```
-For example:
+
+Example for the Prog-X Asset Tracker module:
 ```
     {"id"         : 0x00,
      "totSize"    : ESP32_LOADER_FLASH_SIZE.SZ4MB,
@@ -209,22 +222,22 @@ For example:
      "statusMask" : 65535}
 ```
 
-**Fourth parameter**: hardware pin connected to the ESP32 load switch.
+**Fourth parameter**: Imp-Device pin connected to the ESP32 load switch.
 
-For example:
+Example for the Prog-X Asset Tracker module:
 ```
     hardware.pinXU
 ```
 
-#### Start chip ROM loader ####
+#### Start ####
 
-Method `startROMLoader()` start ROM loader on chip. 
+Method `start()` initiates the loading procedure. 
 
-No arguments.
+No parameters.
 
-#### Load Firmware File ####
+#### Load ####
 
-Method `load()` writes firmware file from the Imp-Device flash to the ESP flash.
+Method `load()` writes firmware file from the Imp-Device SPI flash to the ESP chip SPI flash.
 
 The method is synchronous. No more than one load procedure should be called at a time.
 
@@ -236,18 +249,18 @@ The method is synchronous. No more than one load procedure should be called at a
     - Firmware MD5 (string). Optional. 
 ```
 
-If MD5 is specified: after writing firmware file is completed ROM loader calculate and compare MD5 checksum. Mismatch of MD5 checksum causes an error - `MD5 check failure`. 
-If an MD5 check error occurs, repeat the file writing procedure.
+If MD5 is specified:
+- After the file is written to the ESP flash, ESP bootloader calculates and compares the MD5 checksum.
+- Mismatch of the MD5 checksum causes an error - `MD5 check failure`. 
 
-#### Power off ESP32 ####
+#### Finish ####
 
-Method `finish()` resets the ESP32 chip and transfers control to the downloaded firmware.
+Method `finish()` completes the loading procedure, resets the ESP32 chip and transfers control to the loaded firmware.
 
-No arguments.
+No parameters.
 
 #  Possible Improvements #
 
-1) Add the use of the stub loader (second stage loader) firmware for the possibility of increasing the download speed.
+1) Load and use an alternative bootloader - ["stub loader"](https://docs.espressif.com/projects/esptool/en/latest/esp32/esptool/flasher-stub.html) - it can increase the download speed.
 2) Support compressed firmware files transfer. 
 3) Test at higher UART baud rate (460800).
-
