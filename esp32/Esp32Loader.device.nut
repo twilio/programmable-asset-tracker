@@ -304,11 +304,6 @@ class ESP32Loader {
      * @return {Promise} that:
      * - resolves if the operation succeeded
      * - rejects if the operation failed
-     *
-     * Esptool example:
-     * esptool.py -t -p /dev/ttyUSB0 -b 115200 --no-stub --before=default_reset
-     * --after=hard_reset write_flash --flash_mode dio --flash_freq 40m --flash_size 4MB
-     * 0x8000 partition_table/partition-table.bin
      */
     function _prepare(impFlashAddr, espFlashAddr, fwImgLen) {
         if (fwImgLen == 0) {
