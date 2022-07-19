@@ -28,7 +28,7 @@ if [[ "$agentEndPoint" == "load" ]]; then
         cd $splitDirName
         split -a 1 -b $splitSize $fileName
         echo $fileName
-        for file in ./* ; do 
+        for file in ./* ; do
             echo $fileName-$file;
             md5Part=$(md5sum $file | awk '{ print $1 }');
             fileLenPart=$(ls -la $file | awk '{ print $5 }');
@@ -40,11 +40,11 @@ if [[ "$agentEndPoint" == "load" ]]; then
         rm -rf $splitDirName
     else
         curl -X PUT -T ${fileName} ${agentUrl}/esp32-${agentEndPoint}?fileName=${fileName}'&'fileLen=${fileLen}'&'flashOffset=${flashOffs}'&'deflate=false'&'md5=${md5val}
-    fi    
+    fi
 fi
 
-# Example: 
-# esp32_send_fw.sh https://agent.electricimp.com/D7u-XXXXx6j1 load 0x00 bootloader/bootloader.bin 
-# esp32_send_fw.sh https://agent.electricimp.com/D7u-XXXXx6j1 load 0x8000 partition_table/partition-table.bin 
-# esp32_send_fw.sh https://agent.electricimp.com/D7u-XXXXx6j1 load 0x60000 esp-at.bin 
+# Example:
+# esp32_send_fw.sh https://agent.electricimp.com/D7u-XXXXx6j1 load 0x00 bootloader/bootloader.bin
+# esp32_send_fw.sh https://agent.electricimp.com/D7u-XXXXx6j1 load 0x8000 partition_table/partition-table.bin
+# esp32_send_fw.sh https://agent.electricimp.com/D7u-XXXXx6j1 load 0x60000 esp-at.bin
 # esp32_send_fw.sh https://agent.electricimp.com/D7u-XXXXx6j1 finish

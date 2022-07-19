@@ -83,11 +83,11 @@ enable3V.write(1);
 // configure UART (imp006 mikroBUS)
 serial <- hardware.uartABCD;
 serial.setrxfifosize(RX_FIFO_SIZE);
-serial.configure(DEFAULT_BAUDRATE, 
-                 DEFAULT_BIT_IN_CHAR, 
-                 PARITY_NONE, 
-                 DAFAULT_STOP_BITS, 
-                 NO_CTSRTS, 
+serial.configure(DEFAULT_BAUDRATE,
+                 DEFAULT_BIT_IN_CHAR,
+                 PARITY_NONE,
+                 DAFAULT_STOP_BITS,
+                 NO_CTSRTS,
                  loop);
 
 // send version request

@@ -14,7 +14,7 @@ const APP_SECTOR_SIZE = 0x1000;
 // Messenger message names
 enum APP_M_MSG_NAME {
     INFO = "info",
-    DATA = "data",    
+    DATA = "data",
     ESP_FINISH = "finish"
 };
 
@@ -80,9 +80,9 @@ class Application {
     _espLoader = null;
     // MD5 values of all firmware image
     _md5Sum = null;
-    // load process is active 
-    _isActive = null;
-    // ESP32 flash address 
+    // load process is active
+    _isActive = false;
+    // ESP32 flash address
     _offset = null;
     // Imp SPI flash write address
     _writeAddr = null;
@@ -97,8 +97,6 @@ class Application {
      * Application Constructor
      */
     constructor() {
-        // inactive
-        _isActive = false;
         _writeAddr = APP_FLASH_START_ADDR;
         _writeLen = 0;
         // Initialize ESP32 loader
@@ -145,15 +143,18 @@ class Application {
         local ack = customAck();
 
         if (_isActive) {
-            ::info(format("Load active. Try again later."));
+            ::info(format("Loading is active. Try again later."));
             return;
         }
 
         _espLoader.finish()
         .finally(function(resOrErr) {
             ::info(resOrErr);
+            // TODO: Is it needed here?
             _isActive = false;
         }.bindenv(this));
+
+        // TODO: Why do we send this string in the ACK?
         ack("Flash end reboot");
     }
 
@@ -165,7 +166,7 @@ class Application {
      *          "fileName" : {string} - Firmware filename.
      *          "md5"      : {string} - Firmware MD5 (ASCII string - 32 bytes).
      *          "fileLen"  : {integer} - Firmware length.
-     *          "offs"     : {integer} - Address offset. 
+     *          "offs"     : {integer} - Address offset.
      * @param customAck - Custom acknowledgment function.
      */
     function _onInfo(msg, customAck) {
@@ -176,7 +177,9 @@ class Application {
             ::info(format("Load active. Try again later."));
             return;
         }
-        
+
+        // TODO: Should we reset some variables here? E.g., _writeLen
+
         _md5Sum = data.md5;
         ::info(format("Save MD5: %s", data.md5));
         _fwName = data.fileName;
@@ -204,7 +207,7 @@ class Application {
         local data = msg.data;
 
         if (_isActive) {
-            ::info(format("Load active. Try again later."));
+            ::info(format("Loading is active. Try again later."));
             return;
         }
 
@@ -213,30 +216,32 @@ class Application {
         hardware.spiflash.disable();
 
         _writeLen += data.len();
+        ack(_writeLen);
 
         if (_writeLen < _len) {
-            ack(_writeLen);
             return;
         }
-        
-        ::info("Write to imp flash success. Load to the ESP32 started.");
+
+        ::info("Writing to the imp's flash finished. Loading to the ESP32 started.");
         _isActive = true;
-        _espLoader.start().then(function(res) {
-            _espLoader.load(APP_FLASH_START_ADDR, 
-                            _offset, 
+
+        _espLoader.start()
+        .then(function(res) {
+            _espLoader.load(APP_FLASH_START_ADDR,
+                            _offset,
                             _len,
-                            _md5Sum).finally(function(resOrErr) {
-                                 ::info(resOrErr);
-                                 _isActive = false;
-                                 _writeAddr = APP_FLASH_START_ADDR;
-                                 _writeLen = 0;
-                            }.bindenv(this));
+                            _md5Sum)
+            .finally(function(resOrErr) {
+                ::info(resOrErr);
+                _isActive = false;
+                _writeAddr = APP_FLASH_START_ADDR;
+                _writeLen = 0;
+            }.bindenv(this));
         }.bindenv(this))
-        .fail(function(err){
+        .fail(function(err) {
             ::error(err);
             _isActive = false;
         }.bindenv(this));
-        ack(_writeLen);
     }
 
     /**
@@ -258,10 +263,11 @@ class Application {
      * @return {boolean} - true - erase success.
      */
     function _erase(size) {
-        local sectorCount = (size % APP_SECTOR_SIZE) == 0 ? 
-                            size / APP_SECTOR_SIZE : 
+        // TODO: Can be replaced with (size + APP_SECTOR_SIZE - 1) / APP_SECTOR_SIZE?
+        local sectorCount = (size % APP_SECTOR_SIZE) == 0 ?
+                            size / APP_SECTOR_SIZE :
                             (size + APP_SECTOR_SIZE) / APP_SECTOR_SIZE;
-        if (APP_FLASH_START_ADDR + sectorCount*APP_SECTOR_SIZE > APP_FLASH_END_ADDR) {
+        if (APP_FLASH_START_ADDR + sectorCount * APP_SECTOR_SIZE > APP_FLASH_END_ADDR) {
             ::error(format("Erasing failed. Check erase size![0x%08X;0x%08X]. Sector size: 0x%08X",
                            APP_FLASH_START_ADDR,
                            APP_FLASH_END_ADDR,
@@ -269,17 +275,17 @@ class Application {
             return false;
         }
 
-        ::info(format("Start erasing SPI flash from 0x%x to 0x%x", 
-                      APP_FLASH_START_ADDR, 
-                      (APP_FLASH_START_ADDR + sectorCount*APP_SECTOR_SIZE)));
+        ::info(format("Start erasing SPI flash from 0x%x to 0x%x",
+                      APP_FLASH_START_ADDR,
+                      (APP_FLASH_START_ADDR + sectorCount * APP_SECTOR_SIZE)));
         hardware.spiflash.enable();
-        for (local addr = APP_FLASH_START_ADDR; 
-             addr < (APP_FLASH_START_ADDR + sectorCount*APP_SECTOR_SIZE); 
+        for (local addr = APP_FLASH_START_ADDR;
+             addr < (APP_FLASH_START_ADDR + sectorCount * APP_SECTOR_SIZE);
              addr += APP_SECTOR_SIZE) {
             hardware.spiflash.erasesector(addr);
         }
         hardware.spiflash.disable();
-        
+
         ::info("Erasing finished!");
         return true;
     }

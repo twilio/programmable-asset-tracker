@@ -14,7 +14,7 @@ const APP_FW_ADDR_LEN = 4;
 // Timeout to re-check connection with imp-device, in seconds
 const APP_CHECK_IMP_CONNECT_TIMEOUT = 15;
 // Firmware image portion send size
-const APP_DATA_PORTION_SIZE = 8192; 
+const APP_DATA_PORTION_SIZE = 8192;
 // MD5 string length
 const APP_DATA_MD5_LEN = 32;
 
@@ -46,7 +46,7 @@ class Application {
     _timerSending = null;
     // Current file name
     _fileName = null;
-    // ESP32 flash address 
+    // ESP32 flash address
     _offset = null;
     // firmware image length
     _fileLen = null;
@@ -62,7 +62,7 @@ class Application {
         // Initialize REST API library
         _initRocky();
     }
-    
+
     // -------------------- PRIVATE METHODS -------------------- //
 
     /**
@@ -79,13 +79,13 @@ class Application {
      */
     function _initRocky() {
         Rocky.init();
-        Rocky.on("PUT", 
-                 APP_REST_API_DATA_ENDPOINT_PREFIX + 
-                 APP_REST_API_DATA_ENDPOINT_LOAD, 
+        Rocky.on("PUT",
+                 APP_REST_API_DATA_ENDPOINT_PREFIX +
+                 APP_REST_API_DATA_ENDPOINT_LOAD,
                  _putRockyHandlerLoad.bindenv(this));
-        Rocky.on("PUT", 
-                 APP_REST_API_DATA_ENDPOINT_PREFIX + 
-                 APP_REST_API_DATA_ENDPOINT_FINISH, 
+        Rocky.on("PUT",
+                 APP_REST_API_DATA_ENDPOINT_PREFIX +
+                 APP_REST_API_DATA_ENDPOINT_FINISH,
                  _putRockyHandlerReboot.bindenv(this));
     }
 
@@ -109,7 +109,7 @@ class Application {
             _fileName = req.query.fileName;
             _offset = req.query.flashOffset.tointeger();
 
-            if ("md5" in req.query && 
+            if ("md5" in req.query &&
                 req.query.md5.len() == APP_DATA_MD5_LEN) {
                 _md5Sum = req.query.md5;
             } else {
@@ -127,15 +127,15 @@ class Application {
 
         if (fwLen != fwBlob.len()) {
             ::error("Content length header value is not equal to the body length");
-            context.send(APP_REST_API_HTTP_CODES.INVALID_REQ);
-            return;
+            return context.send(APP_REST_API_HTTP_CODES.INVALID_REQ);
         }
 
         // save firmware image
         _fwImage = fwBlob;
-        _fileLen = fwLen; 
+        _fileLen = fwLen;
 
         local onSuccess = @() context.send(APP_REST_API_HTTP_CODES.OK);
+        // TODO: Maybe it's better to use 503 (Service Unavailable) here?
         local onFail = @() context.send(APP_REST_API_HTTP_CODES.INVALID_REQ);
 
         _sendInfo(onSuccess, onFail);
@@ -143,7 +143,7 @@ class Application {
 
     /**
      * Send firmware file info to imp-device.
-     * 
+     *
      * @param {function} onSuccess - Callback to be called on success request execution.
      * @param {function} onFail - Callback to be called on failure request execution.
      */
@@ -155,12 +155,12 @@ class Application {
                 "offs"     : _offset,
                 "md5"      : _md5Sum
             };
-    
+
             local metadata = {
                 "onSuccess" : onSuccess,
                 "onFail"    : onFail
             };
-    
+
             _msngr.send(APP_M_MSG_NAME.INFO, data, null, metadata);
         } else {
             onFail();
@@ -183,6 +183,8 @@ class Application {
      * Send reboot command to the ESP32.
      */
     function _sendReboot() {
+        // TODO: It's not a reboot command
+
         if (device.isconnected()) {
             _msngr.send(APP_M_MSG_NAME.ESP_FINISH, null);
         } else {
@@ -198,7 +200,6 @@ class Application {
      * Send firmware file to imp-device.
      */
     function _sendData() {
-        
         if (device.isconnected()) {
             _msngr.send(APP_M_MSG_NAME.DATA, _portion);
         } else {
@@ -221,6 +222,7 @@ class Application {
         if (name == APP_M_MSG_NAME.INFO) {
             msg.metadata.onFail();
         }
+
         if (name == APP_M_MSG_NAME.DATA) {
             _sendData();
         }
@@ -235,12 +237,14 @@ class Application {
      */
     function _ackCb(msg, ackData) {
         local name = msg.payload.name;
+
         if (name == APP_M_MSG_NAME.INFO) {
             msg.metadata.onSuccess();
         }
+
         if (name != APP_M_MSG_NAME.ESP_FINISH) {
-            local remain = _fileLen - 
-                           _fwImage.tell();
+            local remain = _fileLen - _fwImage.tell();
+
             if (remain > 0) {
                 _portion = _fwImage.readblob(APP_DATA_PORTION_SIZE);
                 _sendData();

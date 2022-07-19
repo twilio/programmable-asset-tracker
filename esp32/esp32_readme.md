@@ -71,7 +71,7 @@ fileName=<string> - name of the file, eg. bootloader. Exact name is not importan
 md5=<string> - MD5 of the file, eg. 8fe9e52b3e17d01fd06990f4f5381f5f
 ```
 
-For example: 
+For example:
 ```
 curl -X PUT -T ~/Develop/esp32/esp-at/build/partition_table/partition-table.bin "https://agent.electricimp.com/D7u-IqX1x6j1/esp32-load?fileName=partition-table.bin&flashOffset=0x8000&md5=76bc3722dae4b1f2e66c9f5649b31e02"
 ```
@@ -157,8 +157,8 @@ How to flash a firmware is described [here](https://docs.espressif.com/projects/
 
 Esptool command example:
 ```
-esptool.py -t -p /dev/ttyUSB0 -b 115200 --no-stub --before=default_reset 
- --after=hard_reset write_flash --flash_mode dio --flash_freq 40m --flash_size 4MB 
+esptool.py -t -p /dev/ttyUSB0 -b 115200 --no-stub --before=default_reset
+ --after=hard_reset write_flash --flash_mode dio --flash_freq 40m --flash_size 4MB
  0x8000 partition_table/partition-table.bin
 ```
 
@@ -231,7 +231,7 @@ Example for the Prog-X Asset Tracker module:
 
 #### Start ####
 
-Method `start()` initiates the loading procedure. 
+Method `start()` initiates the loading procedure.
 
 No parameters.
 
@@ -246,12 +246,12 @@ The method is synchronous. No more than one load procedure should be called at a
     - Firmware address in imp flash (source).
     - Firmware address in ESP flash (destination).
     - Firmware length (in bytes).
-    - Firmware MD5 (string). Optional. 
+    - Firmware MD5 (string). Optional.
 ```
 
 If MD5 is specified:
 - After the file is written to the ESP flash, ESP bootloader calculates and compares the MD5 checksum.
-- Mismatch of the MD5 checksum causes an error - `MD5 check failure`. 
+- Mismatch of the MD5 checksum causes an error - `MD5 check failure`.
 
 #### Finish ####
 
@@ -262,5 +262,5 @@ No parameters.
 #  Possible Improvements #
 
 1) Load and use an alternative bootloader - ["stub loader"](https://docs.espressif.com/projects/esptool/en/latest/esp32/esptool/flasher-stub.html) - it can increase the download speed.
-2) Support compressed firmware files transfer. 
+2) Support compressed firmware files transfer.
 3) Test at higher UART baud rate (460800).
