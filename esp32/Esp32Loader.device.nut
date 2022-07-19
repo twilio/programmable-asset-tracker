@@ -139,13 +139,13 @@ class ESP32Loader {
     // Flash parameters
     _espFlashParam = null;
     // Firmware packet sequence number
-    _seqNumb = null;
+    _seqNumb = 0;
     // ESP32 firmware address in the imp flash
-    _impFlashAddr = null;
+    _impFlashAddr = 0;
     // Current firmware size
-    _fwImgLen = null;
-    // in loader flag
-    _inLoader = null;
+    _fwImgLen = 0;
+    // In loader flag
+    _inLoader = false;
 
     /**
      * Constructor for ESP32 Loader Driver Class
@@ -167,22 +167,10 @@ class ESP32Loader {
      * @param {object} switchPin - Hardware pin object connected to load switch.
      */
     constructor(bootPins, uart, espFlashParam, switchPin) {
-
-        if (bootPins == null || 
-            uart == null ||
-            espFlashParam == null || 
-            switchPin == null) {
-            throw "Check constructor parameters";
-        }
-
         _switchPin = switchPin;
         _bootPins = bootPins;
         _serial = uart;
         _espFlashParam = espFlashParam;
-        _seqNumb = 0;
-        _impFlashAddr = 0;
-        _fwImgLen = 0;
-        _inLoader = false;
     }
 
     /**
@@ -193,15 +181,12 @@ class ESP32Loader {
      * - rejects if the operation failed
      */
     function start() {
-
         if (_inLoader) {
             return Promise.resolve("Already in loader");
         }
 
-        _inLoader = true;
-
         try {
-            _switchPin && _switchPin.configure(DIGITAL_OUT, ESP32_LOADER_POWER.ON);
+            _switchPin.configure(DIGITAL_OUT, ESP32_LOADER_POWER.ON);
             imp.sleep(ESP32_ROM_LOADER_START_TIMEOUT);
 
             local strappingPin3 = "strappingPin3" in _bootPins ? _bootPins.strappingPin3 : null;
@@ -226,8 +211,11 @@ class ESP32Loader {
                               ESP32_LOADER_DEFAULT_STOP_BITS,
                               ESP32_LOADER_DEFAULT_FLAGS);
         } catch(err) {
+            // TODO: Disable everything in case of failure
             return Promise.reject("Start ROM loader failure: " + err);
         }
+
+        _inLoader = true;
 
         return Promise.resolve("Start ROM loader success");
     }
@@ -245,7 +233,6 @@ class ESP32Loader {
      * - rejects if the operation failed
      */
     function load(impFlashAddr, espFlashAddr, fwImgLen, fwMD5 = null) {
-
         if (!_inLoader) {
             return Promise.reject("ROM loader is not started");
         }
@@ -263,7 +250,9 @@ class ESP32Loader {
             }.bindenv(this));
         }.bindenv(this))
         .fail(function(err) {
-            ::error("Failure: " + err, "@{CLASS_NAME}");
+            ::error("Loading failure: " + err, "@{CLASS_NAME}");
+
+            // TODO: Are we sure we should disable anything here?
 
             _inLoader = false;
             _serial.disable();
@@ -277,6 +266,7 @@ class ESP32Loader {
     }
 
     /**
+     *  TODO: Update the comment?
      *  Send flash end command with argument reboot ESP.
      *  NOTE: It's assumed that if the switch pin is disabled, the ES32 module is off.
      *
@@ -285,9 +275,13 @@ class ESP32Loader {
      *  - rejects if the operation failed
      */
     function finish() {
-
         _inLoader = false;
         _switchPin.disable();
+        _serial.disable();
+
+        foreach (pin in _bootPins) {
+            pin.disable();
+        }
 
         return Promise.resolve("Chip power off success");
     }
@@ -295,7 +289,7 @@ class ESP32Loader {
     // ---------------- PRIVATE METHODS ---------------- //
 
     /**
-     * Preparing ROM loader to receive firmware.
+     * Prepare ROM loader to receive firmware.
      *
      * @param {integer} impFlashAddr - Firmware image address (in imp flash).
      * @param {integer} espFlashAddr - Firmware image address (in ESP flash).
@@ -335,7 +329,7 @@ class ESP32Loader {
         // identify chip
         // wait for answer for ESP32 eg.
         // C0010a0400831DF00000000000C0
-        local chipNameValidator = @(data, _) _basicRespCheck(data, 
+        local chipNameValidator = @(data, _) _basicRespCheck(data,
                                                              ESP32_LOADER_CMD.READ_REG,
                                                              ESP32_LOADER_ESP32C3_CHIP_DETECT_MAGIC_VALUE) ?
                                               null :
@@ -362,9 +356,11 @@ class ESP32Loader {
                                                    null :
                                                    "Flash parameter set failure";
         // FLASH_BEGIN - erasing flash (size to erase, number of data packets, data size in one packet, flash offset)
+        // TODO: Can we replace this with a simpler expression (see below a commented line)?
         local numberOfDataPackets = fwImgLen % ESP32_LOADER_TRANSMIT_PACKET_LEN ?
                                     ((fwImgLen + ESP32_LOADER_TRANSMIT_PACKET_LEN) / ESP32_LOADER_TRANSMIT_PACKET_LEN) :
                                     (fwImgLen / ESP32_LOADER_TRANSMIT_PACKET_LEN);
+        // local numberOfDataPackets = (fwImgLen + ESP32_LOADER_TRANSMIT_PACKET_LEN - 1) / ESP32_LOADER_TRANSMIT_PACKET_LEN;
 @if ESP32
         // https://docs.espressif.com/projects/esptool/en/latest/esp32/advanced-topics/serial-protocol.html
         local flashBeginStr = format("C00002100000000000%08X%08X%08X%08XC0",
@@ -388,6 +384,7 @@ class ESP32Loader {
                                                  "ESP flash erase failure";
         // Functions that return promises which will be executed serially
         local promiseFuncs = [
+            // TODO: Move the syncStr and identChipStr checks into the start() method
             // Wait for response sync message (5 attempts)
             _communicate(syncStr, dummyValidator),
             _communicate(syncStr, dummyValidator),
@@ -651,14 +648,26 @@ class ESP32Loader {
      * @return {bool} True if OK, otherwise - false.
      */
     function _basicRespCheck(data, checkCmd, chipId = null) {
-        return (data.len() > 0 &&
-                data[ESP32_LOADER_RESP_START_IND] == ESP32_LOADER_SLIP_PACK_IDENT &&
-                data[ESP32_LOADER_RESP_END_IND] == ESP32_LOADER_SLIP_PACK_IDENT &&
-                data[ESP32_LOADER_RESP_INDIC_IND] == ESP32_LOADER_RESP_INDIC_VALUE &&
-                data[ESP32_LOADER_RESP_STATUS_IND] == 0 &&
-                data[ESP32_LOADER_RESP_CMD_IND] == checkCmd &&
-                (chipId != null ? (!data.seek(ESP32_LOADER_RESP_REG_VAL_IND, 'b') &&
-                                   data.readn('i') == chipId) : true));
+        // TODO: len() > 0 (was before the fix) doesn't guarantee that we will not go out of the blob's bounds.
+        //       Is it enough to check if len() > ESP32_LOADER_RESP_END_IND? Will this help?
+        if (data.len() <= ESP32_LOADER_RESP_END_IND) {
+            return false;
+        }
+
+        local chipIdMatch = true;
+
+        if (chipId != null) {
+            data.seek(ESP32_LOADER_RESP_REG_VAL_IND, 'b');
+            chipIdMatch = data.readn('i') == chipId;
+        }
+
+        return data[ESP32_LOADER_RESP_START_IND] == ESP32_LOADER_SLIP_PACK_IDENT &&
+               data[ESP32_LOADER_RESP_END_IND] == ESP32_LOADER_SLIP_PACK_IDENT &&
+               data[ESP32_LOADER_RESP_INDIC_IND] == ESP32_LOADER_RESP_INDIC_VALUE &&
+               // TODO: Should we make a const for this 0 too?
+               data[ESP32_LOADER_RESP_STATUS_IND] == 0 &&
+               data[ESP32_LOADER_RESP_CMD_IND] == checkCmd &&
+               chipIdMatch;
     }
 }
 
