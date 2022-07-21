@@ -22,7 +22,8 @@ const APP_DATA_MD5_LEN = 32;
 enum APP_REST_API_HTTP_CODES {
     OK = 200,           // Success
     INVALID_REQ = 400,  // Error
-    TOO_MANY_REQ = 429  // Too many requests
+    TOO_MANY_REQ = 429, // Too many requests
+    SERVICE_UNAVAILABLE = 503 // Service temporarily unavailable
 };
 
 // Messenger message names
@@ -86,7 +87,7 @@ class Application {
         Rocky.on("PUT",
                  APP_REST_API_DATA_ENDPOINT_PREFIX +
                  APP_REST_API_DATA_ENDPOINT_FINISH,
-                 _putRockyHandlerReboot.bindenv(this));
+                 _putRockyHandlerFinish.bindenv(this));
     }
 
     /**
@@ -135,8 +136,7 @@ class Application {
         _fileLen = fwLen;
 
         local onSuccess = @() context.send(APP_REST_API_HTTP_CODES.OK);
-        // TODO: Maybe it's better to use 503 (Service Unavailable) here?
-        local onFail = @() context.send(APP_REST_API_HTTP_CODES.INVALID_REQ);
+        local onFail = @() context.send(APP_REST_API_HTTP_CODES.SERVICE_UNAVAILABLE);
 
         _sendInfo(onSuccess, onFail);
     }
@@ -168,23 +168,21 @@ class Application {
     }
 
     /**
-     * HTTP PUT request callback function reboot endpoint.
+     * HTTP PUT request callback function finish endpoint.
      *
      * @param context - Rocky.Context object
      */
-    function _putRockyHandlerReboot(context) {
+    function _putRockyHandlerFinish(context) {
         ::info("PUT " + context.req.path + " request from cloud");
 
-        _sendReboot();
+        _sendFinish();
         context.send(APP_REST_API_HTTP_CODES.OK);
     }
 
     /**
-     * Send reboot command to the ESP32.
+     * Send finish command to the ESP32.
      */
-    function _sendReboot() {
-        // TODO: It's not a reboot command
-
+    function _sendFinish() {
         if (device.isconnected()) {
             _msngr.send(APP_M_MSG_NAME.ESP_FINISH, null);
         } else {
@@ -192,7 +190,7 @@ class Application {
             // check the connection again after the timeout
             _timerSending && imp.cancelwakeup(_timerSending);
             _timerSending = imp.wakeup(APP_CHECK_IMP_CONNECT_TIMEOUT,
-                                       _sendReboot.bindenv(this));
+                                       _sendFinish.bindenv(this));
         }
     }
 

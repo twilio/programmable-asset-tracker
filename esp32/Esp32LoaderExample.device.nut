@@ -150,12 +150,9 @@ class Application {
         _espLoader.finish()
         .finally(function(resOrErr) {
             ::info(resOrErr);
-            // TODO: Is it needed here?
-            _isActive = false;
         }.bindenv(this));
 
-        // TODO: Why do we send this string in the ACK?
-        ack("Flash end reboot");
+        ack("Finish");
     }
 
     /**
@@ -178,7 +175,8 @@ class Application {
             return;
         }
 
-        // TODO: Should we reset some variables here? E.g., _writeLen
+        _writeAddr = APP_FLASH_START_ADDR;
+        _writeLen = 0;
 
         _md5Sum = data.md5;
         ::info(format("Save MD5: %s", data.md5));
@@ -263,10 +261,7 @@ class Application {
      * @return {boolean} - true - erase success.
      */
     function _erase(size) {
-        // TODO: Can be replaced with (size + APP_SECTOR_SIZE - 1) / APP_SECTOR_SIZE?
-        local sectorCount = (size % APP_SECTOR_SIZE) == 0 ?
-                            size / APP_SECTOR_SIZE :
-                            (size + APP_SECTOR_SIZE) / APP_SECTOR_SIZE;
+        local sectorCount = (size + APP_SECTOR_SIZE - 1) / APP_SECTOR_SIZE;
         if (APP_FLASH_START_ADDR + sectorCount * APP_SECTOR_SIZE > APP_FLASH_END_ADDR) {
             ::error(format("Erasing failed. Check erase size![0x%08X;0x%08X]. Sector size: 0x%08X",
                            APP_FLASH_START_ADDR,

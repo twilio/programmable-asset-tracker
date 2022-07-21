@@ -107,10 +107,7 @@ APP_ESP_FLASH_PARAM <- {"id"         : 0x00,
 server.log("Simple test ESP loader");
 // erase imp flash region
 local simple_test_len = APP_SIMPLE_TEST.len() / 2;
-local sectorCount = (simple_test_len % APP_IMP_FLASH_SECTOR_SIZE) == 0 ?
-                    simple_test_len / APP_IMP_FLASH_SECTOR_SIZE :
-                    (simple_test_len + APP_IMP_FLASH_SECTOR_SIZE) /
-                    APP_IMP_FLASH_SECTOR_SIZE;
+local sectorCount = (simple_test_len + APP_IMP_FLASH_SECTOR_SIZE - 1) / APP_IMP_FLASH_SECTOR_SIZE;
 local spiFlash = hardware.spiflash;
 spiFlash.enable();
 for (local addr = APP_IMP_FLASH_START_ADDR;

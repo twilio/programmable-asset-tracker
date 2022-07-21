@@ -103,6 +103,8 @@ const ESP32_LOADER_RESP_CMD_IND = 0x02;
 const ESP32_LOADER_RESP_REG_VAL_IND = 0x05;
 // status index (if data empty)
 const ESP32_LOADER_RESP_STATUS_IND = 0x09;
+// Response status success
+const ESP32_LOADER_RESP_STATUS_SUCCESS = 0x00;
 // MD5 index
 const ESP32_LOADER_RESP_MD5_IND = 0x09;
 // Direction index
@@ -126,7 +128,7 @@ const ESP32_ROM_LOADER_START_TIMEOUT = 0.5;
 
 // ESP32 Loader Driver class.
 // The class provides the ability to change the
-// firmware of the ESP32/ESP32C3 MCU.
+// firmware of the ESP32C3 MCU.
 class ESP32Loader {
     // Power switch pin
     _switchPin = null;
@@ -174,7 +176,7 @@ class ESP32Loader {
     }
 
     /**
-     * Start ROM loader (set strapping pins, configure UART).
+     * Start ROM loader (set strapping pins, configure UART, send SYNC and identify chip).
      *
      * @return {Promise} that:
      * - resolves if the operation succeeded
@@ -211,13 +213,57 @@ class ESP32Loader {
                               ESP32_LOADER_DEFAULT_STOP_BITS,
                               ESP32_LOADER_DEFAULT_FLAGS);
         } catch(err) {
-            // TODO: Disable everything in case of failure
+            _serial.disable();
+
+            foreach (pin in _bootPins) {
+                pin.disable();
+            }
+
             return Promise.reject("Start ROM loader failure: " + err);
         }
 
         _inLoader = true;
 
-        return Promise.resolve("Start ROM loader success");
+        // SYNC packet:
+        // C00008240000000000070712205555555555555555555555555
+        // 555555555555555555555555555555555555555C0
+        // The checksum field is ignored (can be zero) for all comands
+        // except for MEM_DATA, FLASH_DATA, and FLASH_DEFL_DATA.
+        local syncStr = "C0000824000000000007071220" +
+                        "5555555555555555555555555555555555555555555555555555555555555555C0";
+        // sync packet response validate
+        // wait for answer
+        // C0010804000712205500000000C0
+        // the first 4 sync packets usually come with no result
+        local dummyValidator = @(data, _) null;
+        local syncMsgValidator = @(data, _) _basicRespCheck(data, ESP32_LOADER_CMD.SYNC_FRAME) ?
+                                            null :
+                                            "Sync message failure";
+        // read chip identify register
+        local identChipStr = format("C0000A040000000000%08XC0",
+                                    swap4(ESP32_LOADER_CHIP_DETECT_MAGIC_REG_ADDR));
+        // identify chip
+        // wait for answer for ESP32 eg.
+        // C0010a0400831DF00000000000C0
+        local chipNameValidator = @(data, _) _basicRespCheck(data,
+                                                             ESP32_LOADER_CMD.READ_REG,
+                                                             ESP32_LOADER_ESP32C3_CHIP_DETECT_MAGIC_VALUE) ?
+                                              null :
+                                              "Chip name identify failure";
+
+        // Functions that return promises which will be executed serially
+        local promiseFuncs = [
+            // Wait for response sync message (5 attempts)
+            _communicate(syncStr, dummyValidator),
+            _communicate(syncStr, dummyValidator),
+            _communicate(syncStr, dummyValidator),
+            _communicate(syncStr, dummyValidator),
+            _communicate(syncStr, syncMsgValidator),
+            // identify chip
+            _communicate(identChipStr, chipNameValidator)
+        ];
+
+        return Promise.serial(promiseFuncs);
     }
 
     /**
@@ -251,23 +297,12 @@ class ESP32Loader {
         }.bindenv(this))
         .fail(function(err) {
             ::error("Loading failure: " + err, "@{CLASS_NAME}");
-
-            // TODO: Are we sure we should disable anything here?
-
-            _inLoader = false;
-            _serial.disable();
-
-            foreach (pin in _bootPins) {
-                pin.disable();
-            }
-
             throw err;
         }.bindenv(this));
     }
 
     /**
-     *  TODO: Update the comment?
-     *  Send flash end command with argument reboot ESP.
+     *  Disable ES32 module.
      *  NOTE: It's assumed that if the switch pin is disabled, the ES32 module is off.
      *
      *  @return {Promise} that:
@@ -308,32 +343,6 @@ class ESP32Loader {
         _fwImgLen = fwImgLen;
         _seqNumb = 0;
 
-        // SYNC packet:
-        // C00008240000000000070712205555555555555555555555555
-        // 555555555555555555555555555555555555555C0
-        // The checksum field is ignored (can be zero) for all comands
-        // except for MEM_DATA, FLASH_DATA, and FLASH_DEFL_DATA.
-        local syncStr = "C0000824000000000007071220" +
-                        "5555555555555555555555555555555555555555555555555555555555555555C0";
-        // sync packet response validate
-        // wait for answer
-        // C0010804000712205500000000C0
-        // the first 4 sync packets usually come with no result
-        local dummyValidator = @(data, _) null;
-        local syncMsgValidator = @(data, _) _basicRespCheck(data, ESP32_LOADER_CMD.SYNC_FRAME) ?
-                                            null :
-                                            "Sync message failure";
-        // read chip identify register
-        local identChipStr = format("C0000A040000000000%08XC0",
-                                    swap4(ESP32_LOADER_CHIP_DETECT_MAGIC_REG_ADDR));
-        // identify chip
-        // wait for answer for ESP32 eg.
-        // C0010a0400831DF00000000000C0
-        local chipNameValidator = @(data, _) _basicRespCheck(data,
-                                                             ESP32_LOADER_CMD.READ_REG,
-                                                             ESP32_LOADER_ESP32C3_CHIP_DETECT_MAGIC_VALUE) ?
-                                              null :
-                                              "Chip name identify failure";
         // attach spi flash
         local spiFlashAttachStr = "C0000D0800000000000000000000000000C0";
         // check attach flash
@@ -356,19 +365,7 @@ class ESP32Loader {
                                                    null :
                                                    "Flash parameter set failure";
         // FLASH_BEGIN - erasing flash (size to erase, number of data packets, data size in one packet, flash offset)
-        // TODO: Can we replace this with a simpler expression (see below a commented line)?
-        local numberOfDataPackets = fwImgLen % ESP32_LOADER_TRANSMIT_PACKET_LEN ?
-                                    ((fwImgLen + ESP32_LOADER_TRANSMIT_PACKET_LEN) / ESP32_LOADER_TRANSMIT_PACKET_LEN) :
-                                    (fwImgLen / ESP32_LOADER_TRANSMIT_PACKET_LEN);
-        // local numberOfDataPackets = (fwImgLen + ESP32_LOADER_TRANSMIT_PACKET_LEN - 1) / ESP32_LOADER_TRANSMIT_PACKET_LEN;
-@if ESP32
-        // https://docs.espressif.com/projects/esptool/en/latest/esp32/advanced-topics/serial-protocol.html
-        local flashBeginStr = format("C00002100000000000%08X%08X%08X%08XC0",
-                                     swap4(fwImgLen),
-                                     swap4(numberOfDataPackets),
-                                     swap4(ESP32_LOADER_TRANSMIT_PACKET_LEN),
-                                     swap4(espFlashAddr));
-@else
+        local numberOfDataPackets = (fwImgLen + ESP32_LOADER_TRANSMIT_PACKET_LEN - 1) / ESP32_LOADER_TRANSMIT_PACKET_LEN;
         // NOTE: THIS DOES NOT MATCH THE DOCUMENTATION!!!
         // 4 BYTES DIFFERENCE
         // https://docs.espressif.com/projects/esptool/en/latest/esp32c3/advanced-topics/serial-protocol.html
@@ -377,22 +374,12 @@ class ESP32Loader {
                                      swap4(numberOfDataPackets),
                                      swap4(ESP32_LOADER_TRANSMIT_PACKET_LEN),
                                      swap4(espFlashAddr));
-@endif
         // flash begin command validator
         local flashBeginValidator =  @(data, _) _basicRespCheck(data, ESP32_LOADER_CMD.FLASH_BEGIN) ?
                                                  null :
                                                  "ESP flash erase failure";
         // Functions that return promises which will be executed serially
         local promiseFuncs = [
-            // TODO: Move the syncStr and identChipStr checks into the start() method
-            // Wait for response sync message (5 attempts)
-            _communicate(syncStr, dummyValidator),
-            _communicate(syncStr, dummyValidator),
-            _communicate(syncStr, dummyValidator),
-            _communicate(syncStr, dummyValidator),
-            _communicate(syncStr, syncMsgValidator),
-            // identify chip
-            _communicate(identChipStr, chipNameValidator),
             // attach spi flash
             _communicate(spiFlashAttachStr, spiFlashAttachValidator),
             // set spi flash param
@@ -648,8 +635,6 @@ class ESP32Loader {
      * @return {bool} True if OK, otherwise - false.
      */
     function _basicRespCheck(data, checkCmd, chipId = null) {
-        // TODO: len() > 0 (was before the fix) doesn't guarantee that we will not go out of the blob's bounds.
-        //       Is it enough to check if len() > ESP32_LOADER_RESP_END_IND? Will this help?
         if (data.len() <= ESP32_LOADER_RESP_END_IND) {
             return false;
         }
@@ -664,8 +649,7 @@ class ESP32Loader {
         return data[ESP32_LOADER_RESP_START_IND] == ESP32_LOADER_SLIP_PACK_IDENT &&
                data[ESP32_LOADER_RESP_END_IND] == ESP32_LOADER_SLIP_PACK_IDENT &&
                data[ESP32_LOADER_RESP_INDIC_IND] == ESP32_LOADER_RESP_INDIC_VALUE &&
-               // TODO: Should we make a const for this 0 too?
-               data[ESP32_LOADER_RESP_STATUS_IND] == 0 &&
+               data[ESP32_LOADER_RESP_STATUS_IND] == ESP32_LOADER_RESP_STATUS_SUCCESS &&
                data[ESP32_LOADER_RESP_CMD_IND] == checkCmd &&
                chipIdMatch;
     }
