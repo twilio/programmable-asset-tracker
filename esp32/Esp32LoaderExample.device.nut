@@ -147,10 +147,8 @@ class Application {
             return;
         }
 
-        _espLoader.finish()
-        .finally(function(resOrErr) {
-            ::info(resOrErr);
-        }.bindenv(this));
+        _espLoader.finish();
+        ::info("ESP32 module has been switched off");
 
         ack("Finish");
     }
@@ -186,10 +184,12 @@ class Application {
         ::info(format("Firmware image offset: 0x%08X", _offset));
         _len = data.fileLen;
         ::info(format("Firmware image length: %d", _len));
+
         if (!_erase(data.fileLen)) {
             ::error(format("Erase failure."));
             return;
         }
+
         ::info("Start write to imp-device flash.");
         ack(data.fileName);
     }
@@ -209,6 +209,14 @@ class Application {
             return;
         }
 
+        // Check if we have already received all data. For the case, when the agent re-sends
+        // the last data chunk because it hasn't got an ACK for it
+        if (_writeLen >= _len) {
+            ::debug("Received more data than expected. Ignoring it");
+            // ACK this data so the agent will not re-send it again
+            return ack();
+        }
+
         hardware.spiflash.enable();
         _write(data);
         hardware.spiflash.disable();
@@ -224,20 +232,22 @@ class Application {
         _isActive = true;
 
         _espLoader.start()
-        .then(function(res) {
-            _espLoader.load(APP_FLASH_START_ADDR,
-                            _offset,
-                            _len,
-                            _md5Sum)
-            .finally(function(resOrErr) {
-                ::info(resOrErr);
-                _isActive = false;
-                _writeAddr = APP_FLASH_START_ADDR;
-                _writeLen = 0;
-            }.bindenv(this));
+        .then(function(_) {
+            ::info("ROM loader successfully started");
+
+            return _espLoader.load(APP_FLASH_START_ADDR,
+                                   _offset,
+                                   _len,
+                                   _md5Sum)
+            .then(function(_) {
+                ::info("Loading successfully finished");
+            }.bindenv(this), function(err) {
+                ::error("Loading failed: " + err);
+            }.bindenv(this))
+        }.bindenv(this), function(err) {
+            ::error("Couldn't start ROM loader: " + err);
         }.bindenv(this))
-        .fail(function(err) {
-            ::error(err);
+        .finally(function(_) {
             _isActive = false;
         }.bindenv(this));
     }

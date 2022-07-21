@@ -184,43 +184,33 @@ class ESP32Loader {
      */
     function start() {
         if (_inLoader) {
-            return Promise.resolve("Already in loader");
+            return Promise.resolve(null);
         }
 
-        try {
-            _switchPin.configure(DIGITAL_OUT, ESP32_LOADER_POWER.ON);
-            imp.sleep(ESP32_ROM_LOADER_START_TIMEOUT);
+        _switchPin.configure(DIGITAL_OUT, ESP32_LOADER_POWER.ON);
+        imp.sleep(ESP32_ROM_LOADER_START_TIMEOUT);
 
-            local strappingPin3 = "strappingPin3" in _bootPins ? _bootPins.strappingPin3 : null;
-            local strappingPin1 = "strappingPin1" in _bootPins ? _bootPins.strappingPin1 : null;
-            local strappingPin2 = "strappingPin2" in _bootPins ? _bootPins.strappingPin2 : null;
+        local strappingPin3 = "strappingPin3" in _bootPins ? _bootPins.strappingPin3 : null;
+        local strappingPin1 = "strappingPin1" in _bootPins ? _bootPins.strappingPin1 : null;
+        local strappingPin2 = "strappingPin2" in _bootPins ? _bootPins.strappingPin2 : null;
 
-            strappingPin3 && strappingPin3.configure(DIGITAL_OUT, 1);
-            strappingPin1 && strappingPin1.configure(DIGITAL_OUT, 1);
-            strappingPin2 && strappingPin2.configure(DIGITAL_OUT, 0);
-            imp.sleep(ESP32_ROM_LOADER_START_TIMEOUT);
+        strappingPin3 && strappingPin3.configure(DIGITAL_OUT, 1);
+        strappingPin1 && strappingPin1.configure(DIGITAL_OUT, 1);
+        strappingPin2 && strappingPin2.configure(DIGITAL_OUT, 0);
+        imp.sleep(ESP32_ROM_LOADER_START_TIMEOUT);
 
-            strappingPin1 && strappingPin1.write(0);
-            strappingPin2 && strappingPin2.write(1);
-            imp.sleep(ESP32_ROM_LOADER_START_TIMEOUT);
+        strappingPin1 && strappingPin1.write(0);
+        strappingPin2 && strappingPin2.write(1);
+        imp.sleep(ESP32_ROM_LOADER_START_TIMEOUT);
 
-            strappingPin1 && strappingPin1.write(1);
+        strappingPin1 && strappingPin1.write(1);
 
-            _serial.setrxfifosize(ESP32_LOADER_DEFAULT_RX_FIFO_SZ);
-            _serial.configure(ESP32_LOADER_DEFAULT_BAUDRATE,
-                              ESP32_LOADER_DEFAULT_WORD_SIZE,
-                              ESP32_LOADER_DEFAULT_PARITY,
-                              ESP32_LOADER_DEFAULT_STOP_BITS,
-                              ESP32_LOADER_DEFAULT_FLAGS);
-        } catch(err) {
-            _serial.disable();
-
-            foreach (pin in _bootPins) {
-                pin.disable();
-            }
-
-            return Promise.reject("Start ROM loader failure: " + err);
-        }
+        _serial.setrxfifosize(ESP32_LOADER_DEFAULT_RX_FIFO_SZ);
+        _serial.configure(ESP32_LOADER_DEFAULT_BAUDRATE,
+                          ESP32_LOADER_DEFAULT_WORD_SIZE,
+                          ESP32_LOADER_DEFAULT_PARITY,
+                          ESP32_LOADER_DEFAULT_STOP_BITS,
+                          ESP32_LOADER_DEFAULT_FLAGS);
 
         _inLoader = true;
 
@@ -263,7 +253,12 @@ class ESP32Loader {
             _communicate(identChipStr, chipNameValidator)
         ];
 
-        return Promise.serial(promiseFuncs);
+        return Promise.serial(promiseFuncs)
+        .fail(function(err) {
+            // Disable everything
+            finish();
+            throw err;
+        }.bindenv(this));
     }
 
     /**
@@ -285,19 +280,12 @@ class ESP32Loader {
 
         return _prepare(impFlashAddr, espFlashAddr, fwImgLen)
         .then(function(_) {
-            ::info("Prepare success", "@{CLASS_NAME}");
-            // send data packets
-            return _sendDataPackets()
-            .then(function(_) {
-                return _checkHash(espFlashAddr, fwImgLen, fwMD5);
-            }.bindenv(this))
-            .fail(function(err) {
-                throw err;
-            }.bindenv(this));
+            ::info("Preparing is done", "@{CLASS_NAME}");
+            return _sendDataPackets();
         }.bindenv(this))
-        .fail(function(err) {
-            ::error("Loading failure: " + err, "@{CLASS_NAME}");
-            throw err;
+        .then(function(_) {
+            ::info("Data packets were sent successfully", "@{CLASS_NAME}");
+            return _checkHash(espFlashAddr, fwImgLen, fwMD5);
         }.bindenv(this));
     }
 
@@ -318,7 +306,7 @@ class ESP32Loader {
             pin.disable();
         }
 
-        return Promise.resolve("Chip power off success");
+        return Promise.resolve(null);
     }
 
     // ---------------- PRIVATE METHODS ---------------- //
@@ -474,7 +462,8 @@ class ESP32Loader {
      */
     function _checkHash(espFlashAddr, fwImgLen, fwMD5) {
         if (fwMD5 == null) {
-            return Promise.resolve("Verification MD5 checksum not transmitted in ESP32 loader from cloud");
+            ::debug("No MD5 checksum passed", "@{CLASS_NAME}");
+            return Promise.resolve(null);
         }
 
         ::info("Verification MD5.", "@{CLASS_NAME}");
@@ -489,10 +478,7 @@ class ESP32Loader {
                                            null :
                                            "MD5 check failure";
 
-        return _communicate(hashVerifyStr, hashValidator, null, false)
-        .then(function(_) {
-            return "Load firmware success";
-        }.bindenv(this));
+        return _communicate(hashVerifyStr, hashValidator, null, false);
     }
 
     /**
