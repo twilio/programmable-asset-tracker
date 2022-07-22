@@ -123,7 +123,7 @@ The files to flash and the corresponding offsets in the ESP32C3 flash memory for
 
 **For the next reflashings:** only files modified in the new versions need to be reflashed (no need to reflash unmodified files if their offsets are not changed).
 
-**Attention!** The example may not accept files with the length more than 256 KBytes:
+**Attention!** The example may not accept files with the length more than 256 KBytes (actually, it's usually about 650KB and is limited by agent's impOS and free RAM space):
 - In this case the file should be split into parts before uploading.
 - Every part should be uploaded as an individual file.
 - Note: a correspondingly adjusted ESP Flash Offset should be specified for every part.
@@ -132,14 +132,14 @@ Note, the provided [script](./esp32_send_fw.sh) does the needed splitting (as we
 
 #### PUT /esp32-finish ####
 
-Finishes the reflashing procedure, restarts esp32 chip, new firmware is run after that.
+It powers off ESP32 chip and all pins/ports used to interact with it.
 
 No parameters.
 
 Log output example:
 ```
 2022-06-29T21:14:13.359 +00:00 	[Agent] 	[INFO] PUT /esp32-finish request from cloud
-2022-06-29T21:14:16.506 +00:00 	[Agent] 	[INFO] Chip power off success
+2022-06-29T21:14:16.506 +00:00 	[Agent] 	[INFO] ESP32 module has been switched off
 ```
 
 ## Flash Firmware Using External Tool ##
@@ -255,7 +255,7 @@ If MD5 is specified:
 
 #### Finish ####
 
-Method `finish()` completes the loading procedure, resets the ESP32 chip and transfers control to the loaded firmware.
+Finish loading procedure - method `finish()`. It powers off ESP32 chip and all pins/ports used to interact with it.
 
 No parameters.
 

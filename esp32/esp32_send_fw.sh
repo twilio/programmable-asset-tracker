@@ -32,14 +32,14 @@ if [[ "$agentEndPoint" == "load" ]]; then
             echo $fileName-$file;
             md5Part=$(md5sum $file | awk '{ print $1 }');
             fileLenPart=$(ls -la $file | awk '{ print $5 }');
-            curl -X PUT -T ${file} ${agentUrl}/esp32-${agentEndPoint}?fileName=${fileName}'&'fileLen=${fileLenPart}'&'flashOffset=${flashOffs}'&'deflate=false'&'md5=${md5Part};
+            curl -X PUT -T ${file} ${agentUrl}/esp32-${agentEndPoint}?fileName=${fileName}'&'fileLen=${fileLenPart}'&'flashOffset=${flashOffs}'&'md5=${md5Part};
             flashOffs=$(($flashOffs + $splitSize));
             sleep 300;
         done
         cd ../
         rm -rf $splitDirName
     else
-        curl -X PUT -T ${fileName} ${agentUrl}/esp32-${agentEndPoint}?fileName=${fileName}'&'fileLen=${fileLen}'&'flashOffset=${flashOffs}'&'deflate=false'&'md5=${md5val}
+        curl -X PUT -T ${fileName} ${agentUrl}/esp32-${agentEndPoint}?fileName=${fileName}'&'fileLen=${fileLen}'&'flashOffset=${flashOffs}'&'md5=${md5val}
     fi
 fi
 

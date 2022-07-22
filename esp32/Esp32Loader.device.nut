@@ -134,8 +134,6 @@ class ESP32Loader {
     _switchPin = null;
     // Hardware pins table for UART bootloader start
     _bootPins = null;
-    // Current position in firmware image
-    _fwCurPos = null;
     // UART object
     _serial = null;
     // Flash parameters
@@ -262,7 +260,8 @@ class ESP32Loader {
     }
 
     /**
-     * Load firmware to ESP flash.
+     * Load firmware to ESP flash. 
+     * The method must be called after the previous one is completed.
      *
      * @param {integer} impFlashAddr - Firmware address in imp flash.
      * @param {integer} espFlashAddr - Firmware address in ESP flash.

@@ -106,8 +106,8 @@ APP_ESP_FLASH_PARAM <- {"id"         : 0x00,
 
 server.log("Simple test ESP loader");
 // erase imp flash region
-local simple_test_len = APP_SIMPLE_TEST.len() / 2;
-local sectorCount = (simple_test_len + APP_IMP_FLASH_SECTOR_SIZE - 1) / APP_IMP_FLASH_SECTOR_SIZE;
+local simpleTestLen = APP_SIMPLE_TEST.len() / 2;
+local sectorCount = (simpleTestLen + APP_IMP_FLASH_SECTOR_SIZE - 1) / APP_IMP_FLASH_SECTOR_SIZE;
 local spiFlash = hardware.spiflash;
 spiFlash.enable();
 for (local addr = APP_IMP_FLASH_START_ADDR;
@@ -149,26 +149,36 @@ espLoader <- ESP32Loader({
                          APP_ESP_UART,
                          APP_ESP_FLASH_PARAM,
                          APP_SWITCH_PIN);
-espLoader.start().then(function(res) {
-    // load firmware to ESP flash
-    espLoader.load(APP_IMP_FLASH_START_ADDR,
-                   APP_SIMPLE_TEST_ESP_FLASH_ADDR,
-                   simple_test_len,
-                   APP_SIMPLE_TEST_MD5)
-                   .finally(function(resOrErr) {
-                        server.log(resOrErr);
-                        espLoader.finish().then(function(res) {
-                            APP_SWITCH_PIN.configure(DIGITAL_OUT, 0);
-                            imp.sleep(APP_SWITCH_START_DELAY);
-                            APP_SWITCH_PIN.configure(DIGITAL_OUT, 1);
-                            APP_ESP_UART.disable();
-                            APP_ESP_UART.setrxfifosize(APP_RX_FIFO_SIZE);
-                            APP_ESP_UART.configure(APP_DEFAULT_BAUDRATE,
-                                                   APP_DEFAULT_BIT_IN_CHAR,
-                                                   PARITY_NONE,
-                                                   APP_DAFAULT_STOP_BITS,
-                                                   NO_CTSRTS,
-                                                   loop);
-                            }.bindenv(this));
-                    }.bindenv(this));
+
+espLoader.start()
+.then(function(_) {
+    server.log("ROM loader successfully started");
+
+    return espLoader.load(APP_IMP_FLASH_START_ADDR,
+                          APP_SIMPLE_TEST_ESP_FLASH_ADDR,
+                          simpleTestLen,
+                          APP_SIMPLE_TEST_MD5)
+    .then(function(_) {
+        server.log("Loading successfully finished");
+        return espLoader.finish();
+    }.bindenv(this), function(err) {
+        server.error("Loading failed: " + err);
+        return espLoader.finish();
+    }.bindenv(this));
+}.bindenv(this), function(err) {
+    server.error("Couldn't start ROM loader: " + err);
+}.bindenv(this))
+.finally(function(_) {
+    server.log("Rebooting ESP and activating UART for reading..");
+    APP_SWITCH_PIN.configure(DIGITAL_OUT, 0);
+    imp.sleep(APP_SWITCH_START_DELAY);
+    APP_SWITCH_PIN.write(1);
+    APP_ESP_UART.disable();
+    APP_ESP_UART.setrxfifosize(APP_RX_FIFO_SIZE);
+    APP_ESP_UART.configure(APP_DEFAULT_BAUDRATE,
+                           APP_DEFAULT_BIT_IN_CHAR,
+                           PARITY_NONE,
+                           APP_DAFAULT_STOP_BITS,
+                           NO_CTSRTS,
+                           loop);
 }.bindenv(this));
