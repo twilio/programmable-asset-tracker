@@ -174,7 +174,8 @@ class ESP32Loader {
     }
 
     /**
-     * Start ROM loader (set strapping pins, configure UART, send SYNC and identify chip).
+     * Initiate the loading procedure.
+     * Starts ROM loader (set strapping pins, configure UART, send SYNC and identify chip).
      *
      * @return {Promise} that:
      * - resolves if the operation succeeded
@@ -260,8 +261,8 @@ class ESP32Loader {
     }
 
     /**
-     * Load firmware to ESP flash. 
-     * The method must be called after the previous one is completed.
+     * Load firmware to ESP. Writes firmware file to the ESP chip SPI flash.
+     * The method must be called only after the previous call is completed.
      *
      * @param {integer} impFlashAddr - Firmware address in imp flash.
      * @param {integer} espFlashAddr - Firmware address in ESP flash.
@@ -289,7 +290,7 @@ class ESP32Loader {
     }
 
     /**
-     *  Disable ES32 module.
+     *  Finish loading procedure. Powers off ESP32 chip and all pins/ports used to interact with it.
      *  NOTE: It's assumed that if the switch pin is disabled, the ES32 module is off.
      *
      *  @return {Promise} that:
@@ -399,7 +400,7 @@ class ESP32Loader {
      *  - rejects if the operation failed
      */
     function _sendDataPacket() {
-        ::info("Send packet. Sequnce number: " + _seqNumb, "@{CLASS_NAME}");
+        ::info("Send packet. Sequence number: " + _seqNumb, "@{CLASS_NAME}");
         // data packet
         local flashData = utilities.hexStringToBlob(format("C00003%04X00000000%08X%08X0000000000000000",
                                                            swap2(ESP32_LOADER_TRANSMIT_PACKET_LEN +

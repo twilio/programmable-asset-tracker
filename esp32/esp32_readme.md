@@ -132,7 +132,7 @@ Note, the provided [script](./esp32_send_fw.sh) does the needed splitting (as we
 
 #### PUT /esp32-finish ####
 
-It powers off ESP32 chip and all pins/ports used to interact with it.
+Finishes the reflashing procedure. It powers off ESP32 chip and all pins/ports used to interact with it.
 
 No parameters.
 
@@ -173,7 +173,7 @@ Interacts with the hardware ROM loader of the ESP32 chip over [Serial Protocol](
 Firmware loading procedure contains three steps:
 1) Start loading procedure - method start().
 2) Load firmware file/files - method load(). Firmware file should be located on the Imp-Device SPI flash. Several files can be loaded, but strictly one after another (not in parallel).
-3) Finish loading procedure - method finish(). It reboots ESP32 chip and run the new loaded firmware.
+3) Finish loading procedure - method finish().
 
 Every new loading procedure should be initiated by the start() method.
 
@@ -255,7 +255,7 @@ If MD5 is specified:
 
 #### Finish ####
 
-Finish loading procedure - method `finish()`. It powers off ESP32 chip and all pins/ports used to interact with it.
+Method `finish()` completes the loading procedure. It powers off ESP32 chip and all pins/ports used to interact with it.
 
 No parameters.
 
