@@ -2,7 +2,7 @@
 
 Configuring a tracker from a cloud.
 
-**Version of the configuration format/scheme: 1.0**
+**Version of the configuration format/scheme: 1.1**
 
 ## Introduction ##
 
@@ -210,14 +210,20 @@ The "configuration" block of the configuration reported by the tracker to a clou
         "threshold": <number>     // Battery low alert threshold, in %
       },
 
-      "tamperingDetected": {    // Not supported
-        "enabled": true/false     // true - alert is enabled
+      "tamperingDetected": {    // Tampering is detected (light is detected by photoresistor)
+        "enabled": true/false,    // true - alert is enabled
+        "pollingPeriod": <number> // Photoresistor polling period, in seconds
       }
     },
 
     "debug": {              // Debug settings
       "logLevel": "INFO"      // Logging level on Imp-Device ("ERROR", "INFO", "DEBUG")
     }
+  },
+
+  "simUpdate": {          // SIM OTA update
+    "enabled": true/false,  // true - force SIM OTA update every time Imp-Device is connected
+    "duration": <number>    // Duration of connection retention (when SIM OTA update is forced), in seconds
   },
 
   "agentConfiguration": { // Imp-Agent block of the tracker configuration.
@@ -241,7 +247,7 @@ Example of a full reported configuration:
     "description": {
         "trackerId": "600a0002d7026715",
         "cfgTimestamp": 1651659656,
-        "cfgSchemeVersion": "1.0"
+        "cfgSchemeVersion": "1.1"
     },
     "configuration": {
         "updateId": "61",
@@ -295,7 +301,8 @@ Example of a full reported configuration:
                 "threshold": 3
             },
             "tamperingDetected": {
-                "enabled": false
+                "enabled": true,
+                "pollingPeriod": 1
             },
             "temperatureHigh": {
                 "enabled": true,
@@ -311,6 +318,10 @@ Example of a full reported configuration:
         "debug": {
             "logLevel": "DEBUG"
         }
+    },
+    "simUpdate": {
+        "enabled": false,
+        "duration": 60
     },
     "agentConfiguration": {
         "debug": {
@@ -439,6 +450,14 @@ If no alerts occur, the data is saved in SPI flash and sent to a cloud periodica
 
 If an alert occurs, the new and previously unsent data are sent immediately.
 
+### SIM OTA Update ###
+
+Imp-Device does not detect neither when SIM update is needed, nor when SIM update is completed. SIM update procedure should be controlled using the configuration settings in the "simUpdate" section:
+- To start SIM update procedure: "enabled" should be set to true.
+- When SIM is updated: 'enabled" should be set back to false.
+
+SIM update should not be left enabled when it is not needed due to the increased power consumption.
+
 ### Configuration Deployment Algorithm ###
 
 After every restart of the tracker application (Imp-Device part):
@@ -453,3 +472,4 @@ After every restart of the tracker application (Imp-Device part):
 After a configuration update, which can come in runtime from a cloud, is successfully applied, the full new configuration is saved in SPI flash and is reported as the actual configuration.
 
 The tracking is not stopped during the configuration update is being applied. Only components which are affected by the update may be temporary stopped / restarted.
+
