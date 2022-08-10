@@ -53,13 +53,13 @@ All fields are mandatory, if not specified otherwise.
      "timestamp": <number>,     // Timestamp when this information was obtained (Unix time - secs since the Epoch)
      "mode": <string>,          // Service mode: "NOSERVICE", "GSM", "eMTC", "NBIoT"
      "mcc": <string>,           // 3-chars Mobile Country Code
-     "mnc": <string>,           // 3-chars Mobile Network Code
+     "mnc": <string>,           // 2-chars Mobile Network Code
      "signalStrength": <number> // Received Signal Strength Indicator
    },
 
    "gnssInfo": {    // GNSS information. Optional. Can be missed or empty if no new information available.
      "timestamp": <number>,     // Timestamp when this information was obtained (Unix time - secs since the Epoch)
-     "satellitesUsed": <number> // Number of satellites used to determine GNSS location
+     "satellitesUsed": <number> // Number of used satellites
    }
 }
 ```
@@ -91,12 +91,12 @@ Example:
    "cellInfo": {
      "timestamp": 1617900010,
      "mode": "eMTC",
-     "mcc": "310",
-     "mnc": "410",
+     "mcc": "244",
+     "mnc": "05",
      "signalStrength": -41
    },
    "gnssInfo": {
-     "timestamp": 1617900070
+     "timestamp": 1617900070,
      "satellitesUsed": 5
    }
 }
