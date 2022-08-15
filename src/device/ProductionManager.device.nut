@@ -3,70 +3,101 @@
 // ProductionManager's user config field
 const PMGR_USER_CONFIG_FIELD = "ProductionManager";
 // Period (sec) of checking for new deployments
-// TODO: Make a global const? Or use a builer-variable? Think of many other variables
-const PMGR_CHECK_UPDATES_PERIOD = 10;
-// Maximum length of stats arrays
-const PMGR_STATS_MAX_LEN = 10;
+const PMGR_CHECK_UPDATES_PERIOD = @{PMGR_CHECK_UPDATES_PERIOD || 3600};
 // Maximum length of error saved when error flag is set
 const PMGR_MAX_ERROR_LEN = 512;
 // Connection timeout (sec)
 const PMGR_CONNECT_TIMEOUT = 240;
 // Server.flush timeout (sec)
 const PMGR_FLUSH_TIMEOUT = 5;
+// Send timeout for server.setsendtimeoutpolicy() (sec)
+const PMGR_SEND_TIMEOUT = 3;
 
 // Implements useful in production features:
 // - Emergency mode (If an unhandled error occurred, device goes to sleep and periodically connects to the server waiting for a SW update)
-// - Shipping mode (When released from the factory, the device sleeps until it is woken up by the end-user) (NOT IMPLEMENTED)
+// - Shipping mode (When released from the factory, the device sleeps until it is woken up by the end-user)
 class ProductionManager {
     _debugOn = false;
-    _startAppFunc = null;
+    _startApp = null;
+    _shippingMode = false;
     _isNewDeployment = false;
 
     /**
+     * TODO: Update comment
      * Constructor for Production Manager
      *
      * @param {function} startAppFunc - The function to be called to start the main application
+     * @param {boolean} shippingMode - Enable shipping mode
      */
-    constructor(startAppFunc) {
-        _startAppFunc = startAppFunc;
+    constructor(startAppFunc, shippingMode = false) {
+        _startApp = @() imp.wakeup(0, startAppFunc);
+        _shippingMode = shippingMode;
     }
 
     /**
-     * Start the manager. It will check the conditions and either start the main application or go to sleep
+     * Start the manager. It will check the conditions and either start the main application or go to sleep.
+     * This method must be called first
      */
     function start() {
+        // Maximum sleep time (sec) used for shipping mode
+        const PMGR_MAX_SLEEP_TIME = 2419198;
+
         // TODO: Erase the flash memory on first start (when awake from shipping mode)? Or in factory code?
 
         // NOTE: The app may override this handler but it must call enterEmergencyMode in case of a runtime error
         imp.onunhandledexception(_onUnhandledException.bindenv(this));
+        server.setsendtimeoutpolicy(RETURN_ON_ERROR, WAIT_TIL_SENT, PMGR_SEND_TIMEOUT);
 
-        local userConf = _readUserConf();
-        local data = _extractDataFromUserConf(userConf);
+        local data = _getData();
 
-        if (data && data.lastError != null) {
-            // TODO: Improve logging!
-            // TODO: Should the send timeout policy be set before we print anything?
-            _printLastError(data.lastError);
-        }
-
-        if (data && data.errorFlag && data.deploymentID == __EI.DEPLOYMENT_ID) {
+        if (data.errorFlag && data.deploymentID == __EI.DEPLOYMENT_ID) {
             if (server.isconnected()) {
                 // No new deployment was detected
-                _sleep();
+                _printLastErrorAndSleep(data.lastError);
             } else {
                 // Connect to check for a new deployment
-                server.setsendtimeoutpolicy(RETURN_ON_ERROR, WAIT_TIL_SENT, 30);
-                server.connect(_sleep.bindenv(this), PMGR_CONNECT_TIMEOUT);
+                server.connect(_printLastErrorAndSleep.bindenv(this), PMGR_CONNECT_TIMEOUT);
             }
+
             return;
-        } else if (!data || data.deploymentID != __EI.DEPLOYMENT_ID) {
+        } else if (data.deploymentID != __EI.DEPLOYMENT_ID) {
+            // TODO: Is it OK? (the note below)
+            // NOTE: The first code deploy will not be recognized as a new deploy!
             _info("New deployment detected!");
             _isNewDeployment = true;
-            userConf[PMGR_USER_CONFIG_FIELD] <- _initialUserConfData();
-            _storeUserConf(userConf);
+            data = _initialData(!_shippingMode || data.shipped);
+            _storeData(data);
         }
 
-        _startAppFunc();
+        if (_shippingMode && !data.shipped) {
+            _info("Shipping mode is ON and the device has not been shipped yet");
+            _sleep(PMGR_MAX_SLEEP_TIME);
+        } else {
+            _startApp();
+        }
+    }
+
+    // TODO: Comment
+    function shipped() {
+        local data = _getData();
+
+        if (data.shipped) {
+            return;
+        }
+
+        _info("The device has just been shipped! Starting the main application..");
+
+        // Set "shipped" flag
+        data.shipped = true;
+        _storeData(data);
+
+        // If the error flag is active, we should still go to sleep. Otherwise, let's run the app
+        if (!data.errorFlag) {
+            // Cancel sleep
+            imp.onidle(null);
+            // Start the main application
+            _startApp();
+        }
     }
 
     /**
@@ -77,7 +108,7 @@ class ProductionManager {
     function enterEmergencyMode(error = null) {
         _setErrorFlag(error);
         server.flush(PMGR_FLUSH_TIMEOUT);
-        // TODO: Sleep immediately?
+        // TODO: Sleep immediately? But what if called from the global exception handler?
         server.restart();
     }
 
@@ -96,23 +127,30 @@ class ProductionManager {
     }
 
     /**
-     * Print the last saved error
+     * Print the last saved error (if any) and go to sleep
      *
-     * @param {table} lastError - Last saved error with timestamp and description
+     * @param {table | null} lastError - Last saved error with timestamp and description
      */
-    function _printLastError(lastError) {
-        if ("ts" in lastError && "desc" in lastError) {
+    function _printLastErrorAndSleep(lastError) {
+        // TODO: Improve logging!
+        if (lastError && "ts" in lastError && "desc" in lastError) {
             _info(format("Last error (at %d): \"%s\"", lastError.ts, lastError.desc));
         }
+
+        // Sleep until the next update (code deploy) check
+        _sleep(PMGR_CHECK_UPDATES_PERIOD);
     }
 
     /**
      * Go to sleep once Squirrel VM is idle
+     *
+     * @param {float} sleepTime - The deep sleep duration in seconds
      */
-    function _sleep(unusedParam = null) {
+    function _sleep(sleepTime) {
         imp.onidle(function() {
-            server.sleepfor(PMGR_CHECK_UPDATES_PERIOD);
-        });
+            _info("Going to sleep for " + sleepTime + " seconds");
+            server.sleepfor(sleepTime);
+        }.bindenv(this));
     }
 
     /**
@@ -126,16 +164,66 @@ class ProductionManager {
     }
 
     /**
+     * TODO: Update comment
      * Create and return the initial user configuration data
      *
      * @return {table} The initial user configuration data
      */
-    function _initialUserConfData() {
+    function _initialData(shipped) {
         return {
             "errorFlag": false,
             "lastError": null,
+            "shipped": shipped,
             "deploymentID": __EI.DEPLOYMENT_ID
         };
+    }
+
+    // TODO: Comment
+    function _getData() {
+        try {
+            local userConf = _readUserConf();
+
+            if (userConf == null) {
+                return _initialData(false);
+            }
+
+            local fields = ["errorFlag", "lastError", "shipped", "deploymentID"];
+            local data = userConf[PMGR_USER_CONFIG_FIELD];
+
+            foreach (field in fields) {
+                // This will throw an exception if no such field found
+                data[field];
+            }
+
+            return data;
+        } catch (err) {
+            _error("Error during parsing user configuration: " + err);
+        }
+
+        return _initialData(true);
+    }
+
+    // TODO: Comment
+    function _storeData(data) {
+        local userConf = {};
+
+        try {
+            userConf = _readUserConf() || {};
+        } catch (err) {
+            _error("Error during parsing user configuration: " + err);
+            _debug("Creating user configuration from scratch..");
+        }
+
+        userConf[PMGR_USER_CONFIG_FIELD] <- data;
+
+        local dataStr = JSONEncoder.encode(userConf);
+        _debug("Storing new user configuration: " + dataStr);
+
+        try {
+            imp.setuserconfiguration(dataStr);
+        } catch (err) {
+            _error(err);
+        }
     }
 
     /**
@@ -144,15 +232,7 @@ class ProductionManager {
      * @param {string} error - The error description
      */
     function _setErrorFlag(error) {
-        local userConf = _readUserConf();
-        // If not null, this is just a pointer to the field of userConf. Hence modification of this object updates the userConf object
-        local data = _extractDataFromUserConf(userConf);
-
-        if (data == null) {
-            // Initialize ProductionManager's user config data
-            data = _initialUserConfData();
-            userConf[PMGR_USER_CONFIG_FIELD] <- data;
-        }
+        local data = _getData();
 
         // By this update we update the userConf object (see above)
         data.errorFlag = true;
@@ -168,76 +248,35 @@ class ProductionManager {
             };
         }
 
-        _storeUserConf(userConf);
+        _storeData(data);
     }
 
     /**
-     * Store the user configuration
-     *
-     * @param {table} userConf - The table to be converted to JSON and stored
-     */
-    function _storeUserConf(userConf) {
-        local dataStr = JSONEncoder.encode(userConf);
-        _debug("Storing new user configuration: " + dataStr);
-
-        try {
-            imp.setuserconfiguration(dataStr);
-        } catch (err) {
-            _error(err);
-        }
-    }
-
-    /**
+     * TODO: Update comment
      * Read the user configuration
      *
-     * @return {table} The user configuration converted from JSON to a Squirrel table
+     * @return {table | null} The user configuration converted from JSON to a Squirrel table
+     *      or null if there was no user configuration saved
      */
     function _readUserConf() {
         local config = imp.getuserconfiguration();
 
         if (config == null) {
             _debug("User configuration is empty");
-            return {};
+            return null;
         }
 
         config = config.tostring();
         // TODO: What if a non-readable string was written? It will be printed "binary: ..."
         _debug("User configuration: " + config);
 
-        try {
-            config = JSONParser.parse(config);
+        config = JSONParser.parse(config);
 
-            if (typeof config != "table") {
-                throw "table expected";
-            }
-        } catch (e) {
-            _error("Error during parsing user configuration: " + e);
-            return {};
+        if (typeof config != "table") {
+            throw "table expected";
         }
 
         return config;
-    }
-
-    /**
-     * Extract and check the data belonging to Production Manager from the user configuration
-     *
-     * @param {table} userConf - The user configuration
-     *
-     * @return {table|null} The data extracted or null
-     */
-    function _extractDataFromUserConf(userConf) {
-        try {
-            local data = userConf[PMGR_USER_CONFIG_FIELD];
-
-            if ("errorFlag" in data &&
-                "lastError" in data &&
-                "deploymentID" in data) {
-                return data;
-            }
-        } catch (err) {
-        }
-
-        return null;
     }
 
     /**

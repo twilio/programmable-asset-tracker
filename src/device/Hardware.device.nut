@@ -53,26 +53,79 @@ class PowerSafeI2C {
     }
 }
 
-// I2C bus used by:
-// - Battery fuel gauge
-// - Temperature-humidity sensor
-// - Accelerometer
+// TODO: Comment
+class FlipFlop {
+    _clkPin = null;
+    _switchPin = null;
+
+    // TODO: Comment
+    constructor(clkPin, switchPin) {
+        _clkPin = clkPin;
+        _switchPin = switchPin;
+    }
+
+    // TODO: Comment
+    function _get(key) {
+        if (!(key in _switchPin)) {
+            throw null;
+        }
+
+        // We want to clock the flip-flop after every change on the pin. This will trigger clocking even when the pin is being read.
+        // But this shouldn't affect anything. Moreover, it's assumed that DIGITAL_OUT pins are read rarely.
+        // To "attach" clocking to every pin's function, we return a wrapper-function that calls the requested original pin's
+        // function and then clocks the flip-flop. This will make it transparent for the other components/modules.
+        // All members of hardware.pin objects are functions. Hence we can always return a function here
+        return function(...) {
+            // Let's call the requested function with the arguments passed
+            vargv.insert(0, _switchPin);
+            // Also, we save the value returned by the original pin's function
+            local res = _switchPin[key].acall(vargv);
+
+            // Then we clock the flip-flop assuming that the default pin value is LOW (externally pulled-down)
+            _clkPin.configure(DIGITAL_OUT, 1);
+            _clkPin.disable();
+
+            // Return the value returned by the original pin's function
+            return res;
+        };
+    }
+}
+
+// Accelerometer's I2C bus
 HW_SHARED_I2C <- PowerSafeI2C(hardware.i2cLM);
 
 // Accelerometer's interrupt pin
 HW_ACCEL_INT_PIN <- hardware.pinW;
 
 // UART port used for the u-blox module
-HW_UBLOX_UART <- hardware.uartPQRS;
+HW_UBLOX_UART <- hardware.uartXEFGH;
+
+// U-blox module power enable pin
+HW_UBLOX_POWER_EN_PIN <- hardware.pinG;
+
+// U-blox module backup power enable pin (flip-flop)
+HW_UBLOX_BACKUP_PIN <- FlipFlop(hardware.pinYD, hardware.pinYM);
 
 // UART port used for logging (if enabled)
-HW_LOGGING_UART <- hardware.uartYABCD;
+HW_LOGGING_UART <- hardware.uartYJKLM;
 
 // ESP32 UART port
-HW_ESP_UART <- hardware.uartXEFGH;
+HW_ESP_UART <- hardware.uartABCD;
 
-// ESP32 power enable pin
-HW_ESP_POWER_EN_PIN <- hardware.pinXU;
+// ESP32 power enable pin (flip-flop)
+HW_ESP_POWER_EN_PIN <- FlipFlop(hardware.pinYD, hardware.pinS);
+
+// Light Dependent Photoresistor pin
+HW_LDR_PIN <- hardware.pinV;
+
+// Light Dependent Photoresistor power enable pin
+HW_LDR_POWER_EN_PIN <- FlipFlop(hardware.pinYD, hardware.pinXM);
+
+// Battery level measurement pin
+HW_BAT_LEVEL_PIN <- hardware.pinXD;
+
+// Battery level measurement power enable pin
+HW_BAT_LEVEL_POWER_EN_PIN <- hardware.pinYG;
 
 // LED indication: RED pin
 HW_LED_RED_PIN <- hardware.pinR;

@@ -89,6 +89,9 @@ const LIS2DH12_HPF_AOI_INT1 = 0x01; // High-pass filter enabled for AOI function
 const LIS2DH12_FDS = 0x08; // Filtered data selection. Data from internal filter sent to output register and FIFO.
 const LIS2DH12_FIFO_SRC_REG  = 0x2F; // FIFO state register.
 const LIS2DH12_FIFO_WTM = 0x80; // Set high when FIFO content exceeds watermark level.
+const LIS2DH12_OUT_T_H = 0x0D; // Measured temperature (High byte)
+const LIS2DH12_TEMP_EN = 0xC0; // Temperature enable bits (11 - Enable)
+const LIS2DH12_BDU = 0x80; // Block Data Update bit (0 - continuous update; default)
 
 // Vector of velocity and movement class.
 // Vectors operation in 3D.
@@ -356,6 +359,29 @@ class AccelerometerDriver {
         }
     }
 
+    // TODO: Comment
+    function readTemperature() {
+        // To convert the raw data to celsius
+        const ACCEL_TEMP_TO_CELSIUS = 25.0;
+        // Calibration offset for temperature.
+        // By default, accelerometer can only provide temperature variaton, not the precise value.
+        // NOTE: This value may be inaccurate for some devices. It was chosen based only on two devices
+        const ACCEL_TEMP_CALIBRATION_OFFSET = -8.0;
+        // Delay to allow the sensor to make a measurement, in seconds
+        const ACCEL_TEMP_READING_DELAY = 0.01;
+
+        _switchTempSensor(true);
+
+        imp.sleep(ACCEL_TEMP_READING_DELAY);
+
+        local high = _accel._getReg(LIS2DH12_OUT_T_H);
+        local res = (high << 24) >> 24;
+
+        _switchTempSensor(false);
+
+        return res + ACCEL_TEMP_TO_CELSIUS + ACCEL_TEMP_CALIBRATION_OFFSET;
+    }
+
     /**
      * Enables or disables a shock detection.
      * If enabled, the specified callback is called every time the shock condition is detected.
@@ -513,8 +539,8 @@ class AccelerometerDriver {
             _enMtnDetect = true;
             _motionState = ACCEL_MOTION_STATE.WAITING;
             _accel.configureFifoInterrupts(false);
-            _accel.configureInertialInterrupt(true, 
-                                              _movementCurThr, 
+            _accel.configureInertialInterrupt(true,
+                                              _movementCurThr,
                                               (_movementAccDur*ACCEL_DEFAULT_DATA_RATE).tointeger());
             ::info("Motion detection enabled", "@{CLASS_NAME}");
         } else {
@@ -540,6 +566,22 @@ class AccelerometerDriver {
      */
     function _isFunction(f) {
         return f && typeof f == "function";
+    }
+
+    // TODO: Comment
+    function _switchTempSensor(enable) {
+        // LIS3DH_TEMP_CFG_REG enables/disables temperature sensor
+        _accel._setReg(LIS3DH_TEMP_CFG_REG, enable ? LIS2DH12_TEMP_EN : 0);
+
+        local valReg4 = _accel._getReg(LIS3DH_CTRL_REG4);
+
+        if (enable) {
+            valReg4 = valReg4 | LIS2DH12_BDU;
+        } else {
+            valReg4 = valReg4 & ~LIS2DH12_BDU;
+        }
+
+        _accel._setReg(LIS3DH_CTRL_REG4, valReg4);
     }
 
     /**
@@ -669,7 +711,7 @@ class AccelerometerDriver {
         //   | /|  | \___
         //   |/ |  |   | \
         //   |---------------------------------------- t
-        //   |   
+        //   |
         //   |   dt
         _velCur = _velCur*(ACCEL_G*ACCEL_DEFAULT_WTM.tofloat() / ACCEL_DEFAULT_DATA_RATE.tofloat());
         _velCur = _velPrev + _velCur;

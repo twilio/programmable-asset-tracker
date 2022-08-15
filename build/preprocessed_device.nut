@@ -12,18 +12,16 @@
 #require "ReplayMessenger.device.lib.nut:0.2.0"
 #require "utilities.lib.nut:3.0.1"
 #require "LIS3DH.device.lib.nut:3.0.0"
-#require "HTS221.device.lib.nut:2.0.2"
 #require "UBloxM8N.device.lib.nut:1.0.1"
 #require "UbxMsgParser.lib.nut:2.0.1"
 #require "UBloxAssistNow.device.lib.nut:0.1.0"
-
-#require "MAX17055.device.lib.nut:1.0.2"
+#require "BG96_Modem.device.lib.nut:0.0.4"
 
 // TODO: Aggregate all constants that should be customized in production in one place?
 
 //line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/shared/Version.shared.nut"
 // Application Version
-const APP_VERSION = "2.1.0";
+const APP_VERSION = "2.2.0";
 //line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/shared/Constants.shared.nut"
 // Constants common for the imp-agent and the imp-device
 
@@ -400,7 +398,7 @@ Logger <- {
 
 Logger.setLogLevelStr("INFO");
 
-//line 26 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
+//line 22 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
 
 //line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/shared/Logger/stream/Logger.IOutputStream.shared.nut"
 /**
@@ -447,7 +445,7 @@ class UartOutputStream extends Logger.IOutputStream {
         return server.log(data);
     }
 }
-//line 30 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
+//line 26 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
 
 //line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/LedIndication.device.nut"
 
@@ -529,7 +527,7 @@ class LedIndication {
     }
 }
 
-//line 34 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
+//line 30 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
 
 //line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Hardware.device.nut"
 // TODO: Comment
@@ -587,26 +585,79 @@ class PowerSafeI2C {
     }
 }
 
-// I2C bus used by:
-// - Battery fuel gauge
-// - Temperature-humidity sensor
-// - Accelerometer
+// TODO: Comment
+class FlipFlop {
+    _clkPin = null;
+    _switchPin = null;
+
+    // TODO: Comment
+    constructor(clkPin, switchPin) {
+        _clkPin = clkPin;
+        _switchPin = switchPin;
+    }
+
+    // TODO: Comment
+    function _get(key) {
+        if (!(key in _switchPin)) {
+            throw null;
+        }
+
+        // We want to clock the flip-flop after every change on the pin. This will trigger clocking even when the pin is being read.
+        // But this shouldn't affect anything. Moreover, it's assumed that DIGITAL_OUT pins are read rarely.
+        // To "attach" clocking to every pin's function, we return a wrapper-function that calls the requested original pin's
+        // function and then clocks the flip-flop. This will make it transparent for the other components/modules.
+        // All members of hardware.pin objects are functions. Hence we can always return a function here
+        return function(...) {
+            // Let's call the requested function with the arguments passed
+            vargv.insert(0, _switchPin);
+            // Also, we save the value returned by the original pin's function
+            local res = _switchPin[key].acall(vargv);
+
+            // Then we clock the flip-flop assuming that the default pin value is LOW (externally pulled-down)
+            _clkPin.configure(DIGITAL_OUT, 1);
+            _clkPin.disable();
+
+            // Return the value returned by the original pin's function
+            return res;
+        };
+    }
+}
+
+// Accelerometer's I2C bus
 HW_SHARED_I2C <- PowerSafeI2C(hardware.i2cLM);
 
 // Accelerometer's interrupt pin
 HW_ACCEL_INT_PIN <- hardware.pinW;
 
 // UART port used for the u-blox module
-HW_UBLOX_UART <- hardware.uartPQRS;
+HW_UBLOX_UART <- hardware.uartXEFGH;
+
+// U-blox module power enable pin
+HW_UBLOX_POWER_EN_PIN <- hardware.pinG;
+
+// U-blox module backup power enable pin (flip-flop)
+HW_UBLOX_BACKUP_PIN <- FlipFlop(hardware.pinYD, hardware.pinYM);
 
 // UART port used for logging (if enabled)
-HW_LOGGING_UART <- hardware.uartYABCD;
+HW_LOGGING_UART <- hardware.uartYJKLM;
 
 // ESP32 UART port
-HW_ESP_UART <- hardware.uartXEFGH;
+HW_ESP_UART <- hardware.uartABCD;
 
-// ESP32 power enable pin
-HW_ESP_POWER_EN_PIN <- hardware.pinXU;
+// ESP32 power enable pin (flip-flop)
+HW_ESP_POWER_EN_PIN <- FlipFlop(hardware.pinYD, hardware.pinS);
+
+// Light Dependent Photoresistor pin
+HW_LDR_PIN <- hardware.pinV;
+
+// Light Dependent Photoresistor power enable pin
+HW_LDR_POWER_EN_PIN <- FlipFlop(hardware.pinYD, hardware.pinXM);
+
+// Battery level measurement pin
+HW_BAT_LEVEL_PIN <- hardware.pinXD;
+
+// Battery level measurement power enable pin
+HW_BAT_LEVEL_POWER_EN_PIN <- hardware.pinYG;
 
 // LED indication: RED pin
 HW_LED_RED_PIN <- hardware.pinR;
@@ -687,75 +738,152 @@ function mixTables(src, dst) {
 
     return dst;
 }
+
+// TODO: Comment
+function deepEqual(value1, value2, level = 0) {
+    if (level > 32) {
+        throw "Possible cyclic reference";
+    }
+
+    if (value1 == value2) {
+        return true;
+    }
+
+    local type1 = type(value1);
+    local type2 = type(value2);
+
+    if (type1 == "class" || type2 == "class") {
+        throw "Unsupported type";
+    }
+
+    if (type1 != type2) {
+        return false;
+    }
+
+    switch (type1) {
+        case "table":
+        case "array":
+            if (value1.len() != value2.len()) {
+                return false;
+            }
+
+            foreach (k, v in value1) {
+                if (!(k in value2) || !deepEqual(v, value2[k], level + 1)) {
+                    return false;
+                }
+            }
+
+            return true;
+        default:
+            return false;
+    }
+}
+
+// TODO: Comment
+function tableFullCopy(tbl) {
+    // TODO: This may be suboptimal. May need to be improved
+    return Serializer.deserialize(Serializer.serialize(tbl));
+}
 //line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/ProductionManager.device.nut"
 
 // ProductionManager's user config field
 const PMGR_USER_CONFIG_FIELD = "ProductionManager";
 // Period (sec) of checking for new deployments
-// TODO: Make a global const? Or use a builer-variable? Think of many other variables
-const PMGR_CHECK_UPDATES_PERIOD = 10;
-// Maximum length of stats arrays
-const PMGR_STATS_MAX_LEN = 10;
+const PMGR_CHECK_UPDATES_PERIOD = 3600;
 // Maximum length of error saved when error flag is set
 const PMGR_MAX_ERROR_LEN = 512;
 // Connection timeout (sec)
 const PMGR_CONNECT_TIMEOUT = 240;
 // Server.flush timeout (sec)
 const PMGR_FLUSH_TIMEOUT = 5;
+// Send timeout for server.setsendtimeoutpolicy() (sec)
+const PMGR_SEND_TIMEOUT = 3;
 
 // Implements useful in production features:
 // - Emergency mode (If an unhandled error occurred, device goes to sleep and periodically connects to the server waiting for a SW update)
-// - Shipping mode (When released from the factory, the device sleeps until it is woken up by the end-user) (NOT IMPLEMENTED)
+// - Shipping mode (When released from the factory, the device sleeps until it is woken up by the end-user)
 class ProductionManager {
     _debugOn = false;
-    _startAppFunc = null;
+    _startApp = null;
+    _shippingMode = false;
     _isNewDeployment = false;
 
     /**
+     * TODO: Update comment
      * Constructor for Production Manager
      *
      * @param {function} startAppFunc - The function to be called to start the main application
+     * @param {boolean} shippingMode - Enable shipping mode
      */
-    constructor(startAppFunc) {
-        _startAppFunc = startAppFunc;
+    constructor(startAppFunc, shippingMode = false) {
+        _startApp = @() imp.wakeup(0, startAppFunc);
+        _shippingMode = shippingMode;
     }
 
     /**
-     * Start the manager. It will check the conditions and either start the main application or go to sleep
+     * Start the manager. It will check the conditions and either start the main application or go to sleep.
+     * This method must be called first
      */
     function start() {
+        // Maximum sleep time (sec) used for shipping mode
+        const PMGR_MAX_SLEEP_TIME = 2419198;
+
         // TODO: Erase the flash memory on first start (when awake from shipping mode)? Or in factory code?
 
         // NOTE: The app may override this handler but it must call enterEmergencyMode in case of a runtime error
         imp.onunhandledexception(_onUnhandledException.bindenv(this));
+        server.setsendtimeoutpolicy(RETURN_ON_ERROR, WAIT_TIL_SENT, PMGR_SEND_TIMEOUT);
 
-        local userConf = _readUserConf();
-        local data = _extractDataFromUserConf(userConf);
+        local data = _getData();
 
-        if (data && data.lastError != null) {
-            // TODO: Improve logging!
-            // TODO: Should the send timeout policy be set before we print anything?
-            _printLastError(data.lastError);
-        }
-
-        if (data && data.errorFlag && data.deploymentID == __EI.DEPLOYMENT_ID) {
+        if (data.errorFlag && data.deploymentID == __EI.DEPLOYMENT_ID) {
             if (server.isconnected()) {
                 // No new deployment was detected
-                _sleep();
+                _printLastErrorAndSleep(data.lastError);
             } else {
                 // Connect to check for a new deployment
-                server.setsendtimeoutpolicy(RETURN_ON_ERROR, WAIT_TIL_SENT, 30);
-                server.connect(_sleep.bindenv(this), PMGR_CONNECT_TIMEOUT);
+                server.connect(_printLastErrorAndSleep.bindenv(this), PMGR_CONNECT_TIMEOUT);
             }
+
             return;
-        } else if (!data || data.deploymentID != __EI.DEPLOYMENT_ID) {
+        } else if (data.deploymentID != __EI.DEPLOYMENT_ID) {
+            // TODO: Is it OK? (the note below)
+            // NOTE: The first code deploy will not be recognized as a new deploy!
             _info("New deployment detected!");
             _isNewDeployment = true;
-            userConf[PMGR_USER_CONFIG_FIELD] <- _initialUserConfData();
-            _storeUserConf(userConf);
+            data = _initialData(!_shippingMode || data.shipped);
+            _storeData(data);
         }
 
-        _startAppFunc();
+        if (_shippingMode && !data.shipped) {
+            _info("Shipping mode is ON and the device has not been shipped yet");
+            _sleep(PMGR_MAX_SLEEP_TIME);
+        } else {
+            _startApp();
+        }
+    }
+
+    // TODO: Comment
+    function shipped() {
+        local data = _getData();
+
+        if (data.shipped) {
+            return;
+        }
+
+        _info("The device has just been shipped! Starting the main application..");
+
+        // Set "shipped" flag
+        data.shipped = true;
+        _storeData(data);
+
+        // If the error flag is active, we should still go to sleep. Otherwise, let's run the app
+        if (!data.errorFlag) {
+            // Cancel sleep
+            imp.onidle(null);
+            // Start the main application
+            _startApp();
+        }
     }
 
     /**
@@ -766,7 +894,7 @@ class ProductionManager {
     function enterEmergencyMode(error = null) {
         _setErrorFlag(error);
         server.flush(PMGR_FLUSH_TIMEOUT);
-        // TODO: Sleep immediately?
+        // TODO: Sleep immediately? But what if called from the global exception handler?
         server.restart();
     }
 
@@ -785,23 +913,30 @@ class ProductionManager {
     }
 
     /**
-     * Print the last saved error
+     * Print the last saved error (if any) and go to sleep
      *
-     * @param {table} lastError - Last saved error with timestamp and description
+     * @param {table | null} lastError - Last saved error with timestamp and description
      */
-    function _printLastError(lastError) {
-        if ("ts" in lastError && "desc" in lastError) {
+    function _printLastErrorAndSleep(lastError) {
+        // TODO: Improve logging!
+        if (lastError && "ts" in lastError && "desc" in lastError) {
             _info(format("Last error (at %d): \"%s\"", lastError.ts, lastError.desc));
         }
+
+        // Sleep until the next update (code deploy) check
+        _sleep(PMGR_CHECK_UPDATES_PERIOD);
     }
 
     /**
      * Go to sleep once Squirrel VM is idle
+     *
+     * @param {float} sleepTime - The deep sleep duration in seconds
      */
-    function _sleep(unusedParam = null) {
+    function _sleep(sleepTime) {
         imp.onidle(function() {
-            server.sleepfor(PMGR_CHECK_UPDATES_PERIOD);
-        });
+            _info("Going to sleep for " + sleepTime + " seconds");
+            server.sleepfor(sleepTime);
+        }.bindenv(this));
     }
 
     /**
@@ -815,16 +950,66 @@ class ProductionManager {
     }
 
     /**
+     * TODO: Update comment
      * Create and return the initial user configuration data
      *
      * @return {table} The initial user configuration data
      */
-    function _initialUserConfData() {
+    function _initialData(shipped) {
         return {
             "errorFlag": false,
             "lastError": null,
+            "shipped": shipped,
             "deploymentID": __EI.DEPLOYMENT_ID
         };
+    }
+
+    // TODO: Comment
+    function _getData() {
+        try {
+            local userConf = _readUserConf();
+
+            if (userConf == null) {
+                return _initialData(false);
+            }
+
+            local fields = ["errorFlag", "lastError", "shipped", "deploymentID"];
+            local data = userConf[PMGR_USER_CONFIG_FIELD];
+
+            foreach (field in fields) {
+                // This will throw an exception if no such field found
+                data[field];
+            }
+
+            return data;
+        } catch (err) {
+            _error("Error during parsing user configuration: " + err);
+        }
+
+        return _initialData(true);
+    }
+
+    // TODO: Comment
+    function _storeData(data) {
+        local userConf = {};
+
+        try {
+            userConf = _readUserConf() || {};
+        } catch (err) {
+            _error("Error during parsing user configuration: " + err);
+            _debug("Creating user configuration from scratch..");
+        }
+
+        userConf[PMGR_USER_CONFIG_FIELD] <- data;
+
+        local dataStr = JSONEncoder.encode(userConf);
+        _debug("Storing new user configuration: " + dataStr);
+
+        try {
+            imp.setuserconfiguration(dataStr);
+        } catch (err) {
+            _error(err);
+        }
     }
 
     /**
@@ -833,15 +1018,7 @@ class ProductionManager {
      * @param {string} error - The error description
      */
     function _setErrorFlag(error) {
-        local userConf = _readUserConf();
-        // If not null, this is just a pointer to the field of userConf. Hence modification of this object updates the userConf object
-        local data = _extractDataFromUserConf(userConf);
-
-        if (data == null) {
-            // Initialize ProductionManager's user config data
-            data = _initialUserConfData();
-            userConf[PMGR_USER_CONFIG_FIELD] <- data;
-        }
+        local data = _getData();
 
         // By this update we update the userConf object (see above)
         data.errorFlag = true;
@@ -857,76 +1034,35 @@ class ProductionManager {
             };
         }
 
-        _storeUserConf(userConf);
+        _storeData(data);
     }
 
     /**
-     * Store the user configuration
-     *
-     * @param {table} userConf - The table to be converted to JSON and stored
-     */
-    function _storeUserConf(userConf) {
-        local dataStr = JSONEncoder.encode(userConf);
-        _debug("Storing new user configuration: " + dataStr);
-
-        try {
-            imp.setuserconfiguration(dataStr);
-        } catch (err) {
-            _error(err);
-        }
-    }
-
-    /**
+     * TODO: Update comment
      * Read the user configuration
      *
-     * @return {table} The user configuration converted from JSON to a Squirrel table
+     * @return {table | null} The user configuration converted from JSON to a Squirrel table
+     *      or null if there was no user configuration saved
      */
     function _readUserConf() {
         local config = imp.getuserconfiguration();
 
         if (config == null) {
             _debug("User configuration is empty");
-            return {};
+            return null;
         }
 
         config = config.tostring();
         // TODO: What if a non-readable string was written? It will be printed "binary: ..."
         _debug("User configuration: " + config);
 
-        try {
-            config = JSONParser.parse(config);
+        config = JSONParser.parse(config);
 
-            if (typeof config != "table") {
-                throw "table expected";
-            }
-        } catch (e) {
-            _error("Error during parsing user configuration: " + e);
-            return {};
+        if (typeof config != "table") {
+            throw "table expected";
         }
 
         return config;
-    }
-
-    /**
-     * Extract and check the data belonging to Production Manager from the user configuration
-     *
-     * @param {table} userConf - The user configuration
-     *
-     * @return {table|null} The data extracted or null
-     */
-    function _extractDataFromUserConf(userConf) {
-        try {
-            local data = userConf[PMGR_USER_CONFIG_FIELD];
-
-            if ("errorFlag" in data &&
-                "lastError" in data &&
-                "deploymentID" in data) {
-                return data;
-            }
-        } catch (err) {
-        }
-
-        return null;
     }
 
     /**
@@ -1113,19 +1249,13 @@ class CfgManager {
         ::debug("Reporting cfg..", "CfgManager");
 
         local cfgReport = {
-            "configuration": _tableFullCopy(_actualCfg)
+            "configuration": tableFullCopy(_actualCfg)
             "description": {
                 "cfgTimestamp": time()
             }
         };
 
         rm.send(APP_RM_MSG_NAME.CFG, cfgReport, RM_IMPORTANCE_HIGH);
-    }
-
-    // TODO: Comment
-    function _tableFullCopy(tbl) {
-        // TODO: This may be suboptimal. May need to be improved
-        return Serializer.deserialize(Serializer.serialize(tbl));
     }
 
     // TODO: Comment
@@ -1270,16 +1400,24 @@ class CfgManager {
       "threshold": 12.0         // battery low alert threshold, in %
     },
 
-    "tamperingDetected": {      // Not supported!
-      "enabled": false          // true - alert is enabled
+    "tamperingDetected": {      // tampering detected (light was detected by the photoresistor)
+      "enabled": false,         // true - alert is enabled
+      "pollingPeriod": 1.0      // photoresistor polling period, in seconds
     }
+  },
+
+  "simUpdate": {                // SIM OTA update
+    "enabled": true,            // true - SIM OTA update is enabled. This will force SIM OTA update every
+                                // time the device connects to the Internet. And will keep the device connected
+                                // for the specified time to let the update happen
+    "duration": 60              // duration of connection retention (when SIM OTA update is forced), in seconds
   },
 
   "debug": {                    // debug settings
     "logLevel": "DEBUG"         // logging level on Imp-Device ("ERROR", "INFO", "DEBUG")
   }
 }
-//line 238 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/CfgManager.device.nut"
+//line 232 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/CfgManager.device.nut"
         return cfg;
     }
 
@@ -1858,6 +1996,7 @@ class CustomReplayMessenger extends ReplayMessenger {
             try {
                 _spiFL.write(payload);
             } catch (err) {
+                // TODO: Erase only once!
                 ::error("Couldn't persist a message: " + err, "CustomReplayMessenger");
                 ::error("Erasing the flash logger!", "CustomReplayMessenger");
 
@@ -1948,9 +2087,9 @@ class CustomReplayMessenger extends ReplayMessenger {
     }
 }
 
-//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/BG96CellInfo.device.nut"
+//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/BG9xCellInfo.device.nut"
 
-// Required BG96 AT Commands
+// Required BG96/95 AT Commands
 enum AT_COMMAND {
     // Query the information of neighbour cells (Detailed information of base station)
     GET_QENG  = "AT+QENG=\"neighbourcell\"",
@@ -1958,19 +2097,16 @@ enum AT_COMMAND {
     GET_QENG_SERV_CELL  = "AT+QENG=\"servingcell\""
 }
 
-// Class to obtain cell towers info from BG96 modem.
+// Class to obtain cell towers info from BG96/95 modems.
 // This code uses unofficial impOS features
 // and is based on an unofficial example provided by Twilio
 // Utilizes the following AT Commands:
-// - Network Service Commands:
-//   - AT+CREG Network Registration Status
-//   - AT+COPS Operator Selection
 // - QuecCell Commands:
 //   - AT+QENG Switch on/off Engineering Mode
-class BG96CellInfo {
+class BG9xCellInfo {
 
     /**
-    * Get the network registration information from BG96
+    * Get the network registration information from BG96/95
     *
     * @return {Table} The network registration information, or null on error.
     * Table fields include:
@@ -1995,6 +2131,8 @@ class BG96CellInfo {
             "cellTowers": []
         };
 
+        ::debug("Scanning cell towers..", "BG9xCellInfo");
+
         try {
             local qengCmdResp = _writeAndParseAT(AT_COMMAND.GET_QENG_SERV_CELL);
             if ("error" in qengCmdResp) {
@@ -2004,6 +2142,7 @@ class BG96CellInfo {
             local srvCellRadioType = _qengExtractRadioType(qengCmdResp.data);
 
             switch (srvCellRadioType) {
+                // This type is used by both BG96/95 modem
                 case "GSM":
                     data.radioType = "gsm";
                     // +QENG:
@@ -2018,14 +2157,18 @@ class BG96CellInfo {
                     // <rxlev>,<c1>,<c2>,<c31>,<c32>
                     qengCmdResp = _writeAndParseATMultiline(AT_COMMAND.GET_QENG);
                     if ("error" in qengCmdResp) {
-                        ::error("AT+QENG command returned error: " + qengCmdResp.error, "BG96CellInfo");
+                        ::error("AT+QENG command returned error: " + qengCmdResp.error, "BG9xCellInfo");
                     } else {
                         data.cellTowers.extend(_qengExtractTowersInfo(qengCmdResp.data, srvCellRadioType));
                     }
                     break;
+                // These types are used by BG96 modem
                 case "CAT-M":
                 case "CAT-NB":
                 case "LTE":
+                // These types are used by BG95 modem
+                case "eMTC":
+                case "NBIoT":
                     data.radioType = "lte";
                     data.cellTowers.append(_qengExtractServingCellLTE(qengCmdResp.data));
                     // Neighbor towers parameters not correspond google API
@@ -2036,16 +2179,18 @@ class BG96CellInfo {
                     // +QENG: "neighbourcell intra”,"LTE",<earfcn>,<pcid>,<rsrq>,<rsrp>,<rssi>,<sinr>
                     // ,<srxlev>,<cell_resel_priority>,<s_non_intra_search>,<thresh_serving_low>,
                     // <s_intra_search>
-                    // https://developers.google.com/maps/documentation/geolocation/overview#wifi_access_point_object
-                    // location is determined by one tower
+                    // https://developers.google.com/maps/documentation/geolocation/overview#cell_tower_object
+                    // Location is determined by one tower in this case
                     break;
                 default:
                     throw "Unknown radio type: " + srvCellRadioType;
             }
         } catch (err) {
-            ::error("Scanning cell towers error: " + err, "BG96CellInfo");
+            ::error("Scanning cell towers error: " + err, "BG9xCellInfo");
             return null;
         }
+
+        ::debug("Scanned items: " + data.len(), "BG9xCellInfo");
 
         return data;
     }
@@ -2071,7 +2216,7 @@ class BG96CellInfo {
     }
 
     /**
-     * Send the specified AT Command to BG96.
+     * Send the specified AT Command to the modem.
      * Return a string with response.
      *
      * This function uses unofficial impOS feature.
@@ -2258,16 +2403,16 @@ class BG96CellInfo {
 
             local mcc = splitted[4];
             local mnc = splitted[5];
-            local lac = splitted[12];
+            local tac = splitted[12];
             local ci = splitted[6];
             local ss = splitted[15];
-            lac = utilities.hexStringToInteger(lac);
+            tac = utilities.hexStringToInteger(tac);
             ci = utilities.hexStringToInteger(ci);
 
             return {
                 "mobileCountryCode" : mcc,
                 "mobileNetworkCode" : mnc,
-                "locationAreaCode" : lac,
+                "locationAreaCode" : tac,
                 "cellId" : ci,
                 "signalStrength" : ss
             };
@@ -2390,7 +2535,7 @@ const ESP32_DEFAULT_RX_FIFO_SZ = 4096;
 // Maximum time allowed for waiting for data, in seconds
 const ESP32_WAIT_DATA_TIMEOUT = 8;
 // Maximum amount of data expected to be received, in bytes
-const ESP32_MAX_DATA_LEN = 12288;
+const ESP32_MAX_DATA_LEN = 6144;
 // Automatic switch off delay, in seconds
 const ESP32_SWITCH_OFF_DELAY = 10;
 
@@ -2407,7 +2552,7 @@ const ESP32_BLE_SCAN_INTERVAL = 8;
 // so the range for the actual scan window is [2.5,10240] ms.
 const ESP32_BLE_SCAN_WINDOW = 8;
 // BLE advertisements scan period, in seconds
-const ESP32_BLE_SCAN_PERIOD = 6;
+const ESP32_BLE_SCAN_PERIOD = 2;
 
 // ESP32 Driver class.
 // Ability to work with WiFi networks and BLE
@@ -2569,7 +2714,6 @@ class ESP32Driver {
         _switchOn();
 
         local readyMsgValidator   = @(data, _) data.find("\r\nready\r\n") != null;
-        local restoreCmdValidator = @(data, _) data.find("\r\nOK\r\n\r\nready\r\n") != null;
         local okValidator         = @(data, _) data.find("\r\nOK\r\n") != null;
 
         local cmdSetPrintMask = format("AT+CWLAPOPT=0,%d",
@@ -2590,7 +2734,9 @@ class ESP32Driver {
             // Wait for "ready" message
             _communicate(null, readyMsgValidator),
             // Restore Factory Default Settings
-            _communicate("AT+RESTORE", restoreCmdValidator),
+            _communicate("AT+RESTORE", okValidator),
+            // Wait for "ready" message once again
+            _communicate(null, readyMsgValidator),
             // Check Version Information
             _communicate("AT+GMR", okValidator, _logVersionInfo),
             // Set the Wi-Fi Mode to "Station"
@@ -2661,6 +2807,7 @@ class ESP32Driver {
      * Switch OFF the ESP32 board and disable the UART port
      */
     function _switchOff() {
+        // NOTE: It's assumed that the module is disabled by default (when the switch pin is tri-stated)
         _switchPin.disable();
         _serial.disable();
         _switchedOn = false;
@@ -2935,6 +3082,59 @@ class ESP32Driver {
     }
 }
 
+//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Photoresistor.device.nut"
+
+// Default polling period, in seconds
+const PR_DEFAULT_POLL_PERIOD = 1.0;
+// The value that indicates that the light was detected
+const PR_LIGHT_DETECTED_VALUE = 1;
+
+// TODO: Comment
+class Photoresistor {
+    _valPin = null;
+    _switchPin = null;
+    _pollTimer = null;
+
+    // TODO: Comment
+    constructor(switchPin, valPin) {
+        _switchPin = switchPin;
+        _valPin = valPin;
+    }
+
+    // TODO: Comment
+    function startPolling(callback, pollPeriod = PR_DEFAULT_POLL_PERIOD) {
+        stopPolling();
+
+        ::debug("Starting polling.. Period = " + pollPeriod, "Photoresistor");
+
+        _switchPin.configure(DIGITAL_OUT, 1);
+        _valPin.configure(DIGITAL_IN_WAKEUP);
+
+        local poll;
+        local detected = false;
+
+        poll = function() {
+            _pollTimer = imp.wakeup(pollPeriod, poll);
+
+            if (detected != (_valPin.read() == PR_LIGHT_DETECTED_VALUE)) {
+                detected = !detected;
+                callback(detected);
+            }
+        }.bindenv(this);
+
+        poll();
+    }
+
+    // TODO: Comment
+    function stopPolling() {
+        _pollTimer && imp.cancelwakeup(_pollTimer);
+        _switchPin.disable();
+        _valPin.disable();
+
+        ::debug("Polling stopped", "Photoresistor");
+    }
+}
+
 //line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/AccelerometerDriver.device.nut"
 
 // Accelerometer Driver class:
@@ -3026,6 +3226,9 @@ const LIS2DH12_HPF_AOI_INT1 = 0x01; // High-pass filter enabled for AOI function
 const LIS2DH12_FDS = 0x08; // Filtered data selection. Data from internal filter sent to output register and FIFO.
 const LIS2DH12_FIFO_SRC_REG  = 0x2F; // FIFO state register.
 const LIS2DH12_FIFO_WTM = 0x80; // Set high when FIFO content exceeds watermark level.
+const LIS2DH12_OUT_T_H = 0x0D; // Measured temperature (High byte)
+const LIS2DH12_TEMP_EN = 0xC0; // Temperature enable bits (11 - Enable)
+const LIS2DH12_BDU = 0x80; // Block Data Update bit (0 - continuous update; default)
 
 // Vector of velocity and movement class.
 // Vectors operation in 3D.
@@ -3293,6 +3496,29 @@ class AccelerometerDriver {
         }
     }
 
+    // TODO: Comment
+    function readTemperature() {
+        // To convert the raw data to celsius
+        const ACCEL_TEMP_TO_CELSIUS = 25.0;
+        // Calibration offset for temperature.
+        // By default, accelerometer can only provide temperature variaton, not the precise value.
+        // NOTE: This value may be inaccurate for some devices. It was chosen based only on two devices
+        const ACCEL_TEMP_CALIBRATION_OFFSET = -8.0;
+        // Delay to allow the sensor to make a measurement, in seconds
+        const ACCEL_TEMP_READING_DELAY = 0.01;
+
+        _switchTempSensor(true);
+
+        imp.sleep(ACCEL_TEMP_READING_DELAY);
+
+        local high = _accel._getReg(LIS2DH12_OUT_T_H);
+        local res = (high << 24) >> 24;
+
+        _switchTempSensor(false);
+
+        return res + ACCEL_TEMP_TO_CELSIUS + ACCEL_TEMP_CALIBRATION_OFFSET;
+    }
+
     /**
      * Enables or disables a shock detection.
      * If enabled, the specified callback is called every time the shock condition is detected.
@@ -3450,8 +3676,8 @@ class AccelerometerDriver {
             _enMtnDetect = true;
             _motionState = ACCEL_MOTION_STATE.WAITING;
             _accel.configureFifoInterrupts(false);
-            _accel.configureInertialInterrupt(true, 
-                                              _movementCurThr, 
+            _accel.configureInertialInterrupt(true,
+                                              _movementCurThr,
                                               (_movementAccDur*ACCEL_DEFAULT_DATA_RATE).tointeger());
             ::info("Motion detection enabled", "AccelerometerDriver");
         } else {
@@ -3477,6 +3703,22 @@ class AccelerometerDriver {
      */
     function _isFunction(f) {
         return f && typeof f == "function";
+    }
+
+    // TODO: Comment
+    function _switchTempSensor(enable) {
+        // LIS3DH_TEMP_CFG_REG enables/disables temperature sensor
+        _accel._setReg(LIS3DH_TEMP_CFG_REG, enable ? LIS2DH12_TEMP_EN : 0);
+
+        local valReg4 = _accel._getReg(LIS3DH_CTRL_REG4);
+
+        if (enable) {
+            valReg4 = valReg4 | LIS2DH12_BDU;
+        } else {
+            valReg4 = valReg4 & ~LIS2DH12_BDU;
+        }
+
+        _accel._setReg(LIS3DH_CTRL_REG4, valReg4);
     }
 
     /**
@@ -3606,7 +3848,7 @@ class AccelerometerDriver {
         //   | /|  | \___
         //   |/ |  |   | \
         //   |---------------------------------------- t
-        //   |   
+        //   |
         //   |   dt
         _velCur = _velCur*(ACCEL_G*ACCEL_DEFAULT_WTM.tofloat() / ACCEL_DEFAULT_DATA_RATE.tofloat());
         _velCur = _velPrev + _velCur;
@@ -3718,51 +3960,122 @@ class AccelerometerDriver {
 
 //line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/BatteryMonitor.device.nut"
 
+// Delay (sec) between reads when getting the average value
+const BM_AVG_DELAY = 0.8;
+// Number of reads for getting the average value
+const BM_AVG_SAMPLES = 6;
+// Voltage gain according to the voltage divider
+const BM_VOLTAGE_GAIN = 2.4242;
+
+// 3 x 1.5v battery
+const BM_FULL_VOLTAGE = 4.8;
+
 // Measures the battery level
 class BatteryMonitor {
-    _fg = null;
+    _batLvlEnablePin = null;
+    _batLvlPin = null;
+    _measuringBattery = null;
 
-    constructor(i2c) {
-        if ("MAX17055" in getroottable()) {
-            _fg = MAX17055(i2c);
-        }
+    // Voltage (normalized to 0-1 range) -> remaining capacity (normalized to 0-1 range)
+    // Must be sorted by descending of Voltage
+    _calibrationTable = [
+        [1.0,     1.0],
+        [0.975,   0.634],
+        [0.97357, 0.5405],
+        [0.94357, 0.44395],
+        [0.94214, 0.37677],
+        [0.90143, 0.21877],
+        [0.86786, 0.13403],
+        [0.82571, 0.06954],
+        [0.79857, 0.04018],
+        [0.755,   0.01991],
+        [0.66071, 0.00236],
+        [0.0,     0.0]
+    ];
+
+    // TODO: Comment
+    constructor(batLvlEnablePin, batLvlPin) {
+        _batLvlEnablePin = batLvlEnablePin;
+        _batLvlPin = batLvlPin;
     }
 
-    // Initializes the driver and starts measuring battery in order to determine the battery state
-    function init() {
-        ::info("BatteryMonitor initialization", "BatteryMonitor");
-
-        if (!_fg) {
-            ::info("MAX17055 is not used - no battery measurements will be made", "BatteryMonitor");
-            return Promise.resolve(null);
+    // TODO: Comment
+    // Returns a Promise that resolves with the result of the battery measuring
+    // The result is a table { "percent": <pct>, "voltage": <V> }
+    function measureBattery() {
+        if (_measuringBattery) {
+            return _measuringBattery;
         }
 
-        local settings = {
-            "desCap"       : 3500, // mAh
-            "senseRes"     : 0.01, // ohms
-            "chrgTerm"     : 256,   // mA
-            "emptyVTarget" : 3.3,  // V
-            "recoveryV"    : 3.88, // V
-            "chrgV"        : MAX17055_V_CHRG_4_2,
-            "battType"     : MAX17055_BATT_TYPE.LiCoO2
-        };
+        _batLvlEnablePin.configure(DIGITAL_OUT, 1);
+        _batLvlPin.configure(ANALOG_IN);
 
-        return Promise(function(resolve, reject) {
-            local onDone = function(err) {
-                err ? reject(err) : resolve(err);
+        return _measuringBattery = Promise(function(resolve, reject) {
+            local measures = 0;
+            local sumVoltage = 0;
+
+            local measure = null;
+            measure = function() {
+                // Sum voltage to get the average value
+                // Vbat = PinVal / 65535 * hardware.voltage() * (220k + 180k) / 180k
+                sumVoltage += (_batLvlPin.read() / 65535.0) * hardware.voltage();
+                measures++;
+
+                if (measures < BM_AVG_SAMPLES) {
+                    imp.wakeup(BM_AVG_DELAY, measure);
+                } else {
+                    _batLvlEnablePin.disable();
+                    _batLvlPin.disable();
+                    _measuringBattery = null;
+
+                    // There is a voltage divider
+                    local avgVoltage = sumVoltage * BM_VOLTAGE_GAIN / BM_AVG_SAMPLES;
+
+                    local level = _getBatteryLevelByVoltage(avgVoltage);
+                    ::debug("Battery level (raw):", "BatteryMonitor");
+                    ::debug(level, "BatteryMonitor");
+
+                    // Sampling complete, return result
+                    resolve(level);
+                }
             }.bindenv(this);
 
-            _fg.init(settings, onDone);
+            measure();
         }.bindenv(this));
     }
 
-    // The result is a table { "capacity": <cap>, "percent": <pct> }
-    function measureBattery() {
-        if (!_fg) {
-            throw "No fuel gauge used";
+    // TODO: Comment
+    // Returns battery level { "percent": <pct>, "voltage": <V> }
+    function _getBatteryLevelByVoltage(voltage) {
+        local calTableLen = _calibrationTable.len();
+
+        for (local i = 0; i < calTableLen; i++) {
+            local point = _calibrationTable[i];
+            local calVoltage = point[0] * BM_FULL_VOLTAGE;
+            local calPercent = point[1] * 100.0;
+
+            if (voltage < calVoltage) {
+                continue;
+            }
+
+            if (i == 0) {
+                return { "percent": 100.0, "voltage": voltage };
+            }
+
+            local prevPoint = _calibrationTable[i - 1];
+            local prevCalVoltage = prevPoint[0] * BM_FULL_VOLTAGE;
+            local prevCalPercent = prevPoint[1] * 100.0;
+
+            // Calculate linear (y = k*x + b) coefficients, where x is Voltage and y is Percent
+            local k = (calPercent - prevCalPercent) / (calVoltage - prevCalVoltage);
+            local b = calPercent - k * calVoltage;
+
+            local percent = k * voltage + b;
+
+            return { "percent": percent, "voltage": voltage };
         }
 
-        return _fg.getStateOfCharge().percent;
+        return { "percent": 0.0, "voltage": voltage };
     }
 }
 
@@ -3864,7 +4177,8 @@ class LocationMonitor {
 
         local res = {
             "flags": {},
-            "location": location
+            "location": location,
+            "gnssInfo": _ld.getExtraInfo().gnss
         };
 
         (_geofence.inZone != null) && (res.flags.inGeofence <- _geofence.inZone);
@@ -4363,21 +4677,20 @@ const DP_BATTERY_LEVEL_HYST = 4.0;
 // Data Processor class.
 // Processes data, saves and sends messages
 class DataProcessor {
-
     // Data reading timer period
     _dataReadingPeriod = null;
 
     // Data reading timer handler
     _dataReadingTimer = null;
 
+    // Data reading Promise (null if no data reading is ongoing)
+    _dataReadingPromise = null;
+
     // Data sending timer period
     _dataSendingPeriod = null;
 
     // Data sending timer handler
     _dataSendingTimer = null;
-
-    // Thermosensor driver object
-    _ts = null;
 
     // Battery driver object
     _bd = null;
@@ -4390,6 +4703,9 @@ class DataProcessor {
 
     // Motion Monitor driver object
     _mm = null;
+
+    // Photoresistor object
+    _pr = null;
 
     // Last temperature value
     _temperature = null;
@@ -4409,20 +4725,26 @@ class DataProcessor {
     // Settings of shock, temperature and battery alerts
     _alertsSettings = null;
 
+    // Last obtained cellular info. Cleared once sent
+    _lastCellInfo = null;
+
+    // Last obtained GNSS info
+    _lastGnssInfo = null;
+
     /**
      *  Constructor for Data Processor class.
      *  @param {object} locationMon - Location monitor object.
      *  @param {object} motionMon - Motion monitor object.
      *  @param {object} accelDriver - Accelerometer driver object.
-     *  @param {object} temperDriver - Temperature sensor driver object.
      *  @param {object} batDriver - Battery driver object.
+     *  @param {object} photoresistor - Photoresistor object.
      */
-    constructor(locationMon, motionMon, accelDriver, temperDriver, batDriver) {
+    constructor(locationMon, motionMon, accelDriver, batDriver, photoresistor) {
         _ad = accelDriver;
         _lm = locationMon;
         _mm = motionMon;
-        _ts = temperDriver;
         _bd = batDriver;
+        _pr = photoresistor;
 
         _allAlerts = {
             // TODO: Do we need alerts like trackerReset, trackerReconfigured?
@@ -4434,14 +4756,16 @@ class DataProcessor {
             "repossessionActivated" : false,
             "temperatureHigh"       : false,
             "temperatureLow"        : false,
-            "batteryLow"            : false
+            "batteryLow"            : false,
+            "tamperingDetected"     : false
         };
 
         _alertsSettings = {
-            "shockDetected"   : {},
-            "temperatureHigh" : {},
-            "temperatureLow"  : {},
-            "batteryLow"      : {}
+            "shockDetected"     : {},
+            "temperatureHigh"   : {},
+            "temperatureLow"    : {},
+            "batteryLow"        : {},
+            "tamperingDetected" : {}
         };
     }
 
@@ -4455,6 +4779,8 @@ class DataProcessor {
      * - rejects if the operation failed
      */
     function start(cfg) {
+        cm.onConnect(_getCellInfo.bindenv(this), "DataProcessor");
+
         updateCfg(cfg);
 
         _lm.setGeofencingEventCb(_onGeofencingEvent.bindenv(this));
@@ -4489,11 +4815,12 @@ class DataProcessor {
 
     // TODO: Comment
     function _updCfgAlerts(cfg) {
-        local alertsCfg = getValFromTable(cfg, "alerts");
-        local shockDetectedCfg   = getValFromTable(alertsCfg, "shockDetected");
-        local temperatureHighCfg = getValFromTable(alertsCfg, "temperatureHigh");
-        local temperatureLowCfg  = getValFromTable(alertsCfg, "temperatureLow");
-        local batteryLowCfg      = getValFromTable(alertsCfg, "batteryLow");
+        local alertsCfg            = getValFromTable(cfg, "alerts");
+        local shockDetectedCfg     = getValFromTable(alertsCfg, "shockDetected");
+        local temperatureHighCfg   = getValFromTable(alertsCfg, "temperatureHigh");
+        local temperatureLowCfg    = getValFromTable(alertsCfg, "temperatureLow");
+        local batteryLowCfg        = getValFromTable(alertsCfg, "batteryLow");
+        local tamperingDetectedCfg = getValFromTable(alertsCfg, "tamperingDetected");
 
         if (shockDetectedCfg) {
             _allAlerts.shockDetected = false;
@@ -4512,6 +4839,11 @@ class DataProcessor {
             _allAlerts.batteryLow = false;
             mixTables(batteryLowCfg, _alertsSettings.batteryLow);
         }
+        if (tamperingDetectedCfg) {
+            _allAlerts.tamperingDetected = false;
+            mixTables(tamperingDetectedCfg, _alertsSettings.tamperingDetected);
+            _configureTamperingDetection();
+        }
     }
 
     // TODO: Comment
@@ -4522,6 +4854,16 @@ class DataProcessor {
             _ad.enableShockDetection(_onShockDetectedEvent.bindenv(this), settings);
         } else {
             _ad.enableShockDetection(null);
+        }
+    }
+
+    // TODO: Comment
+    function _configureTamperingDetection() {
+        if (_alertsSettings.tamperingDetected.enabled) {
+            ::debug("Activating tampering detection..", "DataProcessor");
+            _pr.startPolling(_onLightDetectedEvent.bindenv(this), _alertsSettings.tamperingDetected.pollingPeriod);
+        } else {
+            _pr.stopPolling();
         }
     }
 
@@ -4556,80 +4898,95 @@ class DataProcessor {
      *  Data and alerts reading and processing.
      */
     function _dataProc() {
+        if (_dataReadingPromise) {
+            return _dataReadingPromise;
+        }
+
         // read temperature, check alert conditions
         _checkTemperature();
 
-        // read battery level, check alert conditions
-        _checkBatteryLevel();
-
-        // check if alerts have been triggered
-        local alerts = [];
-        foreach (key, val in _allAlerts) {
-            if (val) {
-                alerts.append(key);
-                _allAlerts[key] = false;
+        // get cell info, read battery level
+        _dataReadingPromise = Promise.all([_getCellInfo(), _checkBatteryLevel()])
+        .then(function(res) {
+            // check if alerts have been triggered
+            local alerts = [];
+            foreach (key, val in _allAlerts) {
+                if (val) {
+                    alerts.append(key);
+                    _allAlerts[key] = false;
+                }
             }
-        }
-        local alertsCount = alerts.len();
 
-        local lmStatus = _lm.getStatus();
-        local flags = mixTables(_mm.getStatus().flags, lmStatus.flags);
-        local location = lmStatus.location;
+            local cellInfo = res[0] || {};
+            local lmStatus = _lm.getStatus();
+            local flags = mixTables(_mm.getStatus().flags, lmStatus.flags);
+            local location = lmStatus.location;
+            local gnssInfo = lmStatus.gnssInfo;
 
-        local dataMsg = {
-            "trackerId": hardware.getdeviceid(),
-            "timestamp": time(),
-            "status": flags,
-            "location": {
-                "timestamp": location.timestamp,
-                "type": location.type,
-                "accuracy": location.accuracy,
-                "lng": location.longitude,
-                "lat": location.latitude
-            },
-            "sensors": {},
-            "alerts": alerts
-        };
+            local dataMsg = {
+                "trackerId": hardware.getdeviceid(),
+                "timestamp": time(),
+                "status": flags,
+                "location": {
+                    "timestamp": location.timestamp,
+                    "type": location.type,
+                    "accuracy": location.accuracy,
+                    "lng": location.longitude,
+                    "lat": location.latitude
+                },
+                "sensors": {},
+                "alerts": alerts,
+                "cellInfo": cellInfo,
+                "gnssInfo": {}
+            };
 
-        (_temperature  != null) && (dataMsg.sensors.temperature  <- _temperature);
-        (_batteryLevel != null) && (dataMsg.sensors.batteryLevel <- _batteryLevel);
+            (_temperature  != null) && (dataMsg.sensors.temperature  <- _temperature);
+            (_batteryLevel != null) && (dataMsg.sensors.batteryLevel <- _batteryLevel);
 
-        ::debug("Message: " + JSONEncoder.encode(dataMsg), "DataProcessor");
-
-        if (alertsCount > 0) {
-            ::info("Alerts:", "DataProcessor");
-            foreach (item in alerts) {
-                ::info(item, "DataProcessor");
+            if (_lastGnssInfo == null || !deepEqual(_lastGnssInfo, gnssInfo)) {
+                _lastGnssInfo = gnssInfo;
+                dataMsg.gnssInfo = gnssInfo;
             }
-        }
 
-        // ReplayMessenger saves the message till imp-device is connected
-        rm.send(APP_RM_MSG_NAME.DATA, dataMsg, RM_IMPORTANCE_HIGH);
-        ledIndication && ledIndication.indicate(LI_EVENT_TYPE.NEW_MSG);
+            _lastCellInfo = null;
 
-        // If at least one alert, try to send data immediately
-        if (alertsCount > 0) {
-            _dataSend();
-        }
+            ::debug("Message: " + JSONEncoder.encode(dataMsg), "DataProcessor");
 
-        _dataReadingTimer && imp.cancelwakeup(_dataReadingTimer);
-        _dataReadingTimer = imp.wakeup(_dataReadingPeriod,
-                                       _dataProcTimerCb.bindenv(this));
+            // ReplayMessenger saves the message till imp-device is connected
+            rm.send(APP_RM_MSG_NAME.DATA, dataMsg, RM_IMPORTANCE_HIGH);
+            ledIndication && ledIndication.indicate(LI_EVENT_TYPE.NEW_MSG);
+
+            if (alerts.len() > 0) {
+                ::info("Alerts:", "DataProcessor");
+                foreach (item in alerts) {
+                    ::info(item, "DataProcessor");
+                }
+
+                // If there is at least one alert, try to send data immediately
+                _dataSend();
+            }
+
+            _dataReadingTimer && imp.cancelwakeup(_dataReadingTimer);
+            _dataReadingTimer = imp.wakeup(_dataReadingPeriod,
+                                           _dataProcTimerCb.bindenv(this));
+
+            _dataReadingPromise = null;
+        }.bindenv(this));
     }
 
     /**
      *  Read temperature, check alert conditions
      */
     function _checkTemperature() {
-        local res = _ts.read();
-        if ("error" in res) {
-            ::error("Failed to read temperature: " + res.error, "DataProcessor");
+        try {
+            _temperature = _ad.readTemperature();
+        } catch (err) {
+            ::error("Failed to read temperature: " + err, "DataProcessor");
             // Don't generate alerts and don't send temperature to the cloud
             _temperature = null;
             return;
         }
 
-        _temperature = res.temperature;
         ::debug("Temperature: " + _temperature, "DataProcessor");
 
         local tempHigh = _alertsSettings.temperatureHigh;
@@ -4664,31 +5021,99 @@ class DataProcessor {
      *  Read battery level, check alert conditions
      */
     function _checkBatteryLevel() {
-        try {
-            _batteryLevel = _bd.measureBattery();
-        } catch (err) {
+        return _bd.measureBattery()
+        .then(function(level) {
+            _batteryLevel = level.percent;
+
+            ::debug("Battery level: " + _batteryLevel + "%", "DataProcessor");
+
+            if (!_alertsSettings.batteryLow.enabled) {
+                return;
+            }
+
+            local batteryLowThr = _alertsSettings.batteryLow.threshold;
+
+            if (_batteryLevel < batteryLowThr && _batteryState == DP_BATTERY_LEVEL.NORMAL) {
+                _allAlerts.batteryLow = true;
+                _batteryState = DP_BATTERY_LEVEL.LOW;
+            }
+
+            if (_batteryLevel > batteryLowThr + DP_BATTERY_LEVEL_HYST) {
+                _batteryState = DP_BATTERY_LEVEL.NORMAL;
+            }
+        }.bindenv(this), function(err) {
             ::error("Failed to get battery level: " + err, "DataProcessor");
             // Don't generate alerts and don't send battery level to the cloud
             _batteryLevel = null;
-            return;
+        }.bindenv(this));
+    }
+
+    // TODO: Comment
+    function _getCellInfo() {
+        if (!cm.isConnected()) {
+            return Promise.resolve(_lastCellInfo);
         }
 
-        ::debug("Battery level: " + _batteryLevel, "DataProcessor");
+        return Promise(function(resolve, reject) {
+            // TODO: This is a temporary defense from the incorrect work of getcellinfo()
+            local cbTimeoutTimer = imp.wakeup(5, function() {
+                resolve(null);
+                ::error("imp.net.getcellinfo didn't call its callback!", "DataProcessor");
+            }.bindenv(this));
 
-        if (!_alertsSettings.batteryLow.enabled) {
-            return;
+            imp.net.getcellinfo(function(cellInfo) {
+                imp.cancelwakeup(cbTimeoutTimer);
+                _lastCellInfo = _extractCellInfoBG95(cellInfo);
+                resolve(_extractCellInfoBG95(cellInfo));
+            }.bindenv(this));
+        }.bindenv(this));
+    }
+
+    // TODO: Comment
+    function _extractCellInfoBG95(cellInfo) {
+        local res = {
+            "timestamp": time(),
+            "mode": null,
+            "signalStrength": null,
+            "mcc": null,
+            "mnc": null
+        };
+
+        try {
+            // Remove quote marks from strings
+            do {
+                local idx = cellInfo.find("\"");
+                if (idx == null) {
+                    break;
+                }
+
+                cellInfo = cellInfo.slice(0, idx) + (idx < cellInfo.len() - 1 ? cellInfo.slice(idx + 1) : "");
+            } while (true);
+
+            // Parse string 'cellInfo' into its three newline-separated parts
+            local cellStrings = split(cellInfo, "\n");
+
+            if (cellStrings.len() != 3) {
+                throw "cell info must contain exactly 3 rows";
+            }
+
+            // AT+QCSQ
+            // Response: <sysmode>,[,<rssi>[,<lte_rsrp>[,<lte_sinr>[,<lte_rsrq>]]]]
+            local qcsq = split(cellStrings[1], ",");
+            // AT+QNWINFO
+            // Response: <Act>,<oper>,<band>,<channel>
+            local qnwinfo = split(cellStrings[2], ",");
+
+            res.mode = qcsq[0];
+            res.signalStrength = qcsq[1].tointeger();
+            res.mcc = qnwinfo[1].slice(0, 3);
+            res.mnc = qnwinfo[1].slice(3);
+        } catch (err) {
+            ::error(format("Couldn't parse cell info: '%s'. Raw cell info:\n%s", err, cellInfo), "DataProcessor", true);
+            return null;
         }
 
-        local batteryLowThr = _alertsSettings.batteryLow.threshold;
-
-        if (_batteryLevel < batteryLowThr && _batteryState == DP_BATTERY_LEVEL.NORMAL) {
-            _allAlerts.batteryLow = true;
-            _batteryState = DP_BATTERY_LEVEL.LOW;
-        }
-
-        if (_batteryLevel > batteryLowThr + DP_BATTERY_LEVEL_HYST) {
-            _batteryState = DP_BATTERY_LEVEL.NORMAL;
-        }
+        return res;
     }
 
     /**
@@ -4739,11 +5164,24 @@ class DataProcessor {
 
         _dataProc();
     }
+
+    /**
+     *  This handler is called when a light detection event happens.
+     *  @param {bool} eventType - true: light is detected, false: light is no longer present
+     */
+    function _onLightDetectedEvent(eventType) {
+        if (eventType) {
+            _allAlerts.tamperingDetected = true;
+
+            _dataProc();
+        }
+    }
 }
 
 //line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/LocationDriver.device.nut"
 
 // GNSS options:
+// TODO: Make a global const? Or use a builer-variable? Think of many other variables
 // Accuracy threshold of positioning, in meters
 const LD_GNSS_ACCURACY = 30;
 // The maximum positioning time, in seconds
@@ -4778,10 +5216,8 @@ enum LD_UBLOX_FIX_TYPE {
 // Location Driver class.
 // Determines the current position.
 class LocationDriver {
-    // UBloxM8N instance
-    _ubxDriver = null;
-    // UBloxAssistNow instance
-    _ubxAssist = null;
+    // u-blox module's power switch pin
+    _ubxSwitchPin = null;
     // SPIFlashFileSystem instance. Used to store u-blox assist data and other data
     _storage = null;
     // Timestamp of the latest assist data check (download)
@@ -4794,32 +5230,27 @@ class LocationDriver {
     _gettingAssistData = null;
     // Fails counter for GNSS. If it exceeds the threshold, the cooldown period will be applied
     _gnssFailsCounter = 0;
-    // ESP32 object
+    // ESP32Driver object
     _esp = null;
     // True if location using BLE devices is enabled, false otherwise
     _bleDevicesEnabled = false;
     // Known BLE devices
     _knownBLEDevices = null;
+    // Extra information (e.g., number of GNSS satellites)
+    _extraInfo = null;
 
     /**
      * Constructor for Location Driver
      */
     constructor() {
-        // TODO: Disable UART when it's not in use to save power
-        _ubxDriver = UBloxM8N(HW_UBLOX_UART);
-        local ubxSettings = {
-            "baudRate"     : LD_UBLOX_UART_BAUDRATE,
-            "outputMode"   : UBLOX_M8N_MSG_MODE.UBX_ONLY,
-            // TODO: Why BOTH?
-            "inputMode"    : UBLOX_M8N_MSG_MODE.BOTH
-        };
-
-
-        _ubxDriver.configure(ubxSettings);
-        _ubxAssist = UBloxAssistNow(_ubxDriver);
+        _ubxSwitchPin = HW_UBLOX_POWER_EN_PIN;
 
         _storage = SPIFlashFileSystem(HW_LD_SFFS_START_ADDR, HW_LD_SFFS_END_ADDR);
         _storage.init();
+
+        _extraInfo = {
+            "gnss": {}
+        };
 
         cm.onConnect(_onConnected.bindenv(this), "LocationDriver");
         _esp = ESP32Driver(HW_ESP_POWER_EN_PIN, HW_ESP_UART);
@@ -4828,7 +5259,6 @@ class LocationDriver {
 
     // TODO: Comment
     function lastKnownLocation() {
-        local decoder = @(data) JSONParser.parse(data.tostring());
         return _load(LD_FILE_NAMES.LAST_KNOWN_LOCATION, Serializer.deserialize.bindenv(Serializer));
     }
 
@@ -4887,6 +5317,11 @@ class LocationDriver {
         }.bindenv(this));
     }
 
+    // TODO: Comment
+    function getExtraInfo() {
+        return tableFullCopy(_extraInfo);
+    }
+
     // -------------------- PRIVATE METHODS -------------------- //
 
     /**
@@ -4901,12 +5336,16 @@ class LocationDriver {
             return Promise.reject("Cooldown period is active");
         }
 
+        // TODO: This may leave the UART enabled when it's not needed anymore
+        local ubxDriver = _initUblox();
+        ::debug("Switched ON the u-blox module", "LocationDriver");
+
         return _updateAssistData()
         .finally(function(_) {
-            // TODO: Power on the module?
             ::debug("Writing the UTC time to u-blox..", "LocationDriver");
-            _ubxAssist.writeUtcTimeAssist();
-            return _writeAssistDataToUBlox();
+            local ubxAssist = UBloxAssistNow(ubxDriver);
+            ubxAssist.writeUtcTimeAssist();
+            return _writeAssistDataToUBlox(ubxAssist);
         }.bindenv(this))
         .finally(function(_) {
             ::debug("Getting location using GNSS (u-blox)..", "LocationDriver");
@@ -4947,7 +5386,7 @@ class LocationDriver {
                 }.bindenv(this);
 
                 // Enable Position Velocity Time Solution messages
-                _ubxDriver.enableUbxMsg(UBX_MSG_PARSER_CLASS_MSG_ID.NAV_PVT, LD_UBLOX_LOC_CHECK_PERIOD, _onUBloxNavMsgFunc(onFix));
+                ubxDriver.enableUbxMsg(UBX_MSG_PARSER_CLASS_MSG_ID.NAV_PVT, LD_UBLOX_LOC_CHECK_PERIOD, _onUBloxNavMsgFunc(onFix));
             }.bindenv(this));
         }.bindenv(this));
     }
@@ -4978,7 +5417,8 @@ class LocationDriver {
 
         return cm.connect()
         .then(function(_) {
-            scannedTowers = BG96CellInfo.scanCellTowers();
+            // TODO: This can fail due to the cellInfo command called from an onConnect handler
+            scannedTowers = BG9xCellInfo.scanCellTowers();
             // Wait until the WiFi scanning is finished (if not yet)
             return scanWifiPromise;
         }.bindenv(this), function(_) {
@@ -5244,6 +5684,24 @@ class LocationDriver {
 
     // -------------------- UBLOX-SPECIFIC METHODS -------------------- //
 
+    // TODO: Comment
+    function _initUblox() {
+        _ubxSwitchPin.configure(DIGITAL_OUT, 1);
+
+        local ubxDriver = UBloxM8N(HW_UBLOX_UART);
+        local ubxSettings = {
+            "baudRate"     : LD_UBLOX_UART_BAUDRATE,
+            "outputMode"   : UBLOX_M8N_MSG_MODE.UBX_ONLY,
+            // TODO: Why BOTH?
+            "inputMode"    : UBLOX_M8N_MSG_MODE.BOTH
+        };
+
+
+        ubxDriver.configure(ubxSettings);
+
+        return ubxDriver;
+    }
+
     /**
      * Create a handler called when a navigation message received from the u-blox module
      *
@@ -5269,6 +5727,14 @@ class LocationDriver {
             }
 
 
+            if (!("satellitesUsed" in _extraInfo.gnss) || _extraInfo.gnss.satellitesUsed != parsed.numSV) {
+                ::debug(format("Current u-blox info: fixType %d, satellites %d, accuracy %d",
+                        parsed.fixType, parsed.numSV, _getUBloxAccuracy(parsed.hAcc)), "LocationDriver");
+            }
+
+            _extraInfo.gnss.satellitesUsed <- parsed.numSV;
+            _extraInfo.gnss.timestamp <- time();
+
             // Check fixtype
             if (parsed.fixType >= LD_UBLOX_FIX_TYPE.FIX_3D) {
                 local accuracy = _getUBloxAccuracy(parsed.hAcc);
@@ -5288,25 +5754,27 @@ class LocationDriver {
     }
 
     /**
-     * Disable u-blox navigation messages
-     * TODO: And power off the u-blox module?
+     * Disable u-blox module
      */
     function _disableUBlox() {
-        ::debug("Disable u-blox navigation messages...", "LocationDriver._disableNavMsgs");
+        // TODO: Should u-blox NAV_PVT messages be disabled before switching off the module?
+        // ::debug("Disable u-blox navigation messages...", "LocationDriver._disableNavMsgs");
         // Disable Position Velocity Time Solution messages
-        _ubxDriver.enableUbxMsg(UBX_MSG_PARSER_CLASS_MSG_ID.NAV_PVT, 0);
+        // _ubxDriver.enableUbxMsg(UBX_MSG_PARSER_CLASS_MSG_ID.NAV_PVT, 0);
 
-        // TODO: Power off the module?
+        _ubxSwitchPin.disable();
+        ::debug("Switched OFF the u-blox module", "LocationDriver");
     }
 
     /**
+     * TODO: Update the comment
      * Write the applicable u-blox assist data (if any) saved in the storage to the u-blox module
      *
      * @return {Promise} that:
      * - resolves if the operation succeeded
      * - rejects if the operation failed
      */
-    function _writeAssistDataToUBlox() {
+    function _writeAssistDataToUBlox(ubxAssist) {
         return Promise(function(resolve, reject) {
             local assistData = _readUBloxAssistData();
             if (assistData == null) {
@@ -5333,7 +5801,7 @@ class LocationDriver {
             }.bindenv(this);
 
             ::debug("Writing assist data to u-blox..", "LocationDriver");
-            _ubxAssist.writeAssistNow(assistData, onDone);
+            ubxAssist.writeAssistNow(assistData, onDone);
 
             // TODO: Temporarily resolve this Promise immediately because for some reason,
             // the callback is not called by the writeAssistNow() method
@@ -5570,7 +6038,96 @@ class LocationDriver {
     }
 }
 
-//line 49 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
+//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/SimUpdater.device.nut"
+
+// TODO: Comment
+class SimUpdater {
+    _enabled = false;
+    _duration = null;
+    _keepConnectionTimer = null;
+
+    /**
+     *  Start SIM updater.
+     *  @param {table} cfg - Table with the full configuration.
+     *                       For details, please, see the documentation
+     *
+     * @return {Promise} that:
+     * - resolves if the operation succeeded
+     * - rejects if the operation failed
+     */
+    function start(cfg) {
+        updateCfg(cfg);
+
+        return Promise.resolve(null);
+    }
+
+    // TODO: Comment
+    function updateCfg(cfg) {
+        local simUpdateCfg = getValFromTable(cfg, "simUpdate");
+        _enabled = getValFromTable(simUpdateCfg, "enabled", _enabled);
+        _duration = getValFromTable(simUpdateCfg, "duration", _duration);
+
+        if (simUpdateCfg) {
+            _enabled ? _enable() : _disable();
+        }
+
+        return Promise.resolve(null);
+    }
+
+    // TODO: Comment
+    function _enable() {
+        // Maximum server flush duration (sec) before forcing SIM-OTA
+        const SU_SERVER_FLUSH_TIMEOUT = 5;
+
+        ::debug("Enabling SIM OTA updates..", "SimUpdater");
+
+        local onConnected = function() {
+            if (_keepConnectionTimer) {
+                return;
+            }
+
+            ::info("Forcing SIM OTA update..", "SimUpdater");
+
+            // Without server.flush() call we can face very often failures in forcing SIM-OTA
+            server.flush(SU_SERVER_FLUSH_TIMEOUT);
+
+            if (BG96_Modem.forceSuperSimOTA()) {
+                ::debug("SIM OTA call succeeded. Now keeping the device connected for " + _duration + " seconds", "SimUpdater");
+
+                cm.keepConnection("SimUpdater", true);
+
+                local complete = function() {
+                    ::debug("Stopped keeping the device connected", "SimUpdater");
+
+                    _keepConnectionTimer = null;
+                    cm.keepConnection("SimUpdater", false);
+                }.bindenv(this);
+
+                _keepConnectionTimer = imp.wakeup(_duration, complete);
+            } else {
+                ::error("SIM OTA call failed", "SimUpdater");
+            }
+        }.bindenv(this);
+
+        cm.onConnect(onConnected, "SimUpdater");
+        cm.isConnected() && onConnected();
+    }
+
+    // TODO: Comment
+    function _disable() {
+        if (_keepConnectionTimer) {
+            imp.cancelwakeup(_keepConnectionTimer);
+            _keepConnectionTimer = null;
+        }
+
+        cm.onConnect(null, "SimUpdater");
+        cm.keepConnection("SimUpdater", false);
+
+        ::debug("SIM OTA updates disabled", "SimUpdater");
+    }
+}
+
+//line 47 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
 
 // Main application on Imp-Device: does the main logic of the application
 
@@ -5590,19 +6147,10 @@ const APP_RM_MSG_SENDING_MAX_RATE = 5;
 const APP_RM_MSG_RESEND_LIMIT = 5;
 
 // Send buffer size, in bytes
-const APP_SEND_BUFFER_SIZE = 10240;
+const APP_SEND_BUFFER_SIZE = 8192;
 
 // TODO: Check the RAM consumption!
 class Application {
-    _locationDriver = null;
-    _accelDriver = null;
-    _cfgManager = null;
-    _batteryMon = null;
-    _locationMon = null;
-    _motionMon = null;
-    _dataProc = null;
-    _thermoSensDriver = null;
-
     /**
      * Application Constructor
      */
@@ -5622,46 +6170,51 @@ class Application {
 
         ledIndication = LedIndication(HW_LED_RED_PIN, HW_LED_GREEN_PIN, HW_LED_BLUE_PIN);
 
+        // Switch off all flip-flops by default
+        // TODO: Should HW_UBLOX_BACKUP_PIN be kept always on? Or manage it inside the Location Driver/Monitor?
+        local flipFlops = [HW_UBLOX_BACKUP_PIN, HW_ESP_POWER_EN_PIN, HW_LDR_POWER_EN_PIN];
+        foreach (flipFlop in flipFlops) {
+            flipFlop.configure(DIGITAL_OUT, 0);
+            flipFlop.disable();
+        }
+
         // Create and intialize Replay Messenger
         _initReplayMessenger()
         .then(function(_) {
             HW_SHARED_I2C.configure(CLOCK_SPEED_400_KHZ);
 
-            _batteryMon = BatteryMonitor(HW_SHARED_I2C);
-            return _batteryMon.init();
-        }.bindenv(this))
-        .then(function(_) {
+            // Create and initialize Battery Monitor
+            local batteryMon = BatteryMonitor(HW_BAT_LEVEL_POWER_EN_PIN, HW_BAT_LEVEL_PIN);
+            // Create and initialize Photoresistor
+            local photoresistor = Photoresistor(HW_LDR_POWER_EN_PIN, HW_LDR_PIN);
             // Create and initialize Location Driver
-            _locationDriver = LocationDriver();
-
+            local locationDriver = LocationDriver();
             // Create and initialize Accelerometer Driver
-            _accelDriver = AccelerometerDriver(HW_SHARED_I2C, HW_ACCEL_INT_PIN);
-
-            // Create and initialize Thermosensor Driver
-            _thermoSensDriver = HTS221(HW_SHARED_I2C);
-            _thermoSensDriver.setMode(HTS221_MODE.ONE_SHOT);
-
+            local accelDriver = AccelerometerDriver(HW_SHARED_I2C, HW_ACCEL_INT_PIN);
             // Create and initialize Location Monitor
-            _locationMon = LocationMonitor(_locationDriver);
+            local locationMon = LocationMonitor(locationDriver);
             // Create and initialize Motion Monitor
-            _motionMon = MotionMonitor(_accelDriver, _locationMon);
+            local motionMon = MotionMonitor(accelDriver, locationMon);
             // Create and initialize Data Processor
-            _dataProc = DataProcessor(_locationMon, _motionMon, _accelDriver, _thermoSensDriver, _batteryMon);
+            local dataProc = DataProcessor(locationMon, motionMon, accelDriver, batteryMon, photoresistor);
+            // Create and initialize SIM Updater
+            local simUpdater = SimUpdater();
             // Create and initialize Cfg Manager
-            _cfgManager = CfgManager([_locationMon, _motionMon, _dataProc]);
+            local cfgManager = CfgManager([locationMon, motionMon, dataProc, simUpdater]);
             // Start Cfg Manager
-            _cfgManager.start();
+            cfgManager.start();
         }.bindenv(this))
         .fail(function(err) {
             ::error("Error during initialization: " + err);
 
-            // TODO: Reboot after a delay? Or enter the emergency mode?
+            // TODO: Reboot after a delay? Or enter the emergency mode? Let's temporarily put entering the emergency mode
+            pm.enterEmergencyMode("Error during initialization: " + err);
         }.bindenv(this));
     }
 
     // -------------------- PRIVATE METHODS -------------------- //
 
-     /**
+    /**
      * Create and intialize Connection Manager
      */
     function _initConnectionManager() {
@@ -5745,13 +6298,37 @@ rm <- null;
 // LED indication
 ledIndication <- null;
 
+// Used to track the shipping of the device. Once the device has been shipped,
+// the photoresistor will detect the light
+local photoresistor = Photoresistor(HW_LDR_POWER_EN_PIN, HW_LDR_PIN);
+
 // Callback to be called by Production Manager if it allows to run the main application
-function startApp() {
+local startApp = function() {
+    // Stop polling as we are going to start the main app => the device has already been shipped.
+    // This is guaranteed to be called after (!) the startPolling() call as the startApp callback
+    // is called asyncronously (using imp.wakeup)
+    photoresistor.stopPolling();
     // Run the application
     ::app <- Application();
-}
+};
 
-pm <- ProductionManager(startApp);
+pm <- ProductionManager(startApp, true);
 pm.start();
+
+// If woken by the photoresistor (the wake-up pin was HIGH), the device has been shipped
+if (hardware.wakereason() == WAKEREASON_PIN) {
+    pm.shipped();
+} else {
+    local onLightDetected = function(_) {
+        photoresistor.stopPolling();
+        pm.shipped();
+    }.bindenv(this);
+
+    // Start polling to be sure we will not miss light detection while the device is
+    // awake (= the wake-up pin is not working for the light detection).
+    // Also, this will switch ON (via a flip-flop) the photoresistor and configure the wake-up
+    // pin so the light detection is enabled during the deep sleep
+    photoresistor.startPolling(onLightDetected);
+}
 //line 7 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/not_for_uploading/my_main.device.nut"
 

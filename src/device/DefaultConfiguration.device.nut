@@ -74,9 +74,17 @@
       "threshold": 12.0         // battery low alert threshold, in %
     },
 
-    "tamperingDetected": {      // Not supported!
-      "enabled": false          // true - alert is enabled
+    "tamperingDetected": {      // tampering detected (light was detected by the photoresistor)
+      "enabled": false,         // true - alert is enabled
+      "pollingPeriod": 1.0      // photoresistor polling period, in seconds
     }
+  },
+
+  "simUpdate": {                // SIM OTA update
+    "enabled": true,            // true - SIM OTA update is enabled. This will force SIM OTA update every
+                                // time the device connects to the Internet. And will keep the device connected
+                                // for the specified time to let the update happen
+    "duration": 60              // duration of connection retention (when SIM OTA update is forced), in seconds
   },
 
   "debug": {                    // debug settings

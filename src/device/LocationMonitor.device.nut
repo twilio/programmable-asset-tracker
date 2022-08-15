@@ -96,7 +96,8 @@ class LocationMonitor {
 
         local res = {
             "flags": {},
-            "location": location
+            "location": location,
+            "gnssInfo": _ld.getExtraInfo().gnss
         };
 
         (_geofence.inZone != null) && (res.flags.inGeofence <- _geofence.inZone);

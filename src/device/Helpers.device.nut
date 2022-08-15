@@ -52,3 +52,49 @@ function mixTables(src, dst) {
 
     return dst;
 }
+
+// TODO: Comment
+function deepEqual(value1, value2, level = 0) {
+    if (level > 32) {
+        throw "Possible cyclic reference";
+    }
+
+    if (value1 == value2) {
+        return true;
+    }
+
+    local type1 = type(value1);
+    local type2 = type(value2);
+
+    if (type1 == "class" || type2 == "class") {
+        throw "Unsupported type";
+    }
+
+    if (type1 != type2) {
+        return false;
+    }
+
+    switch (type1) {
+        case "table":
+        case "array":
+            if (value1.len() != value2.len()) {
+                return false;
+            }
+
+            foreach (k, v in value1) {
+                if (!(k in value2) || !deepEqual(v, value2[k], level + 1)) {
+                    return false;
+                }
+            }
+
+            return true;
+        default:
+            return false;
+    }
+}
+
+// TODO: Comment
+function tableFullCopy(tbl) {
+    // TODO: This may be suboptimal. May need to be improved
+    return Serializer.deserialize(Serializer.serialize(tbl));
+}

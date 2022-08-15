@@ -9,14 +9,10 @@
 #require "ReplayMessenger.device.lib.nut:0.2.0"
 #require "utilities.lib.nut:3.0.1"
 #require "LIS3DH.device.lib.nut:3.0.0"
-#require "HTS221.device.lib.nut:2.0.2"
 #require "UBloxM8N.device.lib.nut:1.0.1"
 #require "UbxMsgParser.lib.nut:2.0.1"
 #require "UBloxAssistNow.device.lib.nut:0.1.0"
-
-@if MAX17055 || !defined(MAX17055)
-#require "MAX17055.device.lib.nut:1.0.2"
-@endif
+#require "BG96_Modem.device.lib.nut:0.0.4"
 
 // TODO: Aggregate all constants that should be customized in production in one place?
 
@@ -38,14 +34,16 @@
 @include once "CfgManager.device.nut"
 @include once "CustomConnectionManager.device.nut"
 @include once "CustomReplayMessenger.device.nut"
-@include once "BG96CellInfo.device.nut"
+@include once "BG9xCellInfo.device.nut"
 @include once "ESP32Driver.device.nut"
+@include once "Photoresistor.device.nut"
 @include once "AccelerometerDriver.device.nut"
 @include once "BatteryMonitor.device.nut"
 @include once "LocationMonitor.device.nut"
 @include once "MotionMonitor.device.nut"
 @include once "DataProcessor.device.nut"
 @include once "LocationDriver.device.nut"
+@include once "SimUpdater.device.nut"
 
 // Main application on Imp-Device: does the main logic of the application
 
@@ -65,19 +63,10 @@ const APP_RM_MSG_SENDING_MAX_RATE = 5;
 const APP_RM_MSG_RESEND_LIMIT = 5;
 
 // Send buffer size, in bytes
-const APP_SEND_BUFFER_SIZE = 10240;
+const APP_SEND_BUFFER_SIZE = 8192;
 
 // TODO: Check the RAM consumption!
 class Application {
-    _locationDriver = null;
-    _accelDriver = null;
-    _cfgManager = null;
-    _batteryMon = null;
-    _locationMon = null;
-    _motionMon = null;
-    _dataProc = null;
-    _thermoSensDriver = null;
-
     /**
      * Application Constructor
      */
@@ -104,46 +93,51 @@ class Application {
         ledIndication = LedIndication(HW_LED_RED_PIN, HW_LED_GREEN_PIN, HW_LED_BLUE_PIN);
 @endif
 
+        // Switch off all flip-flops by default
+        // TODO: Should HW_UBLOX_BACKUP_PIN be kept always on? Or manage it inside the Location Driver/Monitor?
+        local flipFlops = [HW_UBLOX_BACKUP_PIN, HW_ESP_POWER_EN_PIN, HW_LDR_POWER_EN_PIN];
+        foreach (flipFlop in flipFlops) {
+            flipFlop.configure(DIGITAL_OUT, 0);
+            flipFlop.disable();
+        }
+
         // Create and intialize Replay Messenger
         _initReplayMessenger()
         .then(function(_) {
             HW_SHARED_I2C.configure(CLOCK_SPEED_400_KHZ);
 
-            _batteryMon = BatteryMonitor(HW_SHARED_I2C);
-            return _batteryMon.init();
-        }.bindenv(this))
-        .then(function(_) {
+            // Create and initialize Battery Monitor
+            local batteryMon = BatteryMonitor(HW_BAT_LEVEL_POWER_EN_PIN, HW_BAT_LEVEL_PIN);
+            // Create and initialize Photoresistor
+            local photoresistor = Photoresistor(HW_LDR_POWER_EN_PIN, HW_LDR_PIN);
             // Create and initialize Location Driver
-            _locationDriver = LocationDriver();
-
+            local locationDriver = LocationDriver();
             // Create and initialize Accelerometer Driver
-            _accelDriver = AccelerometerDriver(HW_SHARED_I2C, HW_ACCEL_INT_PIN);
-
-            // Create and initialize Thermosensor Driver
-            _thermoSensDriver = HTS221(HW_SHARED_I2C);
-            _thermoSensDriver.setMode(HTS221_MODE.ONE_SHOT);
-
+            local accelDriver = AccelerometerDriver(HW_SHARED_I2C, HW_ACCEL_INT_PIN);
             // Create and initialize Location Monitor
-            _locationMon = LocationMonitor(_locationDriver);
+            local locationMon = LocationMonitor(locationDriver);
             // Create and initialize Motion Monitor
-            _motionMon = MotionMonitor(_accelDriver, _locationMon);
+            local motionMon = MotionMonitor(accelDriver, locationMon);
             // Create and initialize Data Processor
-            _dataProc = DataProcessor(_locationMon, _motionMon, _accelDriver, _thermoSensDriver, _batteryMon);
+            local dataProc = DataProcessor(locationMon, motionMon, accelDriver, batteryMon, photoresistor);
+            // Create and initialize SIM Updater
+            local simUpdater = SimUpdater();
             // Create and initialize Cfg Manager
-            _cfgManager = CfgManager([_locationMon, _motionMon, _dataProc]);
+            local cfgManager = CfgManager([locationMon, motionMon, dataProc, simUpdater]);
             // Start Cfg Manager
-            _cfgManager.start();
+            cfgManager.start();
         }.bindenv(this))
         .fail(function(err) {
             ::error("Error during initialization: " + err);
 
-            // TODO: Reboot after a delay? Or enter the emergency mode?
+            // TODO: Reboot after a delay? Or enter the emergency mode? Let's temporarily put entering the emergency mode
+            pm.enterEmergencyMode("Error during initialization: " + err);
         }.bindenv(this));
     }
 
     // -------------------- PRIVATE METHODS -------------------- //
 
-     /**
+    /**
      * Create and intialize Connection Manager
      */
     function _initConnectionManager() {
@@ -231,11 +225,35 @@ rm <- null;
 // LED indication
 ledIndication <- null;
 
+// Used to track the shipping of the device. Once the device has been shipped,
+// the photoresistor will detect the light
+local photoresistor = Photoresistor(HW_LDR_POWER_EN_PIN, HW_LDR_PIN);
+
 // Callback to be called by Production Manager if it allows to run the main application
-function startApp() {
+local startApp = function() {
+    // Stop polling as we are going to start the main app => the device has already been shipped.
+    // This is guaranteed to be called after (!) the startPolling() call as the startApp callback
+    // is called asyncronously (using imp.wakeup)
+    photoresistor.stopPolling();
     // Run the application
     ::app <- Application();
-}
+};
 
-pm <- ProductionManager(startApp);
+pm <- ProductionManager(startApp, true);
 pm.start();
+
+// If woken by the photoresistor (the wake-up pin was HIGH), the device has been shipped
+if (hardware.wakereason() == WAKEREASON_PIN) {
+    pm.shipped();
+} else {
+    local onLightDetected = function(_) {
+        photoresistor.stopPolling();
+        pm.shipped();
+    }.bindenv(this);
+
+    // Start polling to be sure we will not miss light detection while the device is
+    // awake (= the wake-up pin is not working for the light detection).
+    // Also, this will switch ON (via a flip-flop) the photoresistor and configure the wake-up
+    // pin so the light detection is enabled during the deep sleep
+    photoresistor.startPolling(onLightDetected);
+}

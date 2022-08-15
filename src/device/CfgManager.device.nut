@@ -154,19 +154,13 @@ class CfgManager {
         ::debug("Reporting cfg..", "@{CLASS_NAME}");
 
         local cfgReport = {
-            "configuration": _tableFullCopy(_actualCfg)
+            "configuration": tableFullCopy(_actualCfg)
             "description": {
                 "cfgTimestamp": time()
             }
         };
 
         rm.send(APP_RM_MSG_NAME.CFG, cfgReport, RM_IMPORTANCE_HIGH);
-    }
-
-    // TODO: Comment
-    function _tableFullCopy(tbl) {
-        // TODO: This may be suboptimal. May need to be improved
-        return Serializer.deserialize(Serializer.serialize(tbl));
     }
 
     // TODO: Comment
