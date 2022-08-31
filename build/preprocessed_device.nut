@@ -21,7 +21,7 @@
 
 //line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/shared/Version.shared.nut"
 // Application Version
-const APP_VERSION = "2.2.0";
+const APP_VERSION = "3.0.0";
 //line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/shared/Constants.shared.nut"
 // Constants common for the imp-agent and the imp-device
 
@@ -1238,7 +1238,7 @@ class CfgManager {
 
         ::debug("Applying debug settings..", "CfgManager");
 
-        if ("logLevel" in cfg) {
+        if ("logLevel" in debugSettings) {
             ::info("Setting log level: " + debugSettings.logLevel, "CfgManager");
             Logger.setLogLevelStr(debugSettings.logLevel);
         }
@@ -2202,6 +2202,10 @@ class BG9xCellInfo {
      * Return table with the parsed response.
      */
     function _writeAndParseAT(cmd) {
+        const BG9XCI_FLUSH_TIMEOUT = 2;
+
+        // TODO: Make sure it helps to avoid "Command in progress" error
+        server.flush(BG9XCI_FLUSH_TIMEOUT);
         local resp = _writeATCommand(cmd);
         return _parseATResp(resp);
     }

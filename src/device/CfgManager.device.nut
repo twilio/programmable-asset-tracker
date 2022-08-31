@@ -143,7 +143,7 @@ class CfgManager {
 
         ::debug("Applying debug settings..", "@{CLASS_NAME}");
 
-        if ("logLevel" in cfg) {
+        if ("logLevel" in debugSettings) {
             ::info("Setting log level: " + debugSettings.logLevel, "@{CLASS_NAME}");
             Logger.setLogLevelStr(debugSettings.logLevel);
         }
