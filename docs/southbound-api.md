@@ -141,7 +141,7 @@ The "configuration" block of the configuration reported by the tracker to a clou
         "enabled": true/false,  // true - location obtaining using BLE devices is enabled
 
         "generic": {            // New set of generic devices - fully replaces the previous set of generic devices
-          <mac>: {                // Generic device identifier (MAC address). Example: "db9786256c43"
+          <mac>: {                // Generic device identifier (MAC address). Must be lowercase. Example: "db9786256c43"
                                     // Device location coordinates.
                                     // "lng" and "lat" should be specified together only.
             "lng": <number>,        // Longitude, in degrees
@@ -151,7 +151,7 @@ The "configuration" block of the configuration reported by the tracker to a clou
         },
 
         "iBeacon": {            // New set of iBeacon devices - fully replaces the previous set of iBeacon devices
-          <uuid>: {               // Group UUID (16 bytes). Example: "74d2515660e6444ca177a96e67ecfc5f"
+          <uuid>: {               // Group UUID (16 bytes). Must be lowercase. Example: "74d2515660e6444ca177a96e67ecfc5f"
             <major>: {               // Sub-group identifier, number from 0 to 65535
               <minor>: {                // Device identifier, number from 0 to 65535
                                           // Device location coordinates.
