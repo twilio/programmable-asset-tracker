@@ -1068,20 +1068,20 @@ function _rulesCheck(rules, cfgGroup) {
  * @return {null | string} null - validation success, otherwise error string.
  */
 function _validateLogLevel(logLevels) {
-    // TODO: It's allowed to not pass the logLevel field
     if (!("logLevel" in logLevels)) {
-        return ("Unknown log level type");
+        return null;
     }
 
-    switch (logLevels.logLevel) {
+    local logLevel = logLevels.logLevel;
+
+    switch (logLevel) {
         case "DEBUG":
         case "INFO":
         case "ERROR":
-            break;
+            return null;
         default:
-            return ("Unknown log level");
+            return "Unknown log level";
     }
-    return null;
 }
 
 /**

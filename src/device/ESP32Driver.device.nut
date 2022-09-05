@@ -252,6 +252,9 @@ class ESP32Driver {
         .then(function(adverts) {
             ::debug("Scanning of BLE advertisements finished successfully. Scanned items: " + adverts.len(), "@{CLASS_NAME}");
             _switchOffTimer = imp.wakeup(ESP32_SWITCH_OFF_DELAY, _switchOff.bindenv(this));
+
+            // NOTE: It's assumed that MACs are in lower case.
+            // Probably, in the future, it's better to explicilty convert them to lower case here
             return adverts;
         }.bindenv(this), function(err) {
             _switchOffTimer = imp.wakeup(ESP32_SWITCH_OFF_DELAY, _switchOff.bindenv(this));

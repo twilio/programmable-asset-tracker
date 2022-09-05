@@ -86,7 +86,6 @@ class LocationDriver {
     // NOTE: This class only stores a reference to the object with BLE devices.
     // If this object is changed outside this class, this class will have the updated version of the object
     function configureBLEDevices(enabled = null, knownBLEDevices = null) {
-        // TODO: Convert all letters to small
         knownBLEDevices && (_knownBLEDevices = knownBLEDevices);
 
         if (enabled && !_knownBLEDevices) {

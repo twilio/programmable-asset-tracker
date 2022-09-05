@@ -345,7 +345,7 @@ class LocationMonitor {
                 if (distWithAccurace <= _geofence.radius) {
                     if (_geofence.inZone != true) {
                         _geofence.eventCb && _geofence.eventCb(true);
-                        _geofence.inZone = false;
+                        _geofence.inZone = true;
                     }
                 }
             }

@@ -1996,7 +1996,7 @@ class CustomReplayMessenger extends ReplayMessenger {
             try {
                 _spiFL.write(payload);
             } catch (err) {
-                // TODO: Erase only once!
+                // TODO: Go to the emergency mode instead (just throw an exception)?
                 ::error("Couldn't persist a message: " + err, "CustomReplayMessenger");
                 ::error("Erasing the flash logger!", "CustomReplayMessenger");
 
@@ -2680,6 +2680,9 @@ class ESP32Driver {
         .then(function(adverts) {
             ::debug("Scanning of BLE advertisements finished successfully. Scanned items: " + adverts.len(), "ESP32Driver");
             _switchOffTimer = imp.wakeup(ESP32_SWITCH_OFF_DELAY, _switchOff.bindenv(this));
+
+            // NOTE: It's assumed that MACs are in lower case.
+            // Probably, in the future, it's better to explicilty convert them to lower case here
             return adverts;
         }.bindenv(this), function(err) {
             _switchOffTimer = imp.wakeup(ESP32_SWITCH_OFF_DELAY, _switchOff.bindenv(this));
@@ -4430,7 +4433,7 @@ class LocationMonitor {
                 if (distWithAccurace <= _geofence.radius) {
                     if (_geofence.inZone != true) {
                         _geofence.eventCb && _geofence.eventCb(true);
-                        _geofence.inZone = false;
+                        _geofence.inZone = true;
                     }
                 }
             }
@@ -5270,7 +5273,6 @@ class LocationDriver {
     // NOTE: This class only stores a reference to the object with BLE devices.
     // If this object is changed outside this class, this class will have the updated version of the object
     function configureBLEDevices(enabled = null, knownBLEDevices = null) {
-        // TODO: Convert all letters to small
         knownBLEDevices && (_knownBLEDevices = knownBLEDevices);
 
         if (enabled && !_knownBLEDevices) {
@@ -6174,13 +6176,15 @@ class Application {
 
         ledIndication = LedIndication(HW_LED_RED_PIN, HW_LED_GREEN_PIN, HW_LED_BLUE_PIN);
 
-        // Switch off all flip-flops by default
-        // TODO: Should HW_UBLOX_BACKUP_PIN be kept always on? Or manage it inside the Location Driver/Monitor?
-        local flipFlops = [HW_UBLOX_BACKUP_PIN, HW_ESP_POWER_EN_PIN, HW_LDR_POWER_EN_PIN];
+        // Switch off all flip-flops by default (except the ublox's backup pin)
+        local flipFlops = [HW_ESP_POWER_EN_PIN, HW_LDR_POWER_EN_PIN];
         foreach (flipFlop in flipFlops) {
             flipFlop.configure(DIGITAL_OUT, 0);
             flipFlop.disable();
         }
+
+        // TODO: Is it the proper usage of the ublox's backup pin?
+        HW_UBLOX_BACKUP_PIN.configure(DIGITAL_OUT, 1);
 
         // Create and intialize Replay Messenger
         _initReplayMessenger()

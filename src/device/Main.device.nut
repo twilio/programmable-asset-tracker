@@ -93,13 +93,15 @@ class Application {
         ledIndication = LedIndication(HW_LED_RED_PIN, HW_LED_GREEN_PIN, HW_LED_BLUE_PIN);
 @endif
 
-        // Switch off all flip-flops by default
-        // TODO: Should HW_UBLOX_BACKUP_PIN be kept always on? Or manage it inside the Location Driver/Monitor?
-        local flipFlops = [HW_UBLOX_BACKUP_PIN, HW_ESP_POWER_EN_PIN, HW_LDR_POWER_EN_PIN];
+        // Switch off all flip-flops by default (except the ublox's backup pin)
+        local flipFlops = [HW_ESP_POWER_EN_PIN, HW_LDR_POWER_EN_PIN];
         foreach (flipFlop in flipFlops) {
             flipFlop.configure(DIGITAL_OUT, 0);
             flipFlop.disable();
         }
+
+        // TODO: Is it the proper usage of the ublox's backup pin?
+        HW_UBLOX_BACKUP_PIN.configure(DIGITAL_OUT, 1);
 
         // Create and intialize Replay Messenger
         _initReplayMessenger()
