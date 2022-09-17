@@ -349,7 +349,6 @@ class AccelerometerDriver {
             _accel.configureFifo(true, LIS3DH_FIFO_BYPASS_MODE);
             _accel.configureFifo(true, LIS3DH_FIFO_STREAM_TO_FIFO_MODE);
             _accel.getInterruptTable();
-            _accel.configureInterruptLatching(false);
             // TODO: Disable the pin when it's not in use to save power?
             _intPin.configure(DIGITAL_IN_WAKEUP, _checkInt.bindenv(this));
             _accel._getReg(LIS2DH12_REFERENCE);
@@ -359,7 +358,11 @@ class AccelerometerDriver {
         }
     }
 
-    // TODO: Comment
+    /**
+     * Get temperature value from internal accelerometer thermosensor.
+     *
+     * @return {float} Temperature value in degrees Celsius.
+     */
     function readTemperature() {
         // To convert the raw data to celsius
         const ACCEL_TEMP_TO_CELSIUS = 25.0;
@@ -568,7 +571,11 @@ class AccelerometerDriver {
         return f && typeof f == "function";
     }
 
-    // TODO: Comment
+    /**
+     * Enable/disable internal thermosensor.
+     *
+     * @param {boolean} enable - true if enable thermosensor.
+     */
     function _switchTempSensor(enable) {
         // LIS3DH_TEMP_CFG_REG enables/disables temperature sensor
         _accel._setReg(LIS3DH_TEMP_CFG_REG, enable ? LIS2DH12_TEMP_EN : 0);
@@ -588,6 +595,8 @@ class AccelerometerDriver {
      * Handler to check interrupt from accelerometer
      */
     function _checkInt() {
+        const SHOCK_CONF_TMOUT = 1;
+
         if (_intPin.read() == 0)
             return;
 
@@ -595,9 +604,15 @@ class AccelerometerDriver {
 
         if (intTable.singleClick) {
             ::debug("Shock interrupt", "@{CLASS_NAME}");
+            _accel.configureClickInterrupt(false);
             if (_shockCb && _enShockDetect) {
                 _shockCb();
             }
+            imp.wakeup(SHOCK_CONF_TMOUT, function(){
+                if (_enShockDetect) {
+                    _accel.configureClickInterrupt(true, LIS3DH_SINGLE_CLICK, _shockThr);
+                }
+            }.bindenv(this));
         }
 
         if (intTable.int1) {
