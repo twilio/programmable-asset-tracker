@@ -5118,7 +5118,8 @@ class DataProcessor {
             }.bindenv(this));
         }.bindenv(this))
         .fail(function(err) {
-            ::error("Failed getting cell info: " + err, "DataProcessor");
+            // TODO: Print to the ERROR level?
+            ::debug("Failed getting cell info: " + err, "DataProcessor");
         }.bindenv(this));
     }
 
