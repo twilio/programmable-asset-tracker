@@ -1,16 +1,13 @@
 # Prog-X Asset Tracker #
 
-**Version of the Application: 2.1.0 (Field Trial on imp006 Breakout Board)**
+**Version of the Application: 3.0.0 (Field Trial on Prog-X Asset Tracker target board)**
 
 An application in Squirrel language for [Electric Imp platform](https://www.electricimp.com/platform) that implements asset tracking functionality.
 
 The requirements: [./docs/Requirements - Prog-X Asset Tracker - external-GPx.pdf](./docs/Requirements%20-%20Prog-X%20Asset%20Tracker%20-%20external-GPx.pdf)
 
 This version supports:
-- Target hardware:
-  - [imp006 Breakout Board](https://developer.electricimp.com/hardware/resources/reference-designs/imp006breakout)
-  - [u-blox NEO-M8N GNSS module](https://www.u-blox.com/en/product/neo-m8-series). Tested with [Readytosky Ublox NEO M8N Kit](http://www.readytosky.com/)
-  - [Espressif ESP32 Series WiFi and Bluetooth chipset](https://www.espressif.com/en/products/socs/esp32) with [ESP-AT](https://docs.espressif.com/projects/esp-at/en/latest/esp32/) version [v2.2.0.0_esp32](https://github.com/espressif/esp-at/releases/tag/v2.2.0.0_esp32). Tested with [Mikroe WiFi BLE Click board](https://www.mikroe.com/wifi-ble-click) (ESP32-WROOM-32 module). See [esp32_readme](./esp32/esp32_readme.md)
+- Target hardware: [Prog-X Asset Tracker target board schematics](./docs/vdf-nt16e_mb_s11_220228.pdf)
 - Communication with the Internet (between Imp-Device and Imp-Agent) via cellular network.
 - Default configuration of the asset tracker application is hardcoded in the source file.
 - The configuration can be updated in runtime using the [Southbound REST API](./docs/southbound-api.md)
@@ -27,6 +24,7 @@ This version supports:
 - Periodic reading and reporting of:
   - Temperature
   - Battery status
+  - Cellular and GNSS auxiliary information
 - Alerts determination and immediate reporting for:
   - Temperature High
   - Temperature Low
@@ -37,6 +35,8 @@ This version supports:
   - Geofence Exited
   - Battery Low
   - Repossession Mode Activated
+  - Tampering Detected
+- Power management: switching hardware components off when not used
 - Staying offline most of time. Connect to the Internet (from Imp-device to Imp-Agent) when required only. Internet connection is used for:
   - Data/alerts sending
   - GNSS Assist data obtaining
@@ -48,6 +48,8 @@ This version supports:
 - UART logging.
 - LED indication of the application behavior.
 - Device Evaluation UI on Imp-Agent.
+- SIM OTA update initiation via the [Southbound REST API](./docs/southbound-api.md)
+- Shipping mode - the application sleeps till the "tamper detection patch" is removed.
 - The cloud [Northbound REST API](./docs/northbound-api.md) simple emulation on another Imp.
 
 ## Source Code ##
@@ -77,7 +79,7 @@ Should be passed to [Builder](https://github.com/electricimp/Builder/):
 - or using `--use-directives <path_to_json_file>` option, where the json file contains the variables with the values.
 
 Variables:
-- `ERASE_MEMORY` - Enable (`1`) / disable (`0`) erasing persistent memory used by the application, once after the new application build is deployed. Optional. Default: **disabled**. It can be used, for example, to delete the application configuration previously saved in the flash. **Note:** Currently, only SPI flash of the Imp-Device is erased by this feature.
+- `ERASE_MEMORY` - Enable (`1`) / disable (`0`) erasing persistent memory used by the application, once after the new application build is deployed. Optional. Default: **disabled**. It can be used, for example, to delete the application configuration previously saved in the flash. **Note:** Only SPI flash of the Imp-Device is erased by this feature.
 - `LOGGER_LEVEL` - Set logging level ("ERROR", "INFO", "DEBUG") on Imp-Agent/Device which works after the application restart till the application configuration is applied. Optional. Default: **"INFO"**. Note, when the application configuration is applied, the logging level is set according to the configuration. The logging level can be changed in runtime by updating the configuration.
 - `UART_LOGGING` - Enable (`1`) / disable (`0`) [UART logging](#uart-logging) on Imp-Device. Optional. Default: **enabled**
 - `LED_INDICATION` - Enable (`1`) / disable (`0`) [LED indication](#led-indication) of events. Optional. Default: **enabled**
@@ -110,6 +112,22 @@ Example of JSON with environment variables (when Cloud REST API is [emulated on 
   "UBLOX_ASSIST_NOW_TOKEN": "CW2lcwNtSE2pHmXYP_LbKP" // not a real token
 }
 ```
+
+## First Run Preparation #
+
+Before running the application for the first time make sure that:
+- ESP32 chip on the Prog-X Asset Tracker target board has a firmware flashed. For more details see [./docs/esp32_readme.md](./docs/esp32_readme.md)
+- Imp-Device SPI flash is clean (has no "garbage").
+- [User Configuration Storage](https://developer.electricimp.com/resources/permanentstore) is clean (has no data).
+
+Note, the application goes first to the Shipping mode when [User Configuration Storage](https://developer.electricimp.com/resources/permanentstore) is clean or contains a special application-specific setting. Otherwise, the application considers that the tracker is already "shipped" and starts the normal operation.
+
+For production devices it is assumed that the first run preparation is done by a factory code.
+
+For development devices, if needed, the first run preparation steps can be done manually:
+- To reflash ESP32 firmware - see [./docs/esp32_readme.md](./docs/esp32_readme.md)
+- To clean Imp-Device SPI flash - build and run the application with the `ERASE_MEMORY` [Builder Variable](#builder-variables)
+- To clean [User Configuration Storage](https://developer.electricimp.com/resources/permanentstore) (re-initiate the Shipping mode) - run a simple application with the ["imp.setuserconfiguration(null);"](https://developer.electricimp.com/api/imp/setuserconfiguration) call before running the Prog-X Asset Tracker application.
 
 ## Build And Run ##
 

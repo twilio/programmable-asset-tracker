@@ -15,7 +15,7 @@
 @include once "../src/device/Hardware.device.nut"
 @include once "../src/device/CustomConnectionManager.device.nut"
 @include once "../src/device/CustomReplayMessenger.device.nut"
-@include once "../src/device/BG96CellInfo.device.nut"
+@include once "../src/device/BG9xCellInfo.device.nut"
 @include once "../src/device/ESP32Driver.device.nut"
 @include once "../src/device/Configuration.device.nut"
 @include once "../src/device/LocationDriver.device.nut"

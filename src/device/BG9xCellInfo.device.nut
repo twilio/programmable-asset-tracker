@@ -1,6 +1,6 @@
-@set CLASS_NAME = "BG96CellInfo" // Class name for logging
+@set CLASS_NAME = "BG9xCellInfo" // Class name for logging
 
-// Required BG96 AT Commands
+// Required BG96/95 AT Commands
 enum AT_COMMAND {
     // Query the information of neighbour cells (Detailed information of base station)
     GET_QENG  = "AT+QENG=\"neighbourcell\"",
@@ -8,19 +8,16 @@ enum AT_COMMAND {
     GET_QENG_SERV_CELL  = "AT+QENG=\"servingcell\""
 }
 
-// Class to obtain cell towers info from BG96 modem.
+// Class to obtain cell towers info from BG96/95 modems.
 // This code uses unofficial impOS features
 // and is based on an unofficial example provided by Twilio
 // Utilizes the following AT Commands:
-// - Network Service Commands:
-//   - AT+CREG Network Registration Status
-//   - AT+COPS Operator Selection
 // - QuecCell Commands:
 //   - AT+QENG Switch on/off Engineering Mode
-class BG96CellInfo {
+class BG9xCellInfo {
 
     /**
-    * Get the network registration information from BG96
+    * Get the network registration information from BG96/95
     *
     * @return {Table} The network registration information, or null on error.
     * Table fields include:
@@ -45,6 +42,8 @@ class BG96CellInfo {
             "cellTowers": []
         };
 
+        ::debug("Scanning cell towers..", "@{CLASS_NAME}");
+
         try {
             local qengCmdResp = _writeAndParseAT(AT_COMMAND.GET_QENG_SERV_CELL);
             if ("error" in qengCmdResp) {
@@ -54,6 +53,7 @@ class BG96CellInfo {
             local srvCellRadioType = _qengExtractRadioType(qengCmdResp.data);
 
             switch (srvCellRadioType) {
+                // This type is used by both BG96/95 modem
                 case "GSM":
                     data.radioType = "gsm";
                     // +QENG:
@@ -73,9 +73,13 @@ class BG96CellInfo {
                         data.cellTowers.extend(_qengExtractTowersInfo(qengCmdResp.data, srvCellRadioType));
                     }
                     break;
+                // These types are used by BG96 modem
                 case "CAT-M":
                 case "CAT-NB":
                 case "LTE":
+                // These types are used by BG95 modem
+                case "eMTC":
+                case "NBIoT":
                     data.radioType = "lte";
                     data.cellTowers.append(_qengExtractServingCellLTE(qengCmdResp.data));
                     // Neighbor towers parameters not correspond google API
@@ -86,8 +90,8 @@ class BG96CellInfo {
                     // +QENG: "neighbourcell intra”,"LTE",<earfcn>,<pcid>,<rsrq>,<rsrp>,<rssi>,<sinr>
                     // ,<srxlev>,<cell_resel_priority>,<s_non_intra_search>,<thresh_serving_low>,
                     // <s_intra_search>
-                    // https://developers.google.com/maps/documentation/geolocation/overview#wifi_access_point_object
-                    // location is determined by one tower
+                    // https://developers.google.com/maps/documentation/geolocation/overview#cell_tower_object
+                    // Location is determined by one tower in this case
                     break;
                 default:
                     throw "Unknown radio type: " + srvCellRadioType;
@@ -96,6 +100,8 @@ class BG96CellInfo {
             ::error("Scanning cell towers error: " + err, "@{CLASS_NAME}");
             return null;
         }
+
+        ::debug("Scanned items: " + data.len(), "@{CLASS_NAME}");
 
         return data;
     }
@@ -107,6 +113,10 @@ class BG96CellInfo {
      * Return table with the parsed response.
      */
     function _writeAndParseAT(cmd) {
+        const BG9XCI_FLUSH_TIMEOUT = 2;
+
+        // TODO: Make sure it helps to avoid "Command in progress" error
+        server.flush(BG9XCI_FLUSH_TIMEOUT);
         local resp = _writeATCommand(cmd);
         return _parseATResp(resp);
     }
@@ -121,7 +131,7 @@ class BG96CellInfo {
     }
 
     /**
-     * Send the specified AT Command to BG96.
+     * Send the specified AT Command to the modem.
      * Return a string with response.
      *
      * This function uses unofficial impOS feature.
@@ -308,16 +318,16 @@ class BG96CellInfo {
 
             local mcc = splitted[4];
             local mnc = splitted[5];
-            local lac = splitted[12];
+            local tac = splitted[12];
             local ci = splitted[6];
             local ss = splitted[15];
-            lac = utilities.hexStringToInteger(lac);
+            tac = utilities.hexStringToInteger(tac);
             ci = utilities.hexStringToInteger(ci);
 
             return {
                 "mobileCountryCode" : mcc,
                 "mobileNetworkCode" : mnc,
-                "locationAreaCode" : lac,
+                "locationAreaCode" : tac,
                 "cellId" : ci,
                 "signalStrength" : ss
             };

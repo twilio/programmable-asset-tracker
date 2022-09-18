@@ -1,8 +1,9 @@
 @set CLASS_NAME = "LocationDriver" // Class name for logging
 
 // GNSS options:
+// TODO: Make a global const? Or use a builer-variable? Think of many other variables
 // Accuracy threshold of positioning, in meters
-const LD_GNSS_ACCURACY = 30;
+const LD_GNSS_ACCURACY = 50;
 // The maximum positioning time, in seconds
 const LD_GNSS_LOC_TIMEOUT = 55;
 // The number of fails allowed before the cooldown period is activated
@@ -35,10 +36,8 @@ enum LD_UBLOX_FIX_TYPE {
 // Location Driver class.
 // Determines the current position.
 class LocationDriver {
-    // UBloxM8N instance
-    _ubxDriver = null;
-    // UBloxAssistNow instance
-    _ubxAssist = null;
+    // u-blox module's power switch pin
+    _ubxSwitchPin = null;
     // SPIFlashFileSystem instance. Used to store u-blox assist data and other data
     _storage = null;
     // Timestamp of the latest assist data check (download)
@@ -51,40 +50,27 @@ class LocationDriver {
     _gettingAssistData = null;
     // Fails counter for GNSS. If it exceeds the threshold, the cooldown period will be applied
     _gnssFailsCounter = 0;
-    // ESP32 object
+    // ESP32Driver object
     _esp = null;
     // True if location using BLE devices is enabled, false otherwise
     _bleDevicesEnabled = false;
     // Known BLE devices
     _knownBLEDevices = null;
+    // Extra information (e.g., number of GNSS satellites)
+    _extraInfo = null;
 
     /**
      * Constructor for Location Driver
      */
     constructor() {
-        // TODO: Disable UART when it's not in use to save power
-        _ubxDriver = UBloxM8N(HW_UBLOX_UART);
-        local ubxSettings = {
-            "baudRate"     : LD_UBLOX_UART_BAUDRATE,
-            "outputMode"   : UBLOX_M8N_MSG_MODE.UBX_ONLY,
-            // TODO: Why BOTH?
-            "inputMode"    : UBLOX_M8N_MSG_MODE.BOTH
-        };
-
-@if DEBUG_UBLOX
-        // Register handlers with debug logging only if needed
-        // Register command ACK and NAK callbacks
-        _ubxDriver.registerOnMessageCallback(UBX_MSG_PARSER_CLASS_MSG_ID.ACK_ACK, _onUBloxACK.bindenv(this));
-        _ubxDriver.registerOnMessageCallback(UBX_MSG_PARSER_CLASS_MSG_ID.ACK_NAK, _onUBloxNAK.bindenv(this));
-        // Register general handler
-        ubxSettings.defaultOnMsg <- _onUBloxMessage.bindenv(this);
-@endif
-
-        _ubxDriver.configure(ubxSettings);
-        _ubxAssist = UBloxAssistNow(_ubxDriver);
+        _ubxSwitchPin = HW_UBLOX_POWER_EN_PIN;
 
         _storage = SPIFlashFileSystem(HW_LD_SFFS_START_ADDR, HW_LD_SFFS_END_ADDR);
         _storage.init();
+
+        _extraInfo = {
+            "gnss": {}
+        };
 
         cm.onConnect(_onConnected.bindenv(this), "@{CLASS_NAME}");
         _esp = ESP32Driver(HW_ESP_POWER_EN_PIN, HW_ESP_UART);
@@ -93,7 +79,6 @@ class LocationDriver {
 
     // TODO: Comment
     function lastKnownLocation() {
-        local decoder = @(data) JSONParser.parse(data.tostring());
         return _load(LD_FILE_NAMES.LAST_KNOWN_LOCATION, Serializer.deserialize.bindenv(Serializer));
     }
 
@@ -101,7 +86,6 @@ class LocationDriver {
     // NOTE: This class only stores a reference to the object with BLE devices.
     // If this object is changed outside this class, this class will have the updated version of the object
     function configureBLEDevices(enabled = null, knownBLEDevices = null) {
-        // TODO: Convert all letters to small
         knownBLEDevices && (_knownBLEDevices = knownBLEDevices);
 
         if (enabled && !_knownBLEDevices) {
@@ -152,6 +136,11 @@ class LocationDriver {
         }.bindenv(this));
     }
 
+    // TODO: Comment
+    function getExtraInfo() {
+        return tableFullCopy(_extraInfo);
+    }
+
     // -------------------- PRIVATE METHODS -------------------- //
 
     /**
@@ -166,12 +155,16 @@ class LocationDriver {
             return Promise.reject("Cooldown period is active");
         }
 
+        // TODO: This may leave the UART enabled when it's not needed anymore
+        local ubxDriver = _initUblox();
+        ::debug("Switched ON the u-blox module", "@{CLASS_NAME}");
+
         return _updateAssistData()
         .finally(function(_) {
-            // TODO: Power on the module?
             ::debug("Writing the UTC time to u-blox..", "@{CLASS_NAME}");
-            _ubxAssist.writeUtcTimeAssist();
-            return _writeAssistDataToUBlox();
+            local ubxAssist = UBloxAssistNow(ubxDriver);
+            ubxAssist.writeUtcTimeAssist();
+            return _writeAssistDataToUBlox(ubxAssist);
         }.bindenv(this))
         .finally(function(_) {
             ::debug("Getting location using GNSS (u-blox)..", "@{CLASS_NAME}");
@@ -212,7 +205,7 @@ class LocationDriver {
                 }.bindenv(this);
 
                 // Enable Position Velocity Time Solution messages
-                _ubxDriver.enableUbxMsg(UBX_MSG_PARSER_CLASS_MSG_ID.NAV_PVT, LD_UBLOX_LOC_CHECK_PERIOD, _onUBloxNavMsgFunc(onFix));
+                ubxDriver.enableUbxMsg(UBX_MSG_PARSER_CLASS_MSG_ID.NAV_PVT, LD_UBLOX_LOC_CHECK_PERIOD, _onUBloxNavMsgFunc(onFix));
             }.bindenv(this));
         }.bindenv(this));
     }
@@ -243,7 +236,8 @@ class LocationDriver {
 
         return cm.connect()
         .then(function(_) {
-            scannedTowers = BG96CellInfo.scanCellTowers();
+            // TODO: This can fail due to the cellInfo command called from an onConnect handler
+            scannedTowers = BG9xCellInfo.scanCellTowers();
             // Wait until the WiFi scanning is finished (if not yet)
             return scanWifiPromise;
         }.bindenv(this), function(_) {
@@ -509,6 +503,31 @@ class LocationDriver {
 
     // -------------------- UBLOX-SPECIFIC METHODS -------------------- //
 
+    // TODO: Comment
+    function _initUblox() {
+        _ubxSwitchPin.configure(DIGITAL_OUT, 1);
+
+        local ubxDriver = UBloxM8N(HW_UBLOX_UART);
+        local ubxSettings = {
+            "outputMode"   : UBLOX_M8N_MSG_MODE.UBX_ONLY,
+            // TODO: Why BOTH?
+            "inputMode"    : UBLOX_M8N_MSG_MODE.BOTH
+        };
+
+@if DEBUG_UBLOX
+        // Register handlers with debug logging only if needed
+        // Register command ACK and NAK callbacks
+        ubxDriver.registerOnMessageCallback(UBX_MSG_PARSER_CLASS_MSG_ID.ACK_ACK, _onUBloxACK.bindenv(this));
+        ubxDriver.registerOnMessageCallback(UBX_MSG_PARSER_CLASS_MSG_ID.ACK_NAK, _onUBloxNAK.bindenv(this));
+        // Register general handler
+        ubxSettings.defaultOnMsg <- _onUBloxMessage.bindenv(this);
+@endif
+
+        ubxDriver.configure(ubxSettings);
+
+        return ubxDriver;
+    }
+
     /**
      * Create a handler called when a navigation message received from the u-blox module
      *
@@ -536,11 +555,19 @@ class LocationDriver {
                 return;
             }
 
+
 @if DEBUG_UBLOX
-            // TODO: Log sometimes even when no DEBUG_UBLOX flag set? Just to indicate that the process is ongoing
             ::debug(format("Current u-blox info: fixType %d, satellites %d, accuracy %d",
                            parsed.fixType, parsed.numSV, _getUBloxAccuracy(parsed.hAcc)), "@{CLASS_NAME}");
+@else
+            if (!("satellitesUsed" in _extraInfo.gnss) || _extraInfo.gnss.satellitesUsed != parsed.numSV) {
+                ::debug(format("Current u-blox info: fixType %d, satellites %d, accuracy %d",
+                        parsed.fixType, parsed.numSV, _getUBloxAccuracy(parsed.hAcc)), "@{CLASS_NAME}");
+            }
 @endif
+
+            _extraInfo.gnss.satellitesUsed <- parsed.numSV;
+            _extraInfo.gnss.timestamp <- time();
 
             // Check fixtype
             if (parsed.fixType >= LD_UBLOX_FIX_TYPE.FIX_3D) {
@@ -561,25 +588,29 @@ class LocationDriver {
     }
 
     /**
-     * Disable u-blox navigation messages
-     * TODO: And power off the u-blox module?
+     * Disable u-blox module
      */
     function _disableUBlox() {
-        ::debug("Disable u-blox navigation messages...", "@{CLASS_NAME}._disableNavMsgs");
+        // TODO: Should u-blox NAV_PVT messages be disabled before switching off the module?
+        // ::debug("Disable u-blox navigation messages...", "@{CLASS_NAME}._disableNavMsgs");
         // Disable Position Velocity Time Solution messages
-        _ubxDriver.enableUbxMsg(UBX_MSG_PARSER_CLASS_MSG_ID.NAV_PVT, 0);
+        // _ubxDriver.enableUbxMsg(UBX_MSG_PARSER_CLASS_MSG_ID.NAV_PVT, 0);
 
-        // TODO: Power off the module?
+        _ubxSwitchPin.disable();
+        ::debug("Switched OFF the u-blox module", "@{CLASS_NAME}");
     }
 
     /**
+     * TODO: Update the comment
      * Write the applicable u-blox assist data (if any) saved in the storage to the u-blox module
      *
      * @return {Promise} that:
      * - resolves if the operation succeeded
      * - rejects if the operation failed
      */
-    function _writeAssistDataToUBlox() {
+    function _writeAssistDataToUBlox(ubxAssist) {
+        const LD_ASSIST_DATA_WRITE_TIMEOUT = 15;
+
         return Promise(function(resolve, reject) {
             local assistData = _readUBloxAssistData();
             if (assistData == null) {
@@ -587,30 +618,26 @@ class LocationDriver {
             }
 
             local onDone = function(errors) {
-                // TODO: Temporarily print this log message as we have never seen this
-                // callback called and want to be aware if it is suddenly called one day
-                ::info("ATTENTION!!! U-BLOX WRITE-ASSIST-DATA CALLBACK HAS BEEN CALLED!");
-
                 if (!errors) {
                     ::debug("Assist data has been written to u-blox successfully", "@{CLASS_NAME}");
                     return resolve(null);
                 }
 
-                ::error("Errors during u-blox assist data writing:", "@{CLASS_NAME}");
+                ::info(format("Assist data has been written to u-blox successfully except %d assist messages", errors.len()), "@{CLASS_NAME}");
                 foreach(err in errors) {
                     // Log errors encountered
-                    ::error(err, "@{CLASS_NAME}");
+                    ::debug(err, "@{CLASS_NAME}");
                 }
 
                 reject(null);
             }.bindenv(this);
 
             ::debug("Writing assist data to u-blox..", "@{CLASS_NAME}");
-            _ubxAssist.writeAssistNow(assistData, onDone);
+            ubxAssist.writeAssistNow(assistData, onDone);
 
-            // TODO: Temporarily resolve this Promise immediately because for some reason,
-            // the callback is not called by the writeAssistNow() method
-            resolve(null);
+            // TODO: Temporarily resolve this Promise after a timeout because for some reason,
+            // the callback is not always called by the writeAssistNow() method
+            imp.wakeup(LD_ASSIST_DATA_WRITE_TIMEOUT, reject);
         }.bindenv(this));
     }
 

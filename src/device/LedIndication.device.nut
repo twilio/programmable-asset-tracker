@@ -4,6 +4,8 @@
 const LI_SIGNAL_DURATION = 1.0;
 // Duration of a gap (delay) between signals, in seconds
 const LI_GAP_DURATION = 0.2;
+// Maximum repeats of the same event in a row
+const LI_MAX_EVENT_REPEATS = 3;
 
 // Event type for indication
 enum LI_EVENT_TYPE {
@@ -31,6 +33,10 @@ class LedIndication {
     _rgbPins = null;
     // Promise used instead of a queue of signals for simplicity
     _indicationPromise = Promise.resolve(null);
+    // The last indicated event type
+    _lastEventType = null;
+    // The number of repeats (in a row) of the last indicated event
+    _lastEventRepeats = 0;
 
     /**
      * Constructor LED indication
@@ -53,6 +59,17 @@ class LedIndication {
         // There are 3 LEDS: blue, green, red
         const LI_LEDS_NUM = 3;
 
+        if (eventType == _lastEventType) {
+            _lastEventRepeats++;
+        } else {
+            _lastEventType = eventType;
+            _lastEventRepeats = 0;
+        }
+
+        if (_lastEventRepeats >= LI_MAX_EVENT_REPEATS) {
+            return;
+        }
+
         _indicationPromise = _indicationPromise
         .finally(function(_) {
             // Turn on the required colors
@@ -66,6 +83,9 @@ class LedIndication {
                     for (local i = 0; i < LI_LEDS_NUM; i++) {
                         _rgbPins[i].disable();
                     }
+
+                    // Decrease the counter of repeats since we now have time for one more signal
+                    (_lastEventRepeats > 0) && _lastEventRepeats--;
 
                     // Make a gap (delay) between signals for better perception
                     imp.wakeup(LI_GAP_DURATION, resolve);

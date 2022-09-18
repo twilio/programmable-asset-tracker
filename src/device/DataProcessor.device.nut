@@ -19,21 +19,20 @@ const DP_BATTERY_LEVEL_HYST = 4.0;
 // Data Processor class.
 // Processes data, saves and sends messages
 class DataProcessor {
-
     // Data reading timer period
     _dataReadingPeriod = null;
 
     // Data reading timer handler
     _dataReadingTimer = null;
 
+    // Data reading Promise (null if no data reading is ongoing)
+    _dataReadingPromise = null;
+
     // Data sending timer period
     _dataSendingPeriod = null;
 
     // Data sending timer handler
     _dataSendingTimer = null;
-
-    // Thermosensor driver object
-    _ts = null;
 
     // Battery driver object
     _bd = null;
@@ -46,6 +45,9 @@ class DataProcessor {
 
     // Motion Monitor driver object
     _mm = null;
+
+    // Photoresistor object
+    _pr = null;
 
     // Last temperature value
     _temperature = null;
@@ -65,20 +67,26 @@ class DataProcessor {
     // Settings of shock, temperature and battery alerts
     _alertsSettings = null;
 
+    // Last obtained cellular info. Cleared once sent
+    _lastCellInfo = null;
+
+    // Last obtained GNSS info
+    _lastGnssInfo = null;
+
     /**
      *  Constructor for Data Processor class.
      *  @param {object} locationMon - Location monitor object.
      *  @param {object} motionMon - Motion monitor object.
      *  @param {object} accelDriver - Accelerometer driver object.
-     *  @param {object} temperDriver - Temperature sensor driver object.
      *  @param {object} batDriver - Battery driver object.
+     *  @param {object} photoresistor - Photoresistor object.
      */
-    constructor(locationMon, motionMon, accelDriver, temperDriver, batDriver) {
+    constructor(locationMon, motionMon, accelDriver, batDriver, photoresistor) {
         _ad = accelDriver;
         _lm = locationMon;
         _mm = motionMon;
-        _ts = temperDriver;
         _bd = batDriver;
+        _pr = photoresistor;
 
         _allAlerts = {
             // TODO: Do we need alerts like trackerReset, trackerReconfigured?
@@ -90,14 +98,16 @@ class DataProcessor {
             "repossessionActivated" : false,
             "temperatureHigh"       : false,
             "temperatureLow"        : false,
-            "batteryLow"            : false
+            "batteryLow"            : false,
+            "tamperingDetected"     : false
         };
 
         _alertsSettings = {
-            "shockDetected"   : {},
-            "temperatureHigh" : {},
-            "temperatureLow"  : {},
-            "batteryLow"      : {}
+            "shockDetected"     : {},
+            "temperatureHigh"   : {},
+            "temperatureLow"    : {},
+            "batteryLow"        : {},
+            "tamperingDetected" : {}
         };
     }
 
@@ -111,6 +121,8 @@ class DataProcessor {
      * - rejects if the operation failed
      */
     function start(cfg) {
+        cm.onConnect(_getCellInfo.bindenv(this), "@{CLASS_NAME}");
+
         updateCfg(cfg);
 
         _lm.setGeofencingEventCb(_onGeofencingEvent.bindenv(this));
@@ -145,11 +157,12 @@ class DataProcessor {
 
     // TODO: Comment
     function _updCfgAlerts(cfg) {
-        local alertsCfg = getValFromTable(cfg, "alerts");
-        local shockDetectedCfg   = getValFromTable(alertsCfg, "shockDetected");
-        local temperatureHighCfg = getValFromTable(alertsCfg, "temperatureHigh");
-        local temperatureLowCfg  = getValFromTable(alertsCfg, "temperatureLow");
-        local batteryLowCfg      = getValFromTable(alertsCfg, "batteryLow");
+        local alertsCfg            = getValFromTable(cfg, "alerts");
+        local shockDetectedCfg     = getValFromTable(alertsCfg, "shockDetected");
+        local temperatureHighCfg   = getValFromTable(alertsCfg, "temperatureHigh");
+        local temperatureLowCfg    = getValFromTable(alertsCfg, "temperatureLow");
+        local batteryLowCfg        = getValFromTable(alertsCfg, "batteryLow");
+        local tamperingDetectedCfg = getValFromTable(alertsCfg, "tamperingDetected");
 
         if (shockDetectedCfg) {
             _allAlerts.shockDetected = false;
@@ -168,6 +181,11 @@ class DataProcessor {
             _allAlerts.batteryLow = false;
             mixTables(batteryLowCfg, _alertsSettings.batteryLow);
         }
+        if (tamperingDetectedCfg) {
+            _allAlerts.tamperingDetected = false;
+            mixTables(tamperingDetectedCfg, _alertsSettings.tamperingDetected);
+            _configureTamperingDetection();
+        }
     }
 
     // TODO: Comment
@@ -178,6 +196,16 @@ class DataProcessor {
             _ad.enableShockDetection(_onShockDetectedEvent.bindenv(this), settings);
         } else {
             _ad.enableShockDetection(null);
+        }
+    }
+
+    // TODO: Comment
+    function _configureTamperingDetection() {
+        if (_alertsSettings.tamperingDetected.enabled) {
+            ::debug("Activating tampering detection..", "@{CLASS_NAME}");
+            _pr.startPolling(_onLightDetectedEvent.bindenv(this), _alertsSettings.tamperingDetected.pollingPeriod);
+        } else {
+            _pr.stopPolling();
         }
     }
 
@@ -212,80 +240,95 @@ class DataProcessor {
      *  Data and alerts reading and processing.
      */
     function _dataProc() {
+        if (_dataReadingPromise) {
+            return _dataReadingPromise;
+        }
+
         // read temperature, check alert conditions
         _checkTemperature();
 
-        // read battery level, check alert conditions
-        _checkBatteryLevel();
-
-        // check if alerts have been triggered
-        local alerts = [];
-        foreach (key, val in _allAlerts) {
-            if (val) {
-                alerts.append(key);
-                _allAlerts[key] = false;
+        // get cell info, read battery level
+        _dataReadingPromise = Promise.all([_getCellInfo(), _checkBatteryLevel()])
+        .finally(function(_) {
+            // check if alerts have been triggered
+            local alerts = [];
+            foreach (key, val in _allAlerts) {
+                if (val) {
+                    alerts.append(key);
+                    _allAlerts[key] = false;
+                }
             }
-        }
-        local alertsCount = alerts.len();
 
-        local lmStatus = _lm.getStatus();
-        local flags = mixTables(_mm.getStatus().flags, lmStatus.flags);
-        local location = lmStatus.location;
+            local cellInfo = _lastCellInfo || {};
+            local lmStatus = _lm.getStatus();
+            local flags = mixTables(_mm.getStatus().flags, lmStatus.flags);
+            local location = lmStatus.location;
+            local gnssInfo = lmStatus.gnssInfo;
 
-        local dataMsg = {
-            "trackerId": hardware.getdeviceid(),
-            "timestamp": time(),
-            "status": flags,
-            "location": {
-                "timestamp": location.timestamp,
-                "type": location.type,
-                "accuracy": location.accuracy,
-                "lng": location.longitude,
-                "lat": location.latitude
-            },
-            "sensors": {},
-            "alerts": alerts
-        };
+            local dataMsg = {
+                "trackerId": hardware.getdeviceid(),
+                "timestamp": time(),
+                "status": flags,
+                "location": {
+                    "timestamp": location.timestamp,
+                    "type": location.type,
+                    "accuracy": location.accuracy,
+                    "lng": location.longitude,
+                    "lat": location.latitude
+                },
+                "sensors": {},
+                "alerts": alerts,
+                "cellInfo": cellInfo,
+                "gnssInfo": {}
+            };
 
-        (_temperature  != null) && (dataMsg.sensors.temperature  <- _temperature);
-        (_batteryLevel != null) && (dataMsg.sensors.batteryLevel <- _batteryLevel);
+            (_temperature  != null) && (dataMsg.sensors.temperature  <- _temperature);
+            (_batteryLevel != null) && (dataMsg.sensors.batteryLevel <- _batteryLevel);
 
-        ::debug("Message: " + JSONEncoder.encode(dataMsg), "@{CLASS_NAME}");
-
-        if (alertsCount > 0) {
-            ::info("Alerts:", "@{CLASS_NAME}");
-            foreach (item in alerts) {
-                ::info(item, "@{CLASS_NAME}");
+            if (_lastGnssInfo == null || !deepEqual(_lastGnssInfo, gnssInfo)) {
+                _lastGnssInfo = gnssInfo;
+                dataMsg.gnssInfo = gnssInfo;
             }
-        }
 
-        // ReplayMessenger saves the message till imp-device is connected
-        rm.send(APP_RM_MSG_NAME.DATA, dataMsg, RM_IMPORTANCE_HIGH);
-        ledIndication && ledIndication.indicate(LI_EVENT_TYPE.NEW_MSG);
+            _lastCellInfo = null;
 
-        // If at least one alert, try to send data immediately
-        if (alertsCount > 0) {
-            _dataSend();
-        }
+            ::debug("Message: " + JSONEncoder.encode(dataMsg), "@{CLASS_NAME}");
 
-        _dataReadingTimer && imp.cancelwakeup(_dataReadingTimer);
-        _dataReadingTimer = imp.wakeup(_dataReadingPeriod,
-                                       _dataProcTimerCb.bindenv(this));
+            // ReplayMessenger saves the message till imp-device is connected
+            rm.send(APP_RM_MSG_NAME.DATA, dataMsg, RM_IMPORTANCE_HIGH);
+            ledIndication && ledIndication.indicate(LI_EVENT_TYPE.NEW_MSG);
+
+            if (alerts.len() > 0) {
+                ::info("Alerts:", "@{CLASS_NAME}");
+                foreach (item in alerts) {
+                    ::info(item, "@{CLASS_NAME}");
+                }
+
+                // If there is at least one alert, try to send data immediately
+                _dataSend();
+            }
+
+            _dataReadingTimer && imp.cancelwakeup(_dataReadingTimer);
+            _dataReadingTimer = imp.wakeup(_dataReadingPeriod,
+                                           _dataProcTimerCb.bindenv(this));
+
+            _dataReadingPromise = null;
+        }.bindenv(this));
     }
 
     /**
      *  Read temperature, check alert conditions
      */
     function _checkTemperature() {
-        local res = _ts.read();
-        if ("error" in res) {
-            ::error("Failed to read temperature: " + res.error, "@{CLASS_NAME}");
+        try {
+            _temperature = _ad.readTemperature();
+        } catch (err) {
+            ::error("Failed to read temperature: " + err, "@{CLASS_NAME}");
             // Don't generate alerts and don't send temperature to the cloud
             _temperature = null;
             return;
         }
 
-        _temperature = res.temperature;
         ::debug("Temperature: " + _temperature, "@{CLASS_NAME}");
 
         local tempHigh = _alertsSettings.temperatureHigh;
@@ -320,31 +363,103 @@ class DataProcessor {
      *  Read battery level, check alert conditions
      */
     function _checkBatteryLevel() {
-        try {
-            _batteryLevel = _bd.measureBattery();
-        } catch (err) {
+        return _bd.measureBattery()
+        .then(function(level) {
+            _batteryLevel = level.percent;
+
+            ::debug("Battery level: " + _batteryLevel + "%", "@{CLASS_NAME}");
+
+            if (!_alertsSettings.batteryLow.enabled) {
+                return;
+            }
+
+            local batteryLowThr = _alertsSettings.batteryLow.threshold;
+
+            if (_batteryLevel < batteryLowThr && _batteryState == DP_BATTERY_LEVEL.NORMAL) {
+                _allAlerts.batteryLow = true;
+                _batteryState = DP_BATTERY_LEVEL.LOW;
+            }
+
+            if (_batteryLevel > batteryLowThr + DP_BATTERY_LEVEL_HYST) {
+                _batteryState = DP_BATTERY_LEVEL.NORMAL;
+            }
+        }.bindenv(this), function(err) {
             ::error("Failed to get battery level: " + err, "@{CLASS_NAME}");
             // Don't generate alerts and don't send battery level to the cloud
             _batteryLevel = null;
-            return;
+        }.bindenv(this));
+    }
+
+    // TODO: Comment
+    function _getCellInfo() {
+        if (!cm.isConnected()) {
+            return Promise.resolve(null);
         }
 
-        ::debug("Battery level: " + _batteryLevel, "@{CLASS_NAME}");
+        return Promise(function(resolve, reject) {
+            // TODO: This is a temporary defense from the incorrect work of getcellinfo()
+            local cbTimeoutTimer = imp.wakeup(5, function() {
+                reject("imp.net.getcellinfo didn't call its callback!");
+            }.bindenv(this));
 
-        if (!_alertsSettings.batteryLow.enabled) {
-            return;
+            // TODO: Can potentially be called in parallel - need to avoid this
+            imp.net.getcellinfo(function(cellInfo) {
+                imp.cancelwakeup(cbTimeoutTimer);
+                _lastCellInfo = _extractCellInfoBG95(cellInfo);
+                resolve(null);
+            }.bindenv(this));
+        }.bindenv(this))
+        .fail(function(err) {
+            // TODO: Print to the ERROR level?
+            ::debug("Failed getting cell info: " + err, "@{CLASS_NAME}");
+        }.bindenv(this));
+    }
+
+    // TODO: Comment
+    function _extractCellInfoBG95(cellInfo) {
+        local res = {
+            "timestamp": time(),
+            "mode": null,
+            "signalStrength": null,
+            "mcc": null,
+            "mnc": null
+        };
+
+        try {
+            // Remove quote marks from strings
+            do {
+                local idx = cellInfo.find("\"");
+                if (idx == null) {
+                    break;
+                }
+
+                cellInfo = cellInfo.slice(0, idx) + (idx < cellInfo.len() - 1 ? cellInfo.slice(idx + 1) : "");
+            } while (true);
+
+            // Parse string 'cellInfo' into its three newline-separated parts
+            local cellStrings = split(cellInfo, "\n");
+
+            if (cellStrings.len() != 3) {
+                throw "cell info must contain exactly 3 rows";
+            }
+
+            // AT+QCSQ
+            // Response: <sysmode>,[,<rssi>[,<lte_rsrp>[,<lte_sinr>[,<lte_rsrq>]]]]
+            local qcsq = split(cellStrings[1], ",");
+            // AT+QNWINFO
+            // Response: <Act>,<oper>,<band>,<channel>
+            local qnwinfo = split(cellStrings[2], ",");
+
+            res.mode = qcsq[0];
+            res.signalStrength = qcsq[1].tointeger();
+            res.mcc = qnwinfo[1].slice(0, 3);
+            res.mnc = qnwinfo[1].slice(3);
+        } catch (err) {
+            ::error(format("Couldn't parse cell info: '%s'. Raw cell info:\n%s", err, cellInfo), "@{CLASS_NAME}", true);
+            return null;
         }
 
-        local batteryLowThr = _alertsSettings.batteryLow.threshold;
-
-        if (_batteryLevel < batteryLowThr && _batteryState == DP_BATTERY_LEVEL.NORMAL) {
-            _allAlerts.batteryLow = true;
-            _batteryState = DP_BATTERY_LEVEL.LOW;
-        }
-
-        if (_batteryLevel > batteryLowThr + DP_BATTERY_LEVEL_HYST) {
-            _batteryState = DP_BATTERY_LEVEL.NORMAL;
-        }
+        return res;
     }
 
     /**
@@ -394,6 +509,18 @@ class DataProcessor {
         _allAlerts.repossessionActivated = true;
 
         _dataProc();
+    }
+
+    /**
+     *  This handler is called when a light detection event happens.
+     *  @param {bool} eventType - true: light is detected, false: light is no longer present
+     */
+    function _onLightDetectedEvent(eventType) {
+        if (eventType) {
+            _allAlerts.tamperingDetected = true;
+
+            _dataProc();
+        }
     }
 }
 

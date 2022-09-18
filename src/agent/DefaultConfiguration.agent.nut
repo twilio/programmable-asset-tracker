@@ -1,5 +1,5 @@
 {
   "debug": {                // debug settings
-    "logLevel": "DEBUG"       // logging level on Imp-Agent ("ERROR", "INFO", "DEBUG")
+    "logLevel": "INFO"       // logging level on Imp-Agent ("ERROR", "INFO", "DEBUG")
   }
 }

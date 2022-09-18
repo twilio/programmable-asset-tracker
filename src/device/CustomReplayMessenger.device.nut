@@ -348,6 +348,7 @@ class CustomReplayMessenger extends ReplayMessenger {
             try {
                 _spiFL.write(payload);
             } catch (err) {
+                // TODO: Go to the emergency mode instead (just throw an exception)?
                 ::error("Couldn't persist a message: " + err, "@{CLASS_NAME}");
                 ::error("Erasing the flash logger!", "@{CLASS_NAME}");
 

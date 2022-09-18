@@ -1,6 +1,6 @@
 
 // Supported configuration JSON format/scheme version
-const CFG_SCHEME_VERSION = "1.0";
+const CFG_SCHEME_VERSION = "1.1";
 
 // Configuration safeguard/validation constants:
 
@@ -96,6 +96,12 @@ const CFG_CHARGE_LEVEL_THR_SAFEGUARD_MIN = 0.0;
 // Maximal charge level, in percent.
 const CFG_CHARGE_LEVEL_THR_SAFEGUARD_MAX = 100.0;
 
+// "tamperingDetected"
+// Minimum polling period, in seconds.
+const CFG_TAMPERING_POLL_PERIOD_SAFEGUARD_MIN = 0.1;
+// Maximum polling period, in seconds.
+const CFG_TAMPERING_POLL_PERIOD_SAFEGUARD_MAX = 86400.0;
+
 // other:
 
 // "lng"
@@ -123,6 +129,12 @@ const CFG_MIN_TIMESTAMP = 1585666384;
 // Maximal start time of repossesion, Unix timestamp
 // 17.04.2035 18:48:49 - TODO: adjust
 const CFG_MAX_TIMESTAMP = 2060448529;
+
+// "duration"
+// Minimum SIM update duration, in seconds.
+const CFG_SIM_UPDATE_DURATION_SAFEGUARD_MIN = 5.0;
+// Maximum SIM update duration, in seconds.
+const CFG_SIM_UPDATE_DURATION_SAFEGUARD_MAX = 300.0;
 
 // Maximal value of iBeacon minor, major
 const CFG_BEACON_MINOR_MAJOR_VAL_MAX = 65535;
@@ -188,6 +200,12 @@ function validateCfg(msg) {
             local tracking = conf.locationTracking;
             local validLocTrackRes = _validateLocTracking(tracking);
             if (validLocTrackRes != null) return validLocTrackRes;
+        }
+        // validate SIM update
+        if ("simUpdate" in conf) {
+            local simUpdate = conf.simUpdate;
+            local validSimUpdateRes = _validateSimUpdate(simUpdate);
+            if (validSimUpdateRes != null) return validSimUpdateRes;
         }
     }
 
@@ -293,20 +311,20 @@ function _rulesCheck(rules, cfgGroup) {
  * @return {null | string} null - validation success, otherwise error string.
  */
 function _validateLogLevel(logLevels) {
-    // TODO: It's allowed to not pass the logLevel field
     if (!("logLevel" in logLevels)) {
-        return ("Unknown log level type");
+        return null;
     }
 
-    switch (logLevels.logLevel) {
+    local logLevel = logLevels.logLevel;
+
+    switch (logLevel) {
         case "DEBUG":
         case "INFO":
         case "ERROR":
-            break;
+            return null;
         default:
-            return ("Unknown log level");
+            return "Unknown log level";
     }
-    return null;
 }
 
 /**
@@ -385,6 +403,11 @@ function _validateAlerts(alerts) {
                                         "highLim":CFG_SHOCK_ACC_SAFEGUARD_MAX});
                 break;
             case "tamperingDetected":
+                validationRules.append({"name":"pollingPeriod",
+                                        "required":false,
+                                        "validationType":"integer|float",
+                                        "lowLim":CFG_TAMPERING_POLL_PERIOD_SAFEGUARD_MIN,
+                                        "highLim":CFG_TAMPERING_POLL_PERIOD_SAFEGUARD_MAX});
             default:
                 break;
         }
@@ -552,6 +575,25 @@ function _validateLocTracking(locTracking) {
         }
     }
     return null;
+}
+
+/**
+ * Validation of the SIM update block.
+ *
+ * @param {table} simUpdate - SIM update configuration table.
+ *
+ * @return {null | string} null - validation success, otherwise error string.
+ */
+function _validateSimUpdate(simUpdate) {
+    local validationRules = [{
+        "name":"duration",
+        "required":false,
+        "validationType":"integer|float",
+        "lowLim":CFG_SIM_UPDATE_DURATION_SAFEGUARD_MIN,
+        "highLim":CFG_SIM_UPDATE_DURATION_SAFEGUARD_MAX
+    }];
+
+    return _checkEnableField(simUpdate) || _rulesCheck(validationRules, simUpdate);
 }
 
 /**

@@ -1,78 +1,38 @@
-// TODO: Comment
-class PowerSafeI2C {
-    _i2c = null;
-    _clockSpeed = null;
-    _enabled = false;
-    _disableTimer = null;
-
-    // TODO: Comment
-    constructor(i2c) {
-        _i2c = i2c;
-    }
-
-    // TODO: Comment
-    function configure(clockSpeed) {
-        _clockSpeed = clockSpeed;
-        _enabled = true;
-    }
-
-    // TODO: Comment
-    function disable() {
-        _i2c.disable();
-        _enabled = false;
-    }
-
-    // TODO: Comment
-    function read(deviceAddress, registerAddress, numberOfBytes) {
-        _beforeUse();
-        // If the bus is not enabled/configured, this will return null and set the read error code to -13
-        return _i2c.read(deviceAddress, registerAddress, numberOfBytes);
-    }
-
-    // TODO: Comment
-    function readerror() {
-        return _i2c.readerror();
-    }
-
-    // TODO: Comment
-    function write(deviceAddress, registerPlusData) {
-        _beforeUse();
-        // If the bus is not enabled/configured, this will return -13
-        return _i2c.write(deviceAddress, registerPlusData);
-    }
-
-    // TODO: Comment
-    function _beforeUse() {
-        const HW_PSI2C_DISABLE_DELAY = 5;
-
-        // Don't configure i2c bus if the configure() method hasn't been called before
-        _enabled && _i2c.configure(_clockSpeed);
-
-        _disableTimer && imp.cancelwakeup(_disableTimer);
-        _disableTimer = imp.wakeup(HW_PSI2C_DISABLE_DELAY, (@() _i2c.disable()).bindenv(this));
-    }
-}
-
-// I2C bus used by:
-// - Battery fuel gauge
-// - Temperature-humidity sensor
-// - Accelerometer
+// Accelerometer's I2C bus
 HW_SHARED_I2C <- PowerSafeI2C(hardware.i2cLM);
 
 // Accelerometer's interrupt pin
 HW_ACCEL_INT_PIN <- hardware.pinW;
 
 // UART port used for the u-blox module
-HW_UBLOX_UART <- hardware.uartPQRS;
+HW_UBLOX_UART <- hardware.uartXEFGH;
+
+// U-blox module power enable pin
+HW_UBLOX_POWER_EN_PIN <- hardware.pinG;
+
+// U-blox module backup power enable pin (flip-flop)
+HW_UBLOX_BACKUP_PIN <- FlipFlop(hardware.pinYD, hardware.pinYM);
 
 // UART port used for logging (if enabled)
-HW_LOGGING_UART <- hardware.uartYABCD;
+HW_LOGGING_UART <- hardware.uartYJKLM;
 
 // ESP32 UART port
-HW_ESP_UART <- hardware.uartXEFGH;
+HW_ESP_UART <- hardware.uartABCD;
 
-// ESP32 power enable pin
-HW_ESP_POWER_EN_PIN <- hardware.pinXU;
+// ESP32 power enable pin (flip-flop)
+HW_ESP_POWER_EN_PIN <- FlipFlop(hardware.pinYD, hardware.pinS);
+
+// Light Dependent Photoresistor pin
+HW_LDR_PIN <- hardware.pinV;
+
+// Light Dependent Photoresistor power enable pin
+HW_LDR_POWER_EN_PIN <- FlipFlop(hardware.pinYD, hardware.pinXM);
+
+// Battery level measurement pin
+HW_BAT_LEVEL_PIN <- hardware.pinXD;
+
+// Battery level measurement power enable pin
+HW_BAT_LEVEL_POWER_EN_PIN <- hardware.pinYG;
 
 // LED indication: RED pin
 HW_LED_RED_PIN <- hardware.pinR;

@@ -96,7 +96,8 @@ class LocationMonitor {
 
         local res = {
             "flags": {},
-            "location": location
+            "location": location,
+            "gnssInfo": _ld.getExtraInfo().gnss
         };
 
         (_geofence.inZone != null) && (res.flags.inGeofence <- _geofence.inZone);
@@ -344,7 +345,7 @@ class LocationMonitor {
                 if (distWithAccurace <= _geofence.radius) {
                     if (_geofence.inZone != true) {
                         _geofence.eventCb && _geofence.eventCb(true);
-                        _geofence.inZone = false;
+                        _geofence.inZone = true;
                     }
                 }
             }
