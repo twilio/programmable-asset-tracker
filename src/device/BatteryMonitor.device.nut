@@ -8,7 +8,7 @@ const BM_AVG_SAMPLES = 6;
 const BM_VOLTAGE_GAIN = 2.4242;
 
 // 3 x 1.5v battery
-const BM_FULL_VOLTAGE = 4.8;
+const BM_FULL_VOLTAGE = 4.0;
 
 // Measures the battery level
 class BatteryMonitor {

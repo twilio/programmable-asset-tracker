@@ -249,7 +249,7 @@ class DataProcessor {
 
         // get cell info, read battery level
         _dataReadingPromise = Promise.all([_getCellInfo(), _checkBatteryLevel()])
-        .then(function(res) {
+        .finally(function(_) {
             // check if alerts have been triggered
             local alerts = [];
             foreach (key, val in _allAlerts) {
@@ -259,7 +259,7 @@ class DataProcessor {
                 }
             }
 
-            local cellInfo = res[0] || {};
+            local cellInfo = _lastCellInfo || {};
             local lmStatus = _lm.getStatus();
             local flags = mixTables(_mm.getStatus().flags, lmStatus.flags);
             local location = lmStatus.location;
@@ -393,21 +393,24 @@ class DataProcessor {
     // TODO: Comment
     function _getCellInfo() {
         if (!cm.isConnected()) {
-            return Promise.resolve(_lastCellInfo);
+            return Promise.resolve(null);
         }
 
         return Promise(function(resolve, reject) {
             // TODO: This is a temporary defense from the incorrect work of getcellinfo()
             local cbTimeoutTimer = imp.wakeup(5, function() {
-                resolve(null);
-                ::error("imp.net.getcellinfo didn't call its callback!", "@{CLASS_NAME}");
+                reject("imp.net.getcellinfo didn't call its callback!");
             }.bindenv(this));
 
+            // TODO: Can potentially be called in parallel - need to avoid this
             imp.net.getcellinfo(function(cellInfo) {
                 imp.cancelwakeup(cbTimeoutTimer);
                 _lastCellInfo = _extractCellInfoBG95(cellInfo);
-                resolve(_extractCellInfoBG95(cellInfo));
+                resolve(null);
             }.bindenv(this));
+        }.bindenv(this))
+        .fail(function(err) {
+            ::error("Failed getting cell info: " + err, "@{CLASS_NAME}");
         }.bindenv(this));
     }
 

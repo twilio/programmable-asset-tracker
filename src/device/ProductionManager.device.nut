@@ -48,7 +48,7 @@ class ProductionManager {
         imp.onunhandledexception(_onUnhandledException.bindenv(this));
         server.setsendtimeoutpolicy(RETURN_ON_ERROR, WAIT_TIL_SENT, PMGR_SEND_TIMEOUT);
 
-        local data = _getData();
+        local data = _getOrInitializeData();
 
         if (data.errorFlag && data.deploymentID == __EI.DEPLOYMENT_ID) {
             if (server.isconnected()) {
@@ -79,7 +79,7 @@ class ProductionManager {
 
     // TODO: Comment
     function shipped() {
-        local data = _getData();
+        local data = _getOrInitializeData();
 
         if (data.shipped) {
             return;
@@ -179,11 +179,12 @@ class ProductionManager {
     }
 
     // TODO: Comment
-    function _getData() {
+    function _getOrInitializeData() {
         try {
             local userConf = _readUserConf();
 
             if (userConf == null) {
+                _storeData(_initialData(false));
                 return _initialData(false);
             }
 
@@ -200,6 +201,7 @@ class ProductionManager {
             _error("Error during parsing user configuration: " + err);
         }
 
+        _storeData(_initialData(true));
         return _initialData(true);
     }
 
@@ -232,7 +234,7 @@ class ProductionManager {
      * @param {string} error - The error description
      */
     function _setErrorFlag(error) {
-        local data = _getData();
+        local data = _getOrInitializeData();
 
         // By this update we update the userConf object (see above)
         data.errorFlag = true;

@@ -3,7 +3,7 @@
 // GNSS options:
 // TODO: Make a global const? Or use a builer-variable? Think of many other variables
 // Accuracy threshold of positioning, in meters
-const LD_GNSS_ACCURACY = 30;
+const LD_GNSS_ACCURACY = 50;
 // The maximum positioning time, in seconds
 const LD_GNSS_LOC_TIMEOUT = 55;
 // The number of fails allowed before the cooldown period is activated
@@ -509,7 +509,6 @@ class LocationDriver {
 
         local ubxDriver = UBloxM8N(HW_UBLOX_UART);
         local ubxSettings = {
-            "baudRate"     : LD_UBLOX_UART_BAUDRATE,
             "outputMode"   : UBLOX_M8N_MSG_MODE.UBX_ONLY,
             // TODO: Why BOTH?
             "inputMode"    : UBLOX_M8N_MSG_MODE.BOTH
@@ -610,6 +609,8 @@ class LocationDriver {
      * - rejects if the operation failed
      */
     function _writeAssistDataToUBlox(ubxAssist) {
+        const LD_ASSIST_DATA_WRITE_TIMEOUT = 15;
+
         return Promise(function(resolve, reject) {
             local assistData = _readUBloxAssistData();
             if (assistData == null) {
@@ -617,19 +618,15 @@ class LocationDriver {
             }
 
             local onDone = function(errors) {
-                // TODO: Temporarily print this log message as we have never seen this
-                // callback called and want to be aware if it is suddenly called one day
-                ::info("ATTENTION!!! U-BLOX WRITE-ASSIST-DATA CALLBACK HAS BEEN CALLED!");
-
                 if (!errors) {
                     ::debug("Assist data has been written to u-blox successfully", "@{CLASS_NAME}");
                     return resolve(null);
                 }
 
-                ::error("Errors during u-blox assist data writing:", "@{CLASS_NAME}");
+                ::info(format("Assist data has been written to u-blox successfully except %d assist messages", errors.len()), "@{CLASS_NAME}");
                 foreach(err in errors) {
                     // Log errors encountered
-                    ::error(err, "@{CLASS_NAME}");
+                    ::debug(err, "@{CLASS_NAME}");
                 }
 
                 reject(null);
@@ -638,9 +635,9 @@ class LocationDriver {
             ::debug("Writing assist data to u-blox..", "@{CLASS_NAME}");
             ubxAssist.writeAssistNow(assistData, onDone);
 
-            // TODO: Temporarily resolve this Promise immediately because for some reason,
-            // the callback is not called by the writeAssistNow() method
-            resolve(null);
+            // TODO: Temporarily resolve this Promise after a timeout because for some reason,
+            // the callback is not always called by the writeAssistNow() method
+            imp.wakeup(LD_ASSIST_DATA_WRITE_TIMEOUT, reject);
         }.bindenv(this));
     }
 

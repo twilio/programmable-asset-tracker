@@ -453,6 +453,8 @@ class UartOutputStream extends Logger.IOutputStream {
 const LI_SIGNAL_DURATION = 1.0;
 // Duration of a gap (delay) between signals, in seconds
 const LI_GAP_DURATION = 0.2;
+// Maximum repeats of the same event in a row
+const LI_MAX_EVENT_REPEATS = 3;
 
 // Event type for indication
 enum LI_EVENT_TYPE {
@@ -480,6 +482,10 @@ class LedIndication {
     _rgbPins = null;
     // Promise used instead of a queue of signals for simplicity
     _indicationPromise = Promise.resolve(null);
+    // The last indicated event type
+    _lastEventType = null;
+    // The number of repeats (in a row) of the last indicated event
+    _lastEventRepeats = 0;
 
     /**
      * Constructor LED indication
@@ -502,6 +508,17 @@ class LedIndication {
         // There are 3 LEDS: blue, green, red
         const LI_LEDS_NUM = 3;
 
+        if (eventType == _lastEventType) {
+            _lastEventRepeats++;
+        } else {
+            _lastEventType = eventType;
+            _lastEventRepeats = 0;
+        }
+
+        if (_lastEventRepeats >= LI_MAX_EVENT_REPEATS) {
+            return;
+        }
+
         _indicationPromise = _indicationPromise
         .finally(function(_) {
             // Turn on the required colors
@@ -516,6 +533,9 @@ class LedIndication {
                         _rgbPins[i].disable();
                     }
 
+                    // Decrease the counter of repeats since we now have time for one more signal
+                    (_lastEventRepeats > 0) && _lastEventRepeats--;
+
                     // Make a gap (delay) between signals for better perception
                     imp.wakeup(LI_GAP_DURATION, resolve);
                 }.bindenv(this);
@@ -529,7 +549,8 @@ class LedIndication {
 
 //line 30 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
 
-//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Hardware.device.nut"
+//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/PowerSafeI2C.device.nut"
+
 // TODO: Comment
 class PowerSafeI2C {
     _i2c = null;
@@ -585,6 +606,8 @@ class PowerSafeI2C {
     }
 }
 
+//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/FlipFlop.device.nut"
+
 // TODO: Comment
 class FlipFlop {
     _clkPin = null;
@@ -623,6 +646,7 @@ class FlipFlop {
     }
 }
 
+//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Hardware.device.nut"
 // Accelerometer's I2C bus
 HW_SHARED_I2C <- PowerSafeI2C(hardware.i2cLM);
 
@@ -834,7 +858,7 @@ class ProductionManager {
         imp.onunhandledexception(_onUnhandledException.bindenv(this));
         server.setsendtimeoutpolicy(RETURN_ON_ERROR, WAIT_TIL_SENT, PMGR_SEND_TIMEOUT);
 
-        local data = _getData();
+        local data = _getOrInitializeData();
 
         if (data.errorFlag && data.deploymentID == __EI.DEPLOYMENT_ID) {
             if (server.isconnected()) {
@@ -865,7 +889,7 @@ class ProductionManager {
 
     // TODO: Comment
     function shipped() {
-        local data = _getData();
+        local data = _getOrInitializeData();
 
         if (data.shipped) {
             return;
@@ -965,11 +989,12 @@ class ProductionManager {
     }
 
     // TODO: Comment
-    function _getData() {
+    function _getOrInitializeData() {
         try {
             local userConf = _readUserConf();
 
             if (userConf == null) {
+                _storeData(_initialData(false));
                 return _initialData(false);
             }
 
@@ -986,6 +1011,7 @@ class ProductionManager {
             _error("Error during parsing user configuration: " + err);
         }
 
+        _storeData(_initialData(true));
         return _initialData(true);
     }
 
@@ -1018,7 +1044,7 @@ class ProductionManager {
      * @param {string} error - The error description
      */
     function _setErrorFlag(error) {
-        local data = _getData();
+        local data = _getOrInitializeData();
 
         // By this update we update the userConf object (see above)
         data.errorFlag = true;
@@ -1335,18 +1361,18 @@ class CfgManager {
 
     "motionMonitoring": {
       "enabled": true,          // true - motion monitoring is enabled
-      "movementAccMin": 0.2,    // minimum (starting) acceleration threshold for movement detection, in g
-      "movementAccMax": 0.4,    // maximum  acceleration threshold for movement detection, in g
-      "movementAccDur": 0.25,   // duration of exceeding movement acceleration threshold, in seconds
-      "motionTime": 15.0,       // maximum time to confirm motion detection after the initial movement, in seconds
-      "motionVelocity": 0.5,    // minimum instantaneous velocity to confirm motion detection condition, in meters per second
-      "motionDistance": 5.0,    // minimum movement distance to determine motion detection condition, in meters
+      "movementAccMin": 0.15,    // minimum (starting) acceleration threshold for movement detection, in g
+      "movementAccMax": 0.15,    // maximum  acceleration threshold for movement detection, in g
+      "movementAccDur": 0.01,   // duration of exceeding movement acceleration threshold, in seconds
+      "motionTime": 8.0,       // maximum time to confirm motion detection after the initial movement, in seconds
+      "motionVelocity": 0.1,    // minimum instantaneous velocity to confirm motion detection condition, in meters per second
+      "motionDistance": 2.0,    // minimum movement distance to determine motion detection condition, in meters
                                 // (if 0, distance is not calculated, ie. not used for motion confirmation)
-      "motionStopTimeout": 10.0 // timeout to confirm motion stop, in seconds
+      "motionStopTimeout": 30.0 // timeout to confirm motion stop, in seconds
     },
 
     "repossessionMode": {
-      "enabled": true,          // true - repossession mode is enabled
+      "enabled": false,          // true - repossession mode is enabled
       "after": 1667598736       // (05.11.2022 00:52:16) UNIX timestamp after which location obtaining is activated
     },
 
@@ -1376,7 +1402,7 @@ class CfgManager {
 
     "shockDetected" : {         // one-time shock acceleration
       "enabled": true,          // true - alert is enabled
-      "threshold": 8.0          // shock acceleration alert threshold, in g
+      "threshold": 4.0          // shock acceleration alert threshold, in g
       // IMPORTANT: This value affects the measurement range and accuracy of the accelerometer:
       // the larger the range - the lower the accuracy.
       // This can affect the effectiveness of "movementAccMin".
@@ -1385,7 +1411,7 @@ class CfgManager {
 
     "temperatureLow": {         // temperature crosses the lower limit (becomes below the threshold)
       "enabled": true,          // true - alert is enabled
-      "threshold": 10.0,        // temperature low alert threshold, in Celsius
+      "threshold": 16.0,        // temperature low alert threshold, in Celsius
       "hysteresis": 1.0         // "hysteresis" to avoid alerts "bounce", in Celsius
     },
 
@@ -1396,8 +1422,8 @@ class CfgManager {
     },
 
     "batteryLow": {             // battery level crosses the lower limit (becomes below the threshold)
-      "enabled": false,         // true - alert is enabled
-      "threshold": 12.0         // battery low alert threshold, in %
+      "enabled": true,          // true - alert is enabled
+      "threshold": 20.0         // battery low alert threshold, in %
     },
 
     "tamperingDetected": {      // tampering detected (light was detected by the photoresistor)
@@ -1407,14 +1433,14 @@ class CfgManager {
   },
 
   "simUpdate": {                // SIM OTA update
-    "enabled": true,            // true - SIM OTA update is enabled. This will force SIM OTA update every
+    "enabled": false,           // true - SIM OTA update is enabled. This will force SIM OTA update every
                                 // time the device connects to the Internet. And will keep the device connected
                                 // for the specified time to let the update happen
     "duration": 60              // duration of connection retention (when SIM OTA update is forced), in seconds
   },
 
   "debug": {                    // debug settings
-    "logLevel": "DEBUG"         // logging level on Imp-Device ("ERROR", "INFO", "DEBUG")
+    "logLevel": "INFO"         // logging level on Imp-Device ("ERROR", "INFO", "DEBUG")
   }
 }
 //line 232 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/CfgManager.device.nut"
@@ -3125,6 +3151,7 @@ class Photoresistor {
 
             if (detected != (_valPin.read() == PR_LIGHT_DETECTED_VALUE)) {
                 detected = !detected;
+                ::debug(detected ? "Light has been detected" : "No light detected anymore", "Photoresistor");
                 callback(detected);
             }
         }.bindenv(this);
@@ -3493,7 +3520,6 @@ class AccelerometerDriver {
             _accel.configureFifo(true, LIS3DH_FIFO_BYPASS_MODE);
             _accel.configureFifo(true, LIS3DH_FIFO_STREAM_TO_FIFO_MODE);
             _accel.getInterruptTable();
-            _accel.configureInterruptLatching(false);
             // TODO: Disable the pin when it's not in use to save power?
             _intPin.configure(DIGITAL_IN_WAKEUP, _checkInt.bindenv(this));
             _accel._getReg(LIS2DH12_REFERENCE);
@@ -3503,7 +3529,11 @@ class AccelerometerDriver {
         }
     }
 
-    // TODO: Comment
+    /**
+     * Get temperature value from internal accelerometer thermosensor.
+     *
+     * @return {float} Temperature value in degrees Celsius.
+     */
     function readTemperature() {
         // To convert the raw data to celsius
         const ACCEL_TEMP_TO_CELSIUS = 25.0;
@@ -3566,6 +3596,7 @@ class AccelerometerDriver {
             // accelerometer range determined by the value of shock threashold
             local range = _accel.setRange(_shockThr.tointeger());
             ::info(format("Accelerometer range +-%d g", range), "AccelerometerDriver");
+            // TODO: Is it better to use inertial interrupt here?
             _accel.configureClickInterrupt(true, LIS3DH_SINGLE_CLICK, _shockThr);
             ::info("Shock detection enabled", "AccelerometerDriver");
         } else {
@@ -3712,7 +3743,11 @@ class AccelerometerDriver {
         return f && typeof f == "function";
     }
 
-    // TODO: Comment
+    /**
+     * Enable/disable internal thermosensor.
+     *
+     * @param {boolean} enable - true if enable thermosensor.
+     */
     function _switchTempSensor(enable) {
         // LIS3DH_TEMP_CFG_REG enables/disables temperature sensor
         _accel._setReg(LIS3DH_TEMP_CFG_REG, enable ? LIS2DH12_TEMP_EN : 0);
@@ -3732,6 +3767,8 @@ class AccelerometerDriver {
      * Handler to check interrupt from accelerometer
      */
     function _checkInt() {
+        const ACCEL_SHOCK_COOLDOWN = 1;
+
         if (_intPin.read() == 0)
             return;
 
@@ -3739,9 +3776,15 @@ class AccelerometerDriver {
 
         if (intTable.singleClick) {
             ::debug("Shock interrupt", "AccelerometerDriver");
+            _accel.configureClickInterrupt(false);
             if (_shockCb && _enShockDetect) {
                 _shockCb();
             }
+            imp.wakeup(ACCEL_SHOCK_COOLDOWN, function() {
+                if (_enShockDetect) {
+                    _accel.configureClickInterrupt(true, LIS3DH_SINGLE_CLICK, _shockThr);
+                }
+            }.bindenv(this));
         }
 
         if (intTable.int1) {
@@ -3975,7 +4018,7 @@ const BM_AVG_SAMPLES = 6;
 const BM_VOLTAGE_GAIN = 2.4242;
 
 // 3 x 1.5v battery
-const BM_FULL_VOLTAGE = 4.8;
+const BM_FULL_VOLTAGE = 4.0;
 
 // Measures the battery level
 class BatteryMonitor {
@@ -4914,7 +4957,7 @@ class DataProcessor {
 
         // get cell info, read battery level
         _dataReadingPromise = Promise.all([_getCellInfo(), _checkBatteryLevel()])
-        .then(function(res) {
+        .finally(function(_) {
             // check if alerts have been triggered
             local alerts = [];
             foreach (key, val in _allAlerts) {
@@ -4924,7 +4967,7 @@ class DataProcessor {
                 }
             }
 
-            local cellInfo = res[0] || {};
+            local cellInfo = _lastCellInfo || {};
             local lmStatus = _lm.getStatus();
             local flags = mixTables(_mm.getStatus().flags, lmStatus.flags);
             local location = lmStatus.location;
@@ -5058,21 +5101,24 @@ class DataProcessor {
     // TODO: Comment
     function _getCellInfo() {
         if (!cm.isConnected()) {
-            return Promise.resolve(_lastCellInfo);
+            return Promise.resolve(null);
         }
 
         return Promise(function(resolve, reject) {
             // TODO: This is a temporary defense from the incorrect work of getcellinfo()
             local cbTimeoutTimer = imp.wakeup(5, function() {
-                resolve(null);
-                ::error("imp.net.getcellinfo didn't call its callback!", "DataProcessor");
+                reject("imp.net.getcellinfo didn't call its callback!");
             }.bindenv(this));
 
+            // TODO: Can potentially be called in parallel - need to avoid this
             imp.net.getcellinfo(function(cellInfo) {
                 imp.cancelwakeup(cbTimeoutTimer);
                 _lastCellInfo = _extractCellInfoBG95(cellInfo);
-                resolve(_extractCellInfoBG95(cellInfo));
+                resolve(null);
             }.bindenv(this));
+        }.bindenv(this))
+        .fail(function(err) {
+            ::error("Failed getting cell info: " + err, "DataProcessor");
         }.bindenv(this));
     }
 
@@ -5190,7 +5236,7 @@ class DataProcessor {
 // GNSS options:
 // TODO: Make a global const? Or use a builer-variable? Think of many other variables
 // Accuracy threshold of positioning, in meters
-const LD_GNSS_ACCURACY = 30;
+const LD_GNSS_ACCURACY = 50;
 // The maximum positioning time, in seconds
 const LD_GNSS_LOC_TIMEOUT = 55;
 // The number of fails allowed before the cooldown period is activated
@@ -5696,7 +5742,6 @@ class LocationDriver {
 
         local ubxDriver = UBloxM8N(HW_UBLOX_UART);
         local ubxSettings = {
-            "baudRate"     : LD_UBLOX_UART_BAUDRATE,
             "outputMode"   : UBLOX_M8N_MSG_MODE.UBX_ONLY,
             // TODO: Why BOTH?
             "inputMode"    : UBLOX_M8N_MSG_MODE.BOTH
@@ -5781,6 +5826,8 @@ class LocationDriver {
      * - rejects if the operation failed
      */
     function _writeAssistDataToUBlox(ubxAssist) {
+        const LD_ASSIST_DATA_WRITE_TIMEOUT = 15;
+
         return Promise(function(resolve, reject) {
             local assistData = _readUBloxAssistData();
             if (assistData == null) {
@@ -5788,19 +5835,15 @@ class LocationDriver {
             }
 
             local onDone = function(errors) {
-                // TODO: Temporarily print this log message as we have never seen this
-                // callback called and want to be aware if it is suddenly called one day
-                ::info("ATTENTION!!! U-BLOX WRITE-ASSIST-DATA CALLBACK HAS BEEN CALLED!");
-
                 if (!errors) {
                     ::debug("Assist data has been written to u-blox successfully", "LocationDriver");
                     return resolve(null);
                 }
 
-                ::error("Errors during u-blox assist data writing:", "LocationDriver");
+                ::info(format("Assist data has been written to u-blox successfully except %d assist messages", errors.len()), "LocationDriver");
                 foreach(err in errors) {
                     // Log errors encountered
-                    ::error(err, "LocationDriver");
+                    ::debug(err, "LocationDriver");
                 }
 
                 reject(null);
@@ -5809,9 +5852,9 @@ class LocationDriver {
             ::debug("Writing assist data to u-blox..", "LocationDriver");
             ubxAssist.writeAssistNow(assistData, onDone);
 
-            // TODO: Temporarily resolve this Promise immediately because for some reason,
-            // the callback is not called by the writeAssistNow() method
-            resolve(null);
+            // TODO: Temporarily resolve this Promise after a timeout because for some reason,
+            // the callback is not always called by the writeAssistNow() method
+            imp.wakeup(LD_ASSIST_DATA_WRITE_TIMEOUT, reject);
         }.bindenv(this));
     }
 
@@ -6133,7 +6176,7 @@ class SimUpdater {
     }
 }
 
-//line 47 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
+//line 49 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
 
 // Main application on Imp-Device: does the main logic of the application
 

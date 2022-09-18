@@ -425,6 +425,7 @@ class AccelerometerDriver {
             // accelerometer range determined by the value of shock threashold
             local range = _accel.setRange(_shockThr.tointeger());
             ::info(format("Accelerometer range +-%d g", range), "@{CLASS_NAME}");
+            // TODO: Is it better to use inertial interrupt here?
             _accel.configureClickInterrupt(true, LIS3DH_SINGLE_CLICK, _shockThr);
             ::info("Shock detection enabled", "@{CLASS_NAME}");
         } else {
@@ -595,7 +596,7 @@ class AccelerometerDriver {
      * Handler to check interrupt from accelerometer
      */
     function _checkInt() {
-        const SHOCK_CONF_TMOUT = 1;
+        const ACCEL_SHOCK_COOLDOWN = 1;
 
         if (_intPin.read() == 0)
             return;
@@ -608,7 +609,7 @@ class AccelerometerDriver {
             if (_shockCb && _enShockDetect) {
                 _shockCb();
             }
-            imp.wakeup(SHOCK_CONF_TMOUT, function(){
+            imp.wakeup(ACCEL_SHOCK_COOLDOWN, function() {
                 if (_enShockDetect) {
                     _accel.configureClickInterrupt(true, LIS3DH_SINGLE_CLICK, _shockThr);
                 }

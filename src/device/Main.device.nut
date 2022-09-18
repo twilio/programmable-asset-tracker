@@ -28,6 +28,8 @@
 @include once "LedIndication.device.nut"
 @endif
 
+@include once "PowerSafeI2C.device.nut"
+@include once "FlipFlop.device.nut"
 @include once "Hardware.device.nut"
 @include once "Helpers.device.nut"
 @include once "ProductionManager.device.nut"

@@ -1671,7 +1671,7 @@ class CfgService {
 //line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/agent/DefaultConfiguration.agent.nut"
 {
   "debug": {                // debug settings
-    "logLevel": "DEBUG"       // logging level on Imp-Agent ("ERROR", "INFO", "DEBUG")
+    "logLevel": "INFO"       // logging level on Imp-Agent ("ERROR", "INFO", "DEBUG")
   }
 }
 //line 238 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/agent/CfgService.agent.nut"

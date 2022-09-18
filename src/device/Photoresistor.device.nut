@@ -34,6 +34,7 @@ class Photoresistor {
 
             if (detected != (_valPin.read() == PR_LIGHT_DETECTED_VALUE)) {
                 detected = !detected;
+                ::debug(detected ? "Light has been detected" : "No light detected anymore", "@{CLASS_NAME}");
                 callback(detected);
             }
         }.bindenv(this);
