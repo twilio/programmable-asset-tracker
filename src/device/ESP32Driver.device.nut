@@ -111,7 +111,7 @@ const ESP32_DEFAULT_RX_FIFO_SZ = 4096;
 // Maximum time allowed for waiting for data, in seconds
 const ESP32_WAIT_DATA_TIMEOUT = 8;
 // Maximum amount of data expected to be received, in bytes
-const ESP32_MAX_DATA_LEN = 12288;
+const ESP32_MAX_DATA_LEN = 6144;
 // Automatic switch off delay, in seconds
 const ESP32_SWITCH_OFF_DELAY = 10;
 
@@ -128,7 +128,7 @@ const ESP32_BLE_SCAN_INTERVAL = 8;
 // so the range for the actual scan window is [2.5,10240] ms.
 const ESP32_BLE_SCAN_WINDOW = 8;
 // BLE advertisements scan period, in seconds
-const ESP32_BLE_SCAN_PERIOD = 6;
+const ESP32_BLE_SCAN_PERIOD = 2;
 
 // ESP32 Driver class.
 // Ability to work with WiFi networks and BLE
@@ -252,6 +252,9 @@ class ESP32Driver {
         .then(function(adverts) {
             ::debug("Scanning of BLE advertisements finished successfully. Scanned items: " + adverts.len(), "@{CLASS_NAME}");
             _switchOffTimer = imp.wakeup(ESP32_SWITCH_OFF_DELAY, _switchOff.bindenv(this));
+
+            // NOTE: It's assumed that MACs are in lower case.
+            // Probably, in the future, it's better to explicilty convert them to lower case here
             return adverts;
         }.bindenv(this), function(err) {
             _switchOffTimer = imp.wakeup(ESP32_SWITCH_OFF_DELAY, _switchOff.bindenv(this));
@@ -290,7 +293,6 @@ class ESP32Driver {
         _switchOn();
 
         local readyMsgValidator   = @(data, _) data.find("\r\nready\r\n") != null;
-        local restoreCmdValidator = @(data, _) data.find("\r\nOK\r\n\r\nready\r\n") != null;
         local okValidator         = @(data, _) data.find("\r\nOK\r\n") != null;
 
         local cmdSetPrintMask = format("AT+CWLAPOPT=0,%d",
@@ -311,7 +313,9 @@ class ESP32Driver {
             // Wait for "ready" message
             _communicate(null, readyMsgValidator),
             // Restore Factory Default Settings
-            _communicate("AT+RESTORE", restoreCmdValidator),
+            _communicate("AT+RESTORE", okValidator),
+            // Wait for "ready" message once again
+            _communicate(null, readyMsgValidator),
             // Check Version Information
             _communicate("AT+GMR", okValidator, _logVersionInfo),
             // Set the Wi-Fi Mode to "Station"
@@ -382,6 +386,7 @@ class ESP32Driver {
      * Switch OFF the ESP32 board and disable the UART port
      */
     function _switchOff() {
+        // NOTE: It's assumed that the module is disabled by default (when the switch pin is tri-stated)
         _switchPin.disable();
         _serial.disable();
         _switchedOn = false;

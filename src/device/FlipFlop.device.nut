@@ -1,29 +1,17 @@
-// Simple test for communication with ESP32 module via AT interface:
-// - request ESP32 firmware version (AT+GMR) periodically
+@set CLASS_NAME = "FlipFlop" // Class name for logging
 
-// request period, in seconds
-const VERSION_REQ_PERIOD = 300;
-
-// new RX FIFO size
-const RX_FIFO_SIZE = 200;
-
-// UART settings
-const DEFAULT_BAUDRATE = 115200;
-const DEFAULT_BIT_IN_CHAR = 8;
-const DAFAULT_STOP_BITS = 1;
-
-// version information
-res <- "";
-
+// TODO: Comment
 class FlipFlop {
     _clkPin = null;
     _switchPin = null;
 
+    // TODO: Comment
     constructor(clkPin, switchPin) {
         _clkPin = clkPin;
         _switchPin = switchPin;
     }
 
+    // TODO: Comment
     function _get(key) {
         if (!(key in _switchPin)) {
             throw null;
@@ -50,45 +38,4 @@ class FlipFlop {
     }
 }
 
-// callback on UART data receive
-function loop() {
-    local data = serial.read();
-    // read until FIFO not empty and accumulate to res string
-    while (data != -1) {
-        res += data.tochar();
-        data = serial.read();
-    }
-    if (res.len()) {
-        // split to strings
-        local resArr = split(res, "\r\n");
-        foreach (el in resArr) {
-            server.log(el);
-        }
-        res = "";
-    }
-}
-
-function reqVers() {
-    server.log("Send request");
-    serial.write("AT+GMR\r\n");
-    imp.wakeup(VERSION_REQ_PERIOD, reqVers);
-}
-
-// on 3.3V to board
-enable3V <- FlipFlop(hardware.pinYD, hardware.pinS);
-enable3V.configure(DIGITAL_OUT, 0);
-imp.sleep(5);
-enable3V.write(1);
-
-// configure UART (imp006 mikroBUS)
-serial <- hardware.uartABCD;
-serial.setrxfifosize(RX_FIFO_SIZE);
-serial.configure(DEFAULT_BAUDRATE,
-                 DEFAULT_BIT_IN_CHAR,
-                 PARITY_NONE,
-                 DAFAULT_STOP_BITS,
-                 NO_CTSRTS,
-                 loop);
-
-// send version request
-imp.wakeup(5, reqVers);
+@set CLASS_NAME = null // Reset the variable

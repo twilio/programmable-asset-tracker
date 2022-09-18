@@ -2,7 +2,7 @@
 
 Configuring a tracker from a cloud.
 
-**Version of the configuration format/scheme: 1.0**
+**Version of the configuration format/scheme: 1.1**
 
 ## Introduction ##
 
@@ -141,7 +141,7 @@ The "configuration" block of the configuration reported by the tracker to a clou
         "enabled": true/false,  // true - location obtaining using BLE devices is enabled
 
         "generic": {            // New set of generic devices - fully replaces the previous set of generic devices
-          <mac>: {                // Generic device identifier (MAC address). Example: "db9786256c43"
+          <mac>: {                // Generic device identifier (MAC address). Must be lowercase. Example: "db9786256c43"
                                     // Device location coordinates.
                                     // "lng" and "lat" should be specified together only.
             "lng": <number>,        // Longitude, in degrees
@@ -151,7 +151,7 @@ The "configuration" block of the configuration reported by the tracker to a clou
         },
 
         "iBeacon": {            // New set of iBeacon devices - fully replaces the previous set of iBeacon devices
-          <uuid>: {               // Group UUID (16 bytes). Example: "74d2515660e6444ca177a96e67ecfc5f"
+          <uuid>: {               // Group UUID (16 bytes). Must be lowercase. Example: "74d2515660e6444ca177a96e67ecfc5f"
             <major>: {               // Sub-group identifier, number from 0 to 65535
               <minor>: {                // Device identifier, number from 0 to 65535
                                           // Device location coordinates.
@@ -210,14 +210,20 @@ The "configuration" block of the configuration reported by the tracker to a clou
         "threshold": <number>     // Battery low alert threshold, in %
       },
 
-      "tamperingDetected": {    // Not supported
-        "enabled": true/false     // true - alert is enabled
+      "tamperingDetected": {    // Tampering is detected (light is detected by photoresistor)
+        "enabled": true/false,    // true - alert is enabled
+        "pollingPeriod": <number> // Photoresistor polling period, in seconds
       }
     },
 
     "debug": {              // Debug settings
       "logLevel": "INFO"      // Logging level on Imp-Device ("ERROR", "INFO", "DEBUG")
     }
+  },
+
+  "simUpdate": {          // SIM OTA update
+    "enabled": true/false,  // true - force SIM OTA update every time Imp-Device is connected
+    "duration": <number>    // Duration of connection retention (when SIM OTA update is forced), in seconds
   },
 
   "agentConfiguration": { // Imp-Agent block of the tracker configuration.
@@ -241,7 +247,7 @@ Example of a full reported configuration:
     "description": {
         "trackerId": "600a0002d7026715",
         "cfgTimestamp": 1651659656,
-        "cfgSchemeVersion": "1.0"
+        "cfgSchemeVersion": "1.1"
     },
     "configuration": {
         "updateId": "61",
@@ -295,7 +301,8 @@ Example of a full reported configuration:
                 "threshold": 3
             },
             "tamperingDetected": {
-                "enabled": false
+                "enabled": true,
+                "pollingPeriod": 1
             },
             "temperatureHigh": {
                 "enabled": true,
@@ -311,6 +318,10 @@ Example of a full reported configuration:
         "debug": {
             "logLevel": "DEBUG"
         }
+    },
+    "simUpdate": {
+        "enabled": false,
+        "duration": 60
     },
     "agentConfiguration": {
         "debug": {
@@ -342,9 +353,21 @@ The latest determined location is saved in non-volatile memory and is restored a
 
 The application tries to determine a location using different ways in the following order:
 1. By nearby BLE devices, if "bleDevices" is enabled and a list of BLE devices with their coordinates is specified. Currently, two types of BLE devices are supported: generic devices specified by MAC address and iBeacon devices.
-1. By GNSS fix (u-blox NEO-M8N GNSS). U-blox AssistNow data, if available, is used to speed up GNSS fix.
+1. By GNSS fix (u-blox NEO-M8N GNSS). U-blox AssistNow data, if available, is used to speed up GNSS fix. GNSS fix is accepted as the determined location if a location with accuracy not more than 50 meters is returned by the GNSS module during not more than 55 seconds. 
 1. By nearby WiFi networks information. Google Maps Geolocation API is used.
 1. By nearby cellular towers information. Google Maps Geolocation API is used.
+
+### Geofencing ###
+
+When "geofence" is enabled, every time after a new location is determined the application checks if the tracker enters or exits the geofence zone.
+
+Two circles are used for that:
+- geofence circle - a circle with the radius defined by the geofence "radius" setting in the configuration,
+- location circle - a circle with the radius equal to the accuracy of the latest known location.
+
+"geofenceEntered" alert is generated when the location circle becomes fully inside the geofence circle.
+
+"geofenceExited" alert is generated when the location circle becomes fully outside the geofence circle.
 
 ### Motion Monitoring ###
 
@@ -439,6 +462,14 @@ If no alerts occur, the data is saved in SPI flash and sent to a cloud periodica
 
 If an alert occurs, the new and previously unsent data are sent immediately.
 
+### SIM OTA Update ###
+
+Imp-Device does not detect neither when SIM update is needed, nor when SIM update is completed. SIM update procedure should be controlled using the configuration settings in the "simUpdate" section:
+- To start SIM update procedure: "enabled" should be set to true.
+- When SIM is updated: 'enabled" should be set back to false.
+
+SIM update should not be left enabled when it is not needed due to the increased power consumption.
+
 ### Configuration Deployment Algorithm ###
 
 After every restart of the tracker application (Imp-Device part):
@@ -453,3 +484,4 @@ After every restart of the tracker application (Imp-Device part):
 After a configuration update, which can come in runtime from a cloud, is successfully applied, the full new configuration is saved in SPI flash and is reported as the actual configuration.
 
 The tracking is not stopped during the configuration update is being applied. Only components which are affected by the update may be temporary stopped / restarted.
+

@@ -41,8 +41,6 @@ class Application {
         ::info("Application Version: " + APP_VERSION);
         // Initialize library for communication with Imp-Device
         _initMsngr();
-        // Initialize configuration service
-        _initCfgService();
         // Initialize Location Assistant
         _initLocAssistant();
 

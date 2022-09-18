@@ -19,6 +19,7 @@ All fields are mandatory, if not specified otherwise.
 {
    "trackerId": <string>,    // Unique Id of the tracker (Imp deviceId)
    "timestamp": <number>,    // Timestamp when the data was read (Unix time - secs since the Epoch)
+
    "status": {
      "inMotion": true/false,    // true - the asset is in motion now; false - the asset is not in motion.
                                 // Optional. Absent if motion tracking is not enabled in configuration.
@@ -29,21 +30,37 @@ All fields are mandatory, if not specified otherwise.
                                 // false - the asset is not in repossession mode.
                                 // Optional. Absent if repossession mode is not enabled in configuration.
    },
+
    "location": {             // Last known location
      "timestamp": <number>,  // Timestamp when this location was determined (Unix time - secs since the Epoch)
      "type": <string>,       // Type of location determination: "ble", "gnss", "wifi+cell", "wifi", "cell"
-     "accuracy": 3,          // Location accuracy, in meters
+     "accuracy": <number>,   // Location accuracy, in meters
      "lng": <number>,        // Longitude
      "lat": <number>         // Latitude
    },
+
    "sensors": {
      "temperature": <number>,  // Current temperature, in Celsius
      "batteryLevel": <number>  // Current battery level, in %
    },
-   "alerts": [ <array_of_strings> ]    // Alerts. Optional. Can be missed or empty if no alerts.
+
+   "alerts": [ <array_of_strings> ],    // Alerts. Optional. Can be missed or empty if no alerts.
    // Possible values:
-   //    "temperatureHigh", "temperatureLow", "shockDetected", "batteryLow",
+   //    "temperatureHigh", "temperatureLow", "shockDetected", "batteryLow", "tamperingDetected",
    //    "motionStarted", "motionStopped", "geofenceEntered", "geofenceExited", "repossessionActivated"
+
+   "cellInfo": {    // Cellular information. Optional. Can be missed or empty if no new information available.
+     "timestamp": <number>,     // Timestamp when this information was obtained (Unix time - secs since the Epoch)
+     "mode": <string>,          // Service mode: "NOSERVICE", "GSM", "eMTC", "NBIoT"
+     "mcc": <string>,           // 3-chars Mobile Country Code
+     "mnc": <string>,           // 2-chars Mobile Network Code
+     "signalStrength": <number> // Received Signal Strength Indicator
+   },
+
+   "gnssInfo": {    // GNSS information. Optional. Can be missed or empty if no new information available.
+     "timestamp": <number>,     // Timestamp when this information was obtained (Unix time - secs since the Epoch)
+     "satellitesUsed": <number> // Number of used satellites
+   }
 }
 ```
 
@@ -70,7 +87,18 @@ Example:
    "alerts": [
      "temperatureHigh",
      "shockDetected"
-   ]
+   ],
+   "cellInfo": {
+     "timestamp": 1617900010,
+     "mode": "eMTC",
+     "mcc": "244",
+     "mnc": "05",
+     "signalStrength": -41
+   },
+   "gnssInfo": {
+     "timestamp": 1617900070,
+     "satellitesUsed": 5
+   }
 }
 ```
 
