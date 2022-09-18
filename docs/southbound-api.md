@@ -353,9 +353,21 @@ The latest determined location is saved in non-volatile memory and is restored a
 
 The application tries to determine a location using different ways in the following order:
 1. By nearby BLE devices, if "bleDevices" is enabled and a list of BLE devices with their coordinates is specified. Currently, two types of BLE devices are supported: generic devices specified by MAC address and iBeacon devices.
-1. By GNSS fix (u-blox NEO-M8N GNSS). U-blox AssistNow data, if available, is used to speed up GNSS fix.
+1. By GNSS fix (u-blox NEO-M8N GNSS). U-blox AssistNow data, if available, is used to speed up GNSS fix. GNSS fix is accepted as the determined location if a location with accuracy not more than 50 meters is returned by the GNSS module during not more than 55 seconds. 
 1. By nearby WiFi networks information. Google Maps Geolocation API is used.
 1. By nearby cellular towers information. Google Maps Geolocation API is used.
+
+### Geofencing ###
+
+When "geofence" is enabled, every time after a new location is determined the application checks if the tracker enters or exits the geofence zone.
+
+Two circles are used for that:
+- geofence circle - a circle with the radius defined by the geofence "radius" setting in the configuration,
+- location circle - a circle with the radius equal to the accuracy of the latest known location.
+
+"geofenceEntered" alert is generated when the location circle becomes fully inside the geofence circle.
+
+"geofenceExited" alert is generated when the location circle becomes fully outside the geofence circle.
 
 ### Motion Monitoring ###
 
