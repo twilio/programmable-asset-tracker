@@ -111,7 +111,7 @@ const ESP32_DEFAULT_RX_FIFO_SZ = 4096;
 // Maximum time allowed for waiting for data, in seconds
 const ESP32_WAIT_DATA_TIMEOUT = 8;
 // Maximum amount of data expected to be received, in bytes
-const ESP32_MAX_DATA_LEN = 6144;
+const ESP32_MAX_DATA_LEN = 2048;
 // Automatic switch off delay, in seconds
 const ESP32_SWITCH_OFF_DELAY = 10;
 
@@ -128,7 +128,7 @@ const ESP32_BLE_SCAN_INTERVAL = 8;
 // so the range for the actual scan window is [2.5,10240] ms.
 const ESP32_BLE_SCAN_WINDOW = 8;
 // BLE advertisements scan period, in seconds
-const ESP32_BLE_SCAN_PERIOD = 2;
+const ESP32_BLE_SCAN_PERIOD = 6;
 
 // ESP32 Driver class.
 // Ability to work with WiFi networks and BLE
@@ -209,9 +209,35 @@ class ESP32Driver {
         .then(function(_) {
             ::debug("Scanning WiFi networks..", "@{CLASS_NAME}");
 
-            local okValidator = @(data, _) data.find("\r\nOK\r\n") != null;
+            // The string expected to appear in the reply
+            local validationString = "\r\nOK\r\n";
+            // The tail of the previously received data chunk(s).
+            // Needed to make sure we won't miss the validation substring in the
+            // reply in case when its parts are in different reply data chunks
+            local prevTail = "";
+
+            local streamValidator = function(dataChunk, _) {
+                local data = prevTail + dataChunk;
+                local tailLen = data.len() - validationString.len();
+                prevTail = tailLen > 0 ? data.slice(tailLen) : data;
+
+                return data.find(validationString) != null;
+            }.bindenv(this);
+
+            // The result array of parsed WiFi networks
+            local wifis = [];
+            // The unparsed tail (if any) of the previously received data chunk(s).
+            // Needed to make sure we won't lose some results in the reply in case
+            // when some parsable units are in different reply data chunks
+            local unparsedTail = "";
+
+            local replyStreamHandler = function(dataChunk) {
+                unparsedTail = _parseWifiNetworks(unparsedTail + dataChunk, wifis);
+                return wifis;
+            }.bindenv(this);
+
             // Send "List Available APs" cmd and parse the result
-            return _communicate("AT+CWLAP", okValidator, _parseWifiNetworks, false);
+            return _communicateStream("AT+CWLAP", streamValidator, replyStreamHandler);
         }.bindenv(this))
         .then(function(wifis) {
             ::debug("Scanning of WiFi networks finished successfully. Scanned items: " + wifis.len(), "@{CLASS_NAME}");
@@ -244,10 +270,42 @@ class ESP32Driver {
             ::debug("Scanning BLE advertisements..", "@{CLASS_NAME}");
 
             local bleScanCmd = format("AT+BLESCAN=%d,%d", ESP32_BLE_SCAN.ENABLE, ESP32_BLE_SCAN_PERIOD);
-            local validator = @(data, timeElapsed) (data.find("\r\nOK\r\n") != null &&
-                                                    timeElapsed >= ESP32_BLE_SCAN_PERIOD);
+
+            // The string expected to appear in the reply
+            local validationString = "\r\nOK\r\n";
+            // The tail of the previously received data chunk(s).
+            // Needed to make sure we won't miss the validation substring in the
+            // reply in case when its parts are in different reply data chunks
+            local prevTail = "";
+            // True if the validation string has been found
+            local stringFound = false;
+
+            local streamValidator = function(dataChunk, timeElapsed) {
+                if (!stringFound) {
+                    local data = prevTail + dataChunk;
+                    stringFound = data.find(validationString) != null;
+
+                    local tailLen = data.len() - validationString.len();
+                    prevTail = tailLen > 0 ? data.slice(tailLen) : data;
+                }
+
+                return stringFound && timeElapsed >= ESP32_BLE_SCAN_PERIOD;
+            }.bindenv(this);
+
+            // The result array of parsed BLE adverts
+            local adverts = [];
+            // The unparsed tail (if any) of the previously received data chunk(s).
+            // Needed to make sure we won't lose some results in the reply in case
+            // when some parsable units are in different reply data chunks
+            local unparsedTail = "";
+
+            local replyStreamHandler = function(dataChunk) {
+                unparsedTail = _parseBLEAdverts(unparsedTail + dataChunk, adverts);
+                return adverts;
+            }.bindenv(this);
+
             // Send "Enable Bluetooth LE Scanning" cmd and parse the result
-            return _communicate(bleScanCmd, validator, _parseBLEAdverts, false);
+            return _communicateStream(bleScanCmd, streamValidator, replyStreamHandler);
         }.bindenv(this))
         .then(function(adverts) {
             ::debug("Scanning of BLE advertisements finished successfully. Scanned items: " + adverts.len(), "@{CLASS_NAME}");
@@ -344,7 +402,7 @@ class ESP32Driver {
      * @param {function} validator - Function that checks if a reply has been fully received
      * @param {function} [replyHandler=null] - Handler that is called to process the reply
      * @param {boolean} [wrapInAFunc=true] - True to wrap the Promise to be returned in an additional function with no params.
-     *                                       This optionis useful for, e.g., serial execution of a list of promises (Promise.serial)
+     *                                       This option is useful for, e.g., serial execution of a list of promises (Promise.serial)
      *
      * @return {Promise | function}: Promise or a function with no params that returns this promise. The promise:
      * - resolves with the reply (pre-processed if a reply handler specified) if the operation succeeded
@@ -364,6 +422,39 @@ class ESP32Driver {
         .then(function(reply) {
             cmd && ::debug(format("Reply for %s cmd received", cmd), "@{CLASS_NAME}");
             return replyHandler ? replyHandler(reply) : reply;
+        }.bindenv(this));
+    }
+
+    /**
+     * Communicate with the ESP32 board: send a command (if passed) and pass the reply as a stream to the handler
+     *
+     * @param {string | null} cmd - String with a command to send or null
+     * @param {function} streamValidator - Function that checks if a reply has been fully received. It's called every time
+     *                                     a reply data chunk is received - this chunk (only) is passed to the handler
+     * @param {function} replyStreamHandler - Handler that is called to process the reply. It's called every time a reply
+     *                                        data chunk is received - this chunk (only) is passed to the handler
+     *
+     * @return {Promise} that:
+     * - resolves with the pre-processed (by the reply handler) reply if the operation succeeded
+     * - rejects with an error if the operation failed
+     */
+    function _communicateStream(cmd, streamValidator, replyStreamHandler) {
+        if (cmd) {
+            ::debug(format("Sending %s cmd..", cmd), "@{CLASS_NAME}");
+            _serial.write(cmd + "\r\n");
+        }
+
+        local result = null;
+
+        local validator = function(data, timeElapsed) {
+            data.len() && (result = replyStreamHandler(data));
+            return streamValidator(data, timeElapsed);
+        }.bindenv(this);
+
+        return _waitForData(validator, false)
+        .then(function(reply) {
+            cmd && ::debug(format("Reply for %s cmd received", cmd), "@{CLASS_NAME}");
+            return result;
         }.bindenv(this));
     }
 
@@ -398,18 +489,19 @@ class ESP32Driver {
     /**
      * Parse the data returned by the AT+CWLAP (List Available APs) command
      *
-     * @param {string} data - String with a reply to the AT+CWLAP command
-     *
-     * @return {array} of parsed WiFi networks
+     * @param {string} data - String with a data chunk of the reply to the AT+CWLAP command
+     * @param {array} dstArray - Array for saving parsed results
      *  Each element of the array is a table with the following fields:
      *     "ssid"      : {string}  - SSID (network name).
      *     "bssid"     : {string}  - BSSID (access point’s MAC address), in 0123456789ab format.
      *     "channel"   : {integer} - Channel number: 1-13 (2.4GHz).
      *     "rssi"      : {integer} - RSSI (signal strength).
      *     "open"      : {bool}    - Whether the network is open (password-free).
+     *
+     * @return {string} Unparsed tail of the data chunk or an empty string
      * An exception may be thrown in case of an error.
      */
-    function _parseWifiNetworks(data) {
+    function _parseWifiNetworks(data, dstArray) {
         // The data should look like the following:
         // AT+CWLAP
         // +CWLAP:(3,"Ger",-64,"f1:b2:d4:88:16:32",8)
@@ -439,14 +531,23 @@ class ESP32Driver {
         ::debug("Parsing the WiFi scan response..", "@{CLASS_NAME}");
 
         try {
-            local wifis = [];
             local dataRows = split(data, "\r\n");
+            local unparsedTail = "";
 
             foreach (row in dataRows) {
                 local regexCapture = regex.capture(row);
 
                 if (regexCapture == null) {
-                    continue;
+                    if (row != dataRows.top()) {
+                        continue;
+                    }
+
+                    local lastChar = data[data.len() - 1];
+                    if (lastChar != '\r' && lastChar != '\n') {
+                        unparsedTail = row;
+                    }
+
+                    break;
                 }
 
                 // The first capture is the full row. Let's remove it as we only need the parsed pieces of the row
@@ -464,10 +565,10 @@ class ESP32Driver {
                     "open"   : regexCapture[ESP32_WIFI_PARAM_ORDER.ECN].tointeger() == ESP32_ECN_METHOD.OPEN
                 };
 
-                wifis.push(scannedWifi);
+                dstArray.push(scannedWifi);
             }
 
-            return wifis;
+            return unparsedTail;
         } catch (err) {
             throw "WiFi networks parsing error: " + err;
         }
@@ -503,15 +604,17 @@ class ESP32Driver {
     /**
      * Wait for certain data to be received from the ESP32 board
      *
-     * @param {function} validator - Function that checks if the expected data has been fully received
+     * @param {function} validator - Function that gets reply data checks if the expected data has been fully received
+     * @param {boolean} [accumulateData=true] - If enabled, reply data will be accumulated across calls of the validator.
+     *                                          I.e., all reply data that is already received will be passed to the validator every
+     *                                          time it is called. If disabled, only newly received reply data is passed to the validator.
+     *                                          This option is useful when a big amount of data is expected to prevent out-of-memory.
      *
      * @return {Promise} that:
      * - resolves with the data received if the operation succeeded
      * - rejects if the operation failed
      */
-    // TODO: On-the-fly data processing may be required. And memory consumption optimization.
-    //       If we wait for all data to be received before processing, we can face OOM due to the need of keeping all raw recevied data
-    function _waitForData(validator) {
+    function _waitForData(validator, accumulateData = true) {
         // Data check/read period, in seconds
         const ESP32_DATA_CHECK_PERIOD = 0.1;
         // Maximum data length expected to be received from ESP32, in bytes
@@ -519,16 +622,20 @@ class ESP32Driver {
 
         local start = hardware.millis();
         local data = "";
+        local dataLen = 0;
 
         return Promise(function(resolve, reject) {
             local check;
             check = function() {
                 local chunk = _serial.readblob(ESP32_DATA_READ_CHUNK_LEN);
+                local chunkLen = chunk.len();
 
                 // Read until FIFO is empty and accumulate to the result string
-                while (chunk.len() > 0 && data.len() < ESP32_MAX_DATA_LEN) {
+                while (chunkLen > 0 && data.len() < ESP32_MAX_DATA_LEN) {
                     data += chunk.tostring();
+                    dataLen += chunkLen;
                     chunk = _serial.readblob(ESP32_DATA_READ_CHUNK_LEN);
+                    chunkLen = chunk.len();
                 }
 
                 local timeElapsed = (hardware.millis() - start) / 1000.0;
@@ -537,11 +644,13 @@ class ESP32Driver {
                     return resolve(data);
                 }
 
+                !accumulateData && (data = "");
+
                 if (timeElapsed >= ESP32_WAIT_DATA_TIMEOUT) {
                     return reject("Timeout waiting for the expected data or an acknowledge");
                 }
 
-                if (data.len() >= ESP32_MAX_DATA_LEN) {
+                if (accumulateData && dataLen >= ESP32_MAX_DATA_LEN) {
                     return reject("Too much data received but still no expected data");
                 }
 
@@ -572,22 +681,23 @@ class ESP32Driver {
     /**
      * Parse the data returned by the AT+BLESCAN command
      *
-     * @param {string} data - String with a reply to the AT+BLESCAN command
-     *
-     * @return {array} of scanned BLE advertisements
+     * @param {string} data - String with a data chunk of the reply to the AT+BLESCAN command
+     * @param {array} dstArray - Array for saving parsed results. May contain previously saved results
      *  Each element of the array is a table with the following fields:
      *     "address"  : {string}  - BLE address.
      *     "rssi"     : {integer} - RSSI (signal strength).
      *     "advData"  : {blob} - Advertising data.
      *     "addrType" : {integer} - Address type: 0 - public, 1 - random.
+     *
+     * @return {string} Unparsed tail of the data chunk or an empty string
      * An exception may be thrown in case of an error.
      */
-    function _parseBLEAdverts(data) {
+    function _parseBLEAdverts(data, dstArray) {
         // The data should look like the following:
         // AT+BLESCAN=1,5
         // OK
-        // +BLESCAN:6f:92:8a:04:e1:79,-89,1aff4c000215646be3e46e4e4e25ad0177a28f3df4bd00000000bf,,1
-        // +BLESCAN:76:72:c3:3e:29:e4,-79,1bffffffbeac726addafa7044528b00b12f8f57e7d8200000000bb00,,1
+        // +BLESCAN:"6f:92:8a:04:e1:79",-89,1aff4c000215646be3e46e4e4e25ad0177a28f3df4bd00000000bf,,1
+        // +BLESCAN:"76:72:c3:3e:29:e4",-79,1bffffffbeac726addafa7044528b00b12f8f57e7d8200000000bb00,,1
 
         // Sub-expressions of the regular expression for parsing AT+BLESCAN response
         const ESP32_BLESCAN_PREFIX        = @"\+BLESCAN:";
@@ -607,20 +717,23 @@ class ESP32Driver {
         ::debug("Parsing the BLE devices scan response..", "@{CLASS_NAME}");
 
         try {
-            // Result array of scanned advertisements
-            local result = [];
-            // Array of strings to be compared to check the uniqueness of an advertisement
-            local uniqueAdverts = [];
             local dataRows = split(data, "\r\n");
-
-            // In order to process fresher advertisements first (to get the latest RSSI for duplicated adverts), reverse this array
-            dataRows.reverse();
+            local unparsedTail = "";
 
             foreach (row in dataRows) {
                 local regexCapture = regex.capture(row);
 
                 if (regexCapture == null) {
-                    continue;
+                    if (row != dataRows.top()) {
+                        continue;
+                    }
+
+                    local lastChar = data[data.len() - 1];
+                    if (lastChar != '\r' && lastChar != '\n') {
+                        unparsedTail = row;
+                    }
+
+                    break;
                 }
 
                 // The first capture is the full row. Let's remove it as we only need the parsed pieces of the row
@@ -630,31 +743,32 @@ class ESP32Driver {
                     regexCapture[i] = row.slice(val.begin, val.end);
                 }
 
-                local address = _removeColon(regexCapture[ESP32_BLE_PARAM_ORDER.ADDR]);
-                local advData = regexCapture[ESP32_BLE_PARAM_ORDER.ADV_DATA];
-                local addrType = regexCapture[ESP32_BLE_PARAM_ORDER.ADDR_TYPE].tointeger();
-
-                // Make a string that helps to compare adverts.
-                // Advertisement uniqueness is determined by equality of address, advData and addrType
-                local stringAdvert = address + advData + addrType;
-
-                if (uniqueAdverts.find(stringAdvert) != null) {
-                    continue;
-                }
-
-                uniqueAdverts.push(stringAdvert);
-
+                local advDataStr = regexCapture[ESP32_BLE_PARAM_ORDER.ADV_DATA];
                 local resultAdvert = {
-                    "address" : address,
+                    "address" : _removeColon(regexCapture[ESP32_BLE_PARAM_ORDER.ADDR]),
                     "rssi"    : regexCapture[ESP32_BLE_PARAM_ORDER.RSSI].tointeger(),
-                    "advData" : advData.len() >= 2 ? utilities.hexStringToBlob(advData) : blob(),
-                    "addrType": addrType
+                    "advData" : advDataStr.len() >= 2 ? utilities.hexStringToBlob(advDataStr) : blob(),
+                    "addrType": regexCapture[ESP32_BLE_PARAM_ORDER.ADDR_TYPE].tointeger()
                 };
 
-                result.push(resultAdvert);
+                local alreadyExists = false;
+
+                foreach (existingAdvert in dstArray) {
+                    if (existingAdvert.address == resultAdvert.address &&
+                        existingAdvert.advData.tostring() == resultAdvert.advData.tostring() &&
+                        existingAdvert.addrType == resultAdvert.addrType) {
+                        alreadyExists = true;
+                        existingAdvert.rssi = resultAdvert.rssi;
+                        break;
+                    }
+                }
+
+                if (!alreadyExists) {
+                    dstArray.push(resultAdvert);
+                }
             }
 
-            return result;
+            return unparsedTail;
         } catch (err) {
             throw "BLE advertisements parsing error: " + err;
         }

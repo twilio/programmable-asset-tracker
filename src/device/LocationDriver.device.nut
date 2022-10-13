@@ -332,7 +332,7 @@ class LocationDriver {
                 if (parsed && parsed.uuid  in knownIBeacons
                            && parsed.major in knownIBeacons[parsed.uuid]
                            && parsed.minor in knownIBeacons[parsed.uuid][parsed.major]) {
-                    local iBeaconInfo = format("UUID %s, Major %s, Minor %s", _formatUUID(parsed.uuid), parsed.major, parsed.minor);
+                    local iBeaconInfo = format("UUID %s, Major %s, Minor %s", parsed.uuid, parsed.major, parsed.minor);
                     ::debug(format("An iBeacon device with known location found: %s, %s", advert.address, iBeaconInfo), "@{CLASS_NAME}");
 
                     recognized[advert] <- knownIBeacons[parsed.uuid][parsed.major][parsed.minor];
@@ -591,11 +591,8 @@ class LocationDriver {
      * Disable u-blox module
      */
     function _disableUBlox() {
-        // TODO: Should u-blox NAV_PVT messages be disabled before switching off the module?
-        // ::debug("Disable u-blox navigation messages...", "@{CLASS_NAME}._disableNavMsgs");
-        // Disable Position Velocity Time Solution messages
-        // _ubxDriver.enableUbxMsg(UBX_MSG_PARSER_CLASS_MSG_ID.NAV_PVT, 0);
-
+        // Disable the UART to save power
+        HW_UBLOX_UART.disable();
         _ubxSwitchPin.disable();
         ::debug("Switched OFF the u-blox module", "@{CLASS_NAME}");
     }
@@ -892,29 +889,6 @@ class LocationDriver {
             ::error("Invalid date object passed: " + err, "@{CLASS_NAME}");
             return 0;
         }
-    }
-
-    /**
-     * Format a UUID string to make it printable and human-readable
-     *
-     * @param {string} str - UUID string (16 bytes)
-     *
-     * @return {string} Printable and human-readable UUID string
-     *  The format is: 00112233-4455-6677-8899-aabbccddeeff
-     */
-    function _formatUUID(str) {
-        // The indexes where the dash character ("-") must be placed in the UUID representation
-        local uuidDashes = [3, 5, 7, 9];
-        local res = "";
-
-        for (local i = 0; i < str.len(); i++) {
-            res += format("%02x", str[i]);
-            if (uuidDashes.find(i) != null) {
-                res += "-";
-            }
-        }
-
-        return res;
     }
 }
 

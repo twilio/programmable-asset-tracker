@@ -394,17 +394,18 @@ class AccelerometerDriver {
      * @param {table} shockCnd - Table with the shock condition settings.
      *        Optional, all settings have defaults.
      *        The settings:
-     *          "shockThreshold": {float} - Shock acceleration threshold, in g.
-     *                                      Default: ACCEL_DEFAULT_SHOCK_THR
+     *          "shockThreshold": {float|integer} - Shock acceleration threshold, in g.
+     *                                              Default: ACCEL_DEFAULT_SHOCK_THR
      */
     function enableShockDetection(shockCb, shockCnd = {}) {
         local shockSettIsCorr = true;
         _shockThr = ACCEL_DEFAULT_SHOCK_THR;
+        // NOTE: This can be implemented without a loop
         foreach (key, value in shockCnd) {
             if (typeof key == "string") {
                 if (key == "shockThreshold") {
-                    if (typeof value == "float" && value > 0.0 && value <= 16.0) {
-                        _shockThr = value;
+                    if (value > 0.0 && value <= 16.0) {
+                        _shockThr = value.tofloat();
                     } else {
                         ::error("shockThreshold incorrect value (must be in [0;16] g)", "@{CLASS_NAME}");
                         shockSettIsCorr = false;
@@ -446,19 +447,19 @@ class AccelerometerDriver {
      * @param {table} motionCnd - Table with the motion condition settings.
      *        Optional, all settings have defaults.
      *        The settings:
-     *          "movementAccMax": {float}    - Movement acceleration maximum threshold, in g.
-     *                                        Default: ACCEL_DEFAULT_MOV_MAX
-     *          "movementAccMin": {float}    - Movement acceleration minimum threshold, in g.
-     *                                        Default: ACCEL_DEFAULT_MOV_MIN
-     *          "movementAccDur": {float}    - Duration of exceeding movement acceleration threshold, in seconds.
-     *                                        Default: ACCEL_DEFAULT_MOV_DUR
-     *          "motionTime": {float}  - Maximum time to determine motion detection after the initial movement, in seconds.
-     *                                        Default: ACCEL_DEFAULT_MOTION_TIME
-     *          "motionVelocity": {float} - Minimum instantaneous velocity  to determine motion detection condition, in meters per second.
-     *                                        Default: ACCEL_DEFAULT_MOTION_VEL
-     *          "motionDistance": {float} - Minimal movement distance to determine motion detection condition, in meters.
-     *                                      If 0, distance is not calculated (not used for motion detection).
-     *                                        Default: ACCEL_DEFAULT_MOTION_DIST
+     *          "movementAccMax": {float|integer} - Movement acceleration maximum threshold, in g.
+     *                                              Default: ACCEL_DEFAULT_MOV_MAX
+     *          "movementAccMin": {float|integer} - Movement acceleration minimum threshold, in g.
+     *                                              Default: ACCEL_DEFAULT_MOV_MIN
+     *          "movementAccDur": {float|integer} - Duration of exceeding movement acceleration threshold, in seconds.
+     *                                              Default: ACCEL_DEFAULT_MOV_DUR
+     *          "motionTime":     {float|integer} - Maximum time to determine motion detection after the initial movement, in seconds.
+     *                                              Default: ACCEL_DEFAULT_MOTION_TIME
+     *          "motionVelocity": {float|integer} - Minimum instantaneous velocity  to determine motion detection condition, in meters per second.
+     *                                              Default: ACCEL_DEFAULT_MOTION_VEL
+     *          "motionDistance": {float|integer} - Minimal movement distance to determine motion detection condition, in meters.
+     *                                              If 0, distance is not calculated (not used for motion detection).
+     *                                              Default: ACCEL_DEFAULT_MOTION_DIST
      */
     function detectMotion(motionCb, motionCnd = {}) {
         local motionSettIsCorr = true;
@@ -472,8 +473,8 @@ class AccelerometerDriver {
         foreach (key, value in motionCnd) {
             if (typeof key == "string") {
                 if (key == "movementAccMax") {
-                    if (typeof value == "float" && value > 0) {
-                        _movementAccMax = value;
+                    if (value > 0) {
+                        _movementAccMax = value.tofloat();
                     } else {
                         ::error("movementAccMax incorrect value", "@{CLASS_NAME}");
                         motionSettIsCorr = false;
@@ -482,9 +483,9 @@ class AccelerometerDriver {
                 }
 
                 if (key == "movementAccMin") {
-                    if (typeof value == "float"  && value > 0) {
-                        _movementAccMin = value;
-                        _movementCurThr = value;
+                    if (value > 0) {
+                        _movementAccMin = value.tofloat();
+                        _movementCurThr = value.tofloat();
                     } else {
                         ::error("movementAccMin incorrect value", "@{CLASS_NAME}");
                         motionSettIsCorr = false;
@@ -493,8 +494,8 @@ class AccelerometerDriver {
                 }
 
                 if (key == "movementAccDur") {
-                    if (typeof value == "float"  && value > 0) {
-                        _movementAccDur = value;
+                    if (value > 0) {
+                        _movementAccDur = value.tofloat();
                     } else {
                         ::error("movementAccDur incorrect value", "@{CLASS_NAME}");
                         motionSettIsCorr = false;
@@ -503,8 +504,8 @@ class AccelerometerDriver {
                 }
 
                 if (key == "motionTime") {
-                    if (typeof value == "float"  && value > 0) {
-                        _motionTime = value;
+                    if (value > 0) {
+                        _motionTime = value.tofloat();
                     } else {
                         ::error("motionTime incorrect value", "@{CLASS_NAME}");
                         motionSettIsCorr = false;
@@ -513,8 +514,8 @@ class AccelerometerDriver {
                 }
 
                 if (key == "motionVelocity") {
-                    if (typeof value == "float"  && value >= 0) {
-                        _motionVelocity = value;
+                    if (value >= 0) {
+                        _motionVelocity = value.tofloat();
                     } else {
                         ::error("motionVelocity incorrect value", "@{CLASS_NAME}");
                         motionSettIsCorr = false;
@@ -523,8 +524,8 @@ class AccelerometerDriver {
                 }
 
                 if (key == "motionDistance") {
-                    if (typeof value == "float"  && value >= 0) {
-                        _motionDistance = value;
+                    if (value >= 0) {
+                        _motionDistance = value.tofloat();
                     } else {
                         ::error("motionDistance incorrect value", "@{CLASS_NAME}");
                         motionSettIsCorr = false;
