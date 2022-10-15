@@ -241,10 +241,12 @@ class Application {
         }
 
         if (name != APP_M_MSG_NAME.ESP_FINISH) {
-            local remain = _fileLen - _fwImage.tell();
+            local curPos = _fwImage.tell();
+            local remain = _fileLen - curPos;
 
             if (remain > 0) {
-                _portion = _fwImage.readblob(APP_DATA_PORTION_SIZE);
+                _portion = {"fwData" : _fwImage.readblob(APP_DATA_PORTION_SIZE),
+                            "position" : curPos};
                 _sendData();
             }
         }

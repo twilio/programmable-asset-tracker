@@ -84,7 +84,7 @@ const ESP32_LOADER_DEFAULT_RX_FIFO_SZ = 4096;
 // Maximum amount of data expected to be received, in bytes
 const ESP32_LOADER_MAX_DATA_LEN = 4096;
 // Maximum time allowed for waiting for data, in seconds
-const ESP32_LOADER_WAIT_DATA_TIMEOUT = 5;
+const ESP32_LOADER_WAIT_DATA_TIMEOUT = 15;
 // Checksum start seed
 const ESP32_LOADER_CHECKSUM_SEED = 0xEF;
 // Each SLIP packet begins and ends with 0xC0

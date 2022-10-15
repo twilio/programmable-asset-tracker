@@ -202,7 +202,8 @@ class Application {
      */
     function _onData(msg, customAck) {
         local ack = customAck();
-        local data = msg.data;
+        local data = msg.data.fwData;
+        local agentDataPosition = msg.data.position;
 
         if (_isActive) {
             ::info(format("Loading is active. Try again later."));
@@ -218,10 +219,12 @@ class Application {
         }
 
         hardware.spiflash.enable();
-        _write(data);
+        if (agentDataPosition == _writeLen) {
+            _write(data);
+            _writeLen += data.len();
+        }
         hardware.spiflash.disable();
 
-        _writeLen += data.len();
         ack(_writeLen);
 
         if (_writeLen < _len) {

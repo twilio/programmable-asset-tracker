@@ -26,7 +26,7 @@ if [[ "$agentEndPoint" == "load" ]]; then
     if [[ $fileLen -gt $fileMaxLen ]]; then
         mkdir $splitDirName
         cd $splitDirName
-        split -a 1 -b $splitSize $fileName
+        split -a 1 -b $splitSize ../$fileName
         echo $fileName
         for file in ./* ; do
             echo $fileName-$file;
