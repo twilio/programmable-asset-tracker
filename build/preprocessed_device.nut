@@ -905,13 +905,9 @@ class ProductionManager {
         data.shipped = true;
         _storeData(data);
 
-        // If the error flag is active, we should still go to sleep. Otherwise, let's run the app
-        if (!data.errorFlag) {
-            // Cancel sleep
-            imp.onidle(null);
-            // Start the main application
-            _startApp();
-        }
+        // Restart to run the application
+        server.flush(PMGR_FLUSH_TIMEOUT);
+        imp.reset();
     }
 
     /**
@@ -923,7 +919,7 @@ class ProductionManager {
         _setErrorFlag(error);
         server.flush(PMGR_FLUSH_TIMEOUT);
         // TODO: Sleep immediately? But what if called from the global exception handler?
-        server.restart();
+        imp.reset();
     }
 
     // TODO: Comment
