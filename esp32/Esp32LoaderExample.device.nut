@@ -210,22 +210,20 @@ class Application {
             return;
         }
 
+        ack();
+
         // Check if we have already received all data. For the case, when the agent re-sends
         // the last data chunk because it hasn't got an ACK for it
         if (_writeLen >= _len) {
             ::debug("Received more data than expected. Ignoring it");
-            // ACK this data so the agent will not re-send it again
-            return ack();
+            return;
         }
 
-        hardware.spiflash.enable();
+        // Check if this is the expected chunk of data
         if (agentDataPosition == _writeLen) {
             _write(data);
             _writeLen += data.len();
         }
-        hardware.spiflash.disable();
-
-        ack(_writeLen);
 
         if (_writeLen < _len) {
             return;
@@ -261,9 +259,10 @@ class Application {
      * @param {blob} portion - Portion of firmware image.
      */
     function _write(portion) {
-        local len = portion.len();
+        hardware.spiflash.enable();
         hardware.spiflash.write(_writeAddr, portion);
-        _writeAddr += len;
+        hardware.spiflash.disable();
+        _writeAddr += portion.len();
     }
 
     /**

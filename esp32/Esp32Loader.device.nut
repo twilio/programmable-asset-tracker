@@ -354,7 +354,7 @@ class ESP32Loader {
                                                    "Flash parameter set failure";
         // FLASH_BEGIN - erasing flash (size to erase, number of data packets, data size in one packet, flash offset)
         local numberOfDataPackets = (fwImgLen + ESP32_LOADER_TRANSMIT_PACKET_LEN - 1) / ESP32_LOADER_TRANSMIT_PACKET_LEN;
-        // NOTE: THIS DOES NOT MATCH THE DOCUMENTATION!!!
+        // NOTE: THIS DOES NOT MATCH THE DOCUMENTATION!!!
         // 4 BYTES DIFFERENCE
         // https://docs.espressif.com/projects/esptool/en/latest/esp32c3/advanced-topics/serial-protocol.html
         local flashBeginStr = format("C00002140000000000%08X%08X%08X%08X00000000C0",

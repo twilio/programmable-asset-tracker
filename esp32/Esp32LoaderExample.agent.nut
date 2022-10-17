@@ -245,8 +245,10 @@ class Application {
             local remain = _fileLen - curPos;
 
             if (remain > 0) {
-                _portion = {"fwData" : _fwImage.readblob(APP_DATA_PORTION_SIZE),
-                            "position" : curPos};
+                _portion = {
+                    "fwData" : _fwImage.readblob(APP_DATA_PORTION_SIZE),
+                    "position" : curPos
+                };
                 _sendData();
             }
         }

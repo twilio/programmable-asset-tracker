@@ -21,7 +21,7 @@
 
 //line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/shared/Version.shared.nut"
 // Application Version
-const APP_VERSION = "3.0.0";
+const APP_VERSION = "3.0.1";
 //line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/shared/Constants.shared.nut"
 // Constants common for the imp-agent and the imp-device
 
