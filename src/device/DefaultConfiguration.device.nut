@@ -71,7 +71,7 @@
 
     "batteryLow": {             // battery level crosses the lower limit (becomes below the threshold)
       "enabled": true,          // true - alert is enabled
-      "threshold": 20.0         // battery low alert threshold, in %
+      "threshold": 30.0         // battery low alert threshold, in %
     },
 
     "tamperingDetected": {      // tampering detected (light was detected by the photoresistor)

@@ -36,18 +36,17 @@ How to prepare (compile) a firmware is described [here](https://docs.espressif.c
 
 The latest firmware versions are available [here](https://github.com/espressif/esp-at/releases) - choose versions for ESP32C3-AT.
 
-The used/tested firmware version is [v2.4.0.0](https://docs.espressif.com/projects/esp-at/en/release-v2.4.0.0/esp32c3).
-
-It is already compiled and available [here](https://github.com/espressif/esp-at/files/8739863/ESP32-C3-MINI-1_AT_Bin_V2.4.0.0.zip).
+The used/tested firmware version is [v2.4.2.0](https://github.com/espressif/esp-at/files/9432887/ESP32-C3-MINI-1_AT_Bin_V2.4.2.0.zip)
 
 ## Flash Firmware Using Imp Application ##
 
 A simple Squirrel example which flashes ESP32C3 chip:
 - [imp-agent part](./Esp32LoaderExample.agent.nut) (provides REST API for firmware loading/reflashing)
 - [imp-device part](./Esp32LoaderExample.device.nut)
-- [bash script](./esp32_send_fw.sh) which calculates a firmware file length and MD5, splits the file into parts and sends REST API requests.
-  - Originally the script is intended for Linux bash.
-  - To run the script eg. on Windows, install [git (with bash component)](http://git-scm.com/download/win) and execute the script with git bash terminal.
+- script which calculates a firmware file length and MD5, splits the file into parts and sends REST API requests:
+  - [for Mac OS](./esp32_send_fw_macos.sh)
+  - [for Linux bash](./esp32_send_fw.sh)
+    - to run it on Windows, install [git (with bash component)](http://git-scm.com/download/win) and execute the script with git bash terminal.
 
 ### REST API ###
 
@@ -122,6 +121,8 @@ The files to flash and the corresponding offsets in the ESP32C3 flash memory for
 **For the first flashing:** all files should be flashed. They can be flashed in any order but strictly one after another (not in parallel).
 
 **For the next reflashings:** only files modified in the new versions need to be reflashed (no need to reflash unmodified files if their offsets are not changed).
+
+**Alternatively:** a full factory image can be always reflashed (usually located in the "factory" folder of the release zip).
 
 **Attention!** The example may not accept files with the length more than 256 KBytes (actually, it's usually about 650KB and is limited by agent's impOS and free RAM space):
 - In this case the file should be split into parts before uploading.

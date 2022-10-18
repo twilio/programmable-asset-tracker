@@ -21,7 +21,7 @@
 
 //line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/shared/Version.shared.nut"
 // Application Version
-const APP_VERSION = "3.0.0";
+const APP_VERSION = "3.0.1";
 //line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/shared/Constants.shared.nut"
 // Constants common for the imp-agent and the imp-device
 
@@ -865,8 +865,12 @@ class ProductionManager {
                 // No new deployment was detected
                 _printLastErrorAndSleep(data.lastError);
             } else {
+                local onConnect = function(_) {
+                    _printLastErrorAndSleep(data.lastError);
+                }.bindenv(this);
+
                 // Connect to check for a new deployment
-                server.connect(_printLastErrorAndSleep.bindenv(this), PMGR_CONNECT_TIMEOUT);
+                server.connect(onConnect, PMGR_CONNECT_TIMEOUT);
             }
 
             return;
@@ -901,13 +905,9 @@ class ProductionManager {
         data.shipped = true;
         _storeData(data);
 
-        // If the error flag is active, we should still go to sleep. Otherwise, let's run the app
-        if (!data.errorFlag) {
-            // Cancel sleep
-            imp.onidle(null);
-            // Start the main application
-            _startApp();
-        }
+        // Restart to run the application
+        server.flush(PMGR_FLUSH_TIMEOUT);
+        imp.reset();
     }
 
     /**
@@ -919,7 +919,7 @@ class ProductionManager {
         _setErrorFlag(error);
         server.flush(PMGR_FLUSH_TIMEOUT);
         // TODO: Sleep immediately? But what if called from the global exception handler?
-        server.restart();
+        imp.reset();
     }
 
     // TODO: Comment
@@ -942,25 +942,31 @@ class ProductionManager {
      * @param {table | null} lastError - Last saved error with timestamp and description
      */
     function _printLastErrorAndSleep(lastError) {
+        // Timeout of checking for updates, in seconds
+        const PM_CHECK_UPDATES_TIMEOUT = 5;
+
         // TODO: Improve logging!
         if (lastError && "ts" in lastError && "desc" in lastError) {
             _info(format("Last error (at %d): \"%s\"", lastError.ts, lastError.desc));
         }
 
-        // Sleep until the next update (code deploy) check
-        _sleep(PMGR_CHECK_UPDATES_PERIOD);
+        // After the timeout, sleep until the next update (code deploy) check
+        _sleep(PMGR_CHECK_UPDATES_PERIOD, PM_CHECK_UPDATES_TIMEOUT);
     }
 
     /**
      * Go to sleep once Squirrel VM is idle
      *
      * @param {float} sleepTime - The deep sleep duration in seconds
+     * @param {float} [delay] - Delay before sleep, in seconds
      */
-    function _sleep(sleepTime) {
-        imp.onidle(function() {
+    function _sleep(sleepTime, delay = 0) {
+        local sleep = function() {
             _info("Going to sleep for " + sleepTime + " seconds");
             server.sleepfor(sleepTime);
-        }.bindenv(this));
+        }.bindenv(this);
+
+        imp.wakeup(delay, @() imp.onidle(sleep));
     }
 
     /**
@@ -1423,7 +1429,7 @@ class CfgManager {
 
     "batteryLow": {             // battery level crosses the lower limit (becomes below the threshold)
       "enabled": true,          // true - alert is enabled
-      "threshold": 20.0         // battery low alert threshold, in %
+      "threshold": 30.0         // battery low alert threshold, in %
     },
 
     "tamperingDetected": {      // tampering detected (light was detected by the photoresistor)
@@ -2565,7 +2571,7 @@ const ESP32_DEFAULT_RX_FIFO_SZ = 4096;
 // Maximum time allowed for waiting for data, in seconds
 const ESP32_WAIT_DATA_TIMEOUT = 8;
 // Maximum amount of data expected to be received, in bytes
-const ESP32_MAX_DATA_LEN = 6144;
+const ESP32_MAX_DATA_LEN = 2048;
 // Automatic switch off delay, in seconds
 const ESP32_SWITCH_OFF_DELAY = 10;
 
@@ -2582,7 +2588,7 @@ const ESP32_BLE_SCAN_INTERVAL = 8;
 // so the range for the actual scan window is [2.5,10240] ms.
 const ESP32_BLE_SCAN_WINDOW = 8;
 // BLE advertisements scan period, in seconds
-const ESP32_BLE_SCAN_PERIOD = 2;
+const ESP32_BLE_SCAN_PERIOD = 6;
 
 // ESP32 Driver class.
 // Ability to work with WiFi networks and BLE
@@ -2663,9 +2669,35 @@ class ESP32Driver {
         .then(function(_) {
             ::debug("Scanning WiFi networks..", "ESP32Driver");
 
-            local okValidator = @(data, _) data.find("\r\nOK\r\n") != null;
+            // The string expected to appear in the reply
+            local validationString = "\r\nOK\r\n";
+            // The tail of the previously received data chunk(s).
+            // Needed to make sure we won't miss the validation substring in the
+            // reply in case when its parts are in different reply data chunks
+            local prevTail = "";
+
+            local streamValidator = function(dataChunk, _) {
+                local data = prevTail + dataChunk;
+                local tailLen = data.len() - validationString.len();
+                prevTail = tailLen > 0 ? data.slice(tailLen) : data;
+
+                return data.find(validationString) != null;
+            }.bindenv(this);
+
+            // The result array of parsed WiFi networks
+            local wifis = [];
+            // The unparsed tail (if any) of the previously received data chunk(s).
+            // Needed to make sure we won't lose some results in the reply in case
+            // when some parsable units are in different reply data chunks
+            local unparsedTail = "";
+
+            local replyStreamHandler = function(dataChunk) {
+                unparsedTail = _parseWifiNetworks(unparsedTail + dataChunk, wifis);
+                return wifis;
+            }.bindenv(this);
+
             // Send "List Available APs" cmd and parse the result
-            return _communicate("AT+CWLAP", okValidator, _parseWifiNetworks, false);
+            return _communicateStream("AT+CWLAP", streamValidator, replyStreamHandler);
         }.bindenv(this))
         .then(function(wifis) {
             ::debug("Scanning of WiFi networks finished successfully. Scanned items: " + wifis.len(), "ESP32Driver");
@@ -2698,10 +2730,42 @@ class ESP32Driver {
             ::debug("Scanning BLE advertisements..", "ESP32Driver");
 
             local bleScanCmd = format("AT+BLESCAN=%d,%d", ESP32_BLE_SCAN.ENABLE, ESP32_BLE_SCAN_PERIOD);
-            local validator = @(data, timeElapsed) (data.find("\r\nOK\r\n") != null &&
-                                                    timeElapsed >= ESP32_BLE_SCAN_PERIOD);
+
+            // The string expected to appear in the reply
+            local validationString = "\r\nOK\r\n";
+            // The tail of the previously received data chunk(s).
+            // Needed to make sure we won't miss the validation substring in the
+            // reply in case when its parts are in different reply data chunks
+            local prevTail = "";
+            // True if the validation string has been found
+            local stringFound = false;
+
+            local streamValidator = function(dataChunk, timeElapsed) {
+                if (!stringFound) {
+                    local data = prevTail + dataChunk;
+                    stringFound = data.find(validationString) != null;
+
+                    local tailLen = data.len() - validationString.len();
+                    prevTail = tailLen > 0 ? data.slice(tailLen) : data;
+                }
+
+                return stringFound && timeElapsed >= ESP32_BLE_SCAN_PERIOD;
+            }.bindenv(this);
+
+            // The result array of parsed BLE adverts
+            local adverts = [];
+            // The unparsed tail (if any) of the previously received data chunk(s).
+            // Needed to make sure we won't lose some results in the reply in case
+            // when some parsable units are in different reply data chunks
+            local unparsedTail = "";
+
+            local replyStreamHandler = function(dataChunk) {
+                unparsedTail = _parseBLEAdverts(unparsedTail + dataChunk, adverts);
+                return adverts;
+            }.bindenv(this);
+
             // Send "Enable Bluetooth LE Scanning" cmd and parse the result
-            return _communicate(bleScanCmd, validator, _parseBLEAdverts, false);
+            return _communicateStream(bleScanCmd, streamValidator, replyStreamHandler);
         }.bindenv(this))
         .then(function(adverts) {
             ::debug("Scanning of BLE advertisements finished successfully. Scanned items: " + adverts.len(), "ESP32Driver");
@@ -2798,7 +2862,7 @@ class ESP32Driver {
      * @param {function} validator - Function that checks if a reply has been fully received
      * @param {function} [replyHandler=null] - Handler that is called to process the reply
      * @param {boolean} [wrapInAFunc=true] - True to wrap the Promise to be returned in an additional function with no params.
-     *                                       This optionis useful for, e.g., serial execution of a list of promises (Promise.serial)
+     *                                       This option is useful for, e.g., serial execution of a list of promises (Promise.serial)
      *
      * @return {Promise | function}: Promise or a function with no params that returns this promise. The promise:
      * - resolves with the reply (pre-processed if a reply handler specified) if the operation succeeded
@@ -2818,6 +2882,39 @@ class ESP32Driver {
         .then(function(reply) {
             cmd && ::debug(format("Reply for %s cmd received", cmd), "ESP32Driver");
             return replyHandler ? replyHandler(reply) : reply;
+        }.bindenv(this));
+    }
+
+    /**
+     * Communicate with the ESP32 board: send a command (if passed) and pass the reply as a stream to the handler
+     *
+     * @param {string | null} cmd - String with a command to send or null
+     * @param {function} streamValidator - Function that checks if a reply has been fully received. It's called every time
+     *                                     a reply data chunk is received - this chunk (only) is passed to the handler
+     * @param {function} replyStreamHandler - Handler that is called to process the reply. It's called every time a reply
+     *                                        data chunk is received - this chunk (only) is passed to the handler
+     *
+     * @return {Promise} that:
+     * - resolves with the pre-processed (by the reply handler) reply if the operation succeeded
+     * - rejects with an error if the operation failed
+     */
+    function _communicateStream(cmd, streamValidator, replyStreamHandler) {
+        if (cmd) {
+            ::debug(format("Sending %s cmd..", cmd), "ESP32Driver");
+            _serial.write(cmd + "\r\n");
+        }
+
+        local result = null;
+
+        local validator = function(data, timeElapsed) {
+            data.len() && (result = replyStreamHandler(data));
+            return streamValidator(data, timeElapsed);
+        }.bindenv(this);
+
+        return _waitForData(validator, false)
+        .then(function(reply) {
+            cmd && ::debug(format("Reply for %s cmd received", cmd), "ESP32Driver");
+            return result;
         }.bindenv(this));
     }
 
@@ -2852,18 +2949,19 @@ class ESP32Driver {
     /**
      * Parse the data returned by the AT+CWLAP (List Available APs) command
      *
-     * @param {string} data - String with a reply to the AT+CWLAP command
-     *
-     * @return {array} of parsed WiFi networks
+     * @param {string} data - String with a data chunk of the reply to the AT+CWLAP command
+     * @param {array} dstArray - Array for saving parsed results
      *  Each element of the array is a table with the following fields:
      *     "ssid"      : {string}  - SSID (network name).
      *     "bssid"     : {string}  - BSSID (access point’s MAC address), in 0123456789ab format.
      *     "channel"   : {integer} - Channel number: 1-13 (2.4GHz).
      *     "rssi"      : {integer} - RSSI (signal strength).
      *     "open"      : {bool}    - Whether the network is open (password-free).
+     *
+     * @return {string} Unparsed tail of the data chunk or an empty string
      * An exception may be thrown in case of an error.
      */
-    function _parseWifiNetworks(data) {
+    function _parseWifiNetworks(data, dstArray) {
         // The data should look like the following:
         // AT+CWLAP
         // +CWLAP:(3,"Ger",-64,"f1:b2:d4:88:16:32",8)
@@ -2893,14 +2991,23 @@ class ESP32Driver {
         ::debug("Parsing the WiFi scan response..", "ESP32Driver");
 
         try {
-            local wifis = [];
             local dataRows = split(data, "\r\n");
+            local unparsedTail = "";
 
             foreach (row in dataRows) {
                 local regexCapture = regex.capture(row);
 
                 if (regexCapture == null) {
-                    continue;
+                    if (row != dataRows.top()) {
+                        continue;
+                    }
+
+                    local lastChar = data[data.len() - 1];
+                    if (lastChar != '\r' && lastChar != '\n') {
+                        unparsedTail = row;
+                    }
+
+                    break;
                 }
 
                 // The first capture is the full row. Let's remove it as we only need the parsed pieces of the row
@@ -2918,10 +3025,10 @@ class ESP32Driver {
                     "open"   : regexCapture[ESP32_WIFI_PARAM_ORDER.ECN].tointeger() == ESP32_ECN_METHOD.OPEN
                 };
 
-                wifis.push(scannedWifi);
+                dstArray.push(scannedWifi);
             }
 
-            return wifis;
+            return unparsedTail;
         } catch (err) {
             throw "WiFi networks parsing error: " + err;
         }
@@ -2957,15 +3064,17 @@ class ESP32Driver {
     /**
      * Wait for certain data to be received from the ESP32 board
      *
-     * @param {function} validator - Function that checks if the expected data has been fully received
+     * @param {function} validator - Function that gets reply data checks if the expected data has been fully received
+     * @param {boolean} [accumulateData=true] - If enabled, reply data will be accumulated across calls of the validator.
+     *                                          I.e., all reply data that is already received will be passed to the validator every
+     *                                          time it is called. If disabled, only newly received reply data is passed to the validator.
+     *                                          This option is useful when a big amount of data is expected to prevent out-of-memory.
      *
      * @return {Promise} that:
      * - resolves with the data received if the operation succeeded
      * - rejects if the operation failed
      */
-    // TODO: On-the-fly data processing may be required. And memory consumption optimization.
-    //       If we wait for all data to be received before processing, we can face OOM due to the need of keeping all raw recevied data
-    function _waitForData(validator) {
+    function _waitForData(validator, accumulateData = true) {
         // Data check/read period, in seconds
         const ESP32_DATA_CHECK_PERIOD = 0.1;
         // Maximum data length expected to be received from ESP32, in bytes
@@ -2973,16 +3082,20 @@ class ESP32Driver {
 
         local start = hardware.millis();
         local data = "";
+        local dataLen = 0;
 
         return Promise(function(resolve, reject) {
             local check;
             check = function() {
                 local chunk = _serial.readblob(ESP32_DATA_READ_CHUNK_LEN);
+                local chunkLen = chunk.len();
 
                 // Read until FIFO is empty and accumulate to the result string
-                while (chunk.len() > 0 && data.len() < ESP32_MAX_DATA_LEN) {
+                while (chunkLen > 0 && data.len() < ESP32_MAX_DATA_LEN) {
                     data += chunk.tostring();
+                    dataLen += chunkLen;
                     chunk = _serial.readblob(ESP32_DATA_READ_CHUNK_LEN);
+                    chunkLen = chunk.len();
                 }
 
                 local timeElapsed = (hardware.millis() - start) / 1000.0;
@@ -2991,11 +3104,13 @@ class ESP32Driver {
                     return resolve(data);
                 }
 
+                !accumulateData && (data = "");
+
                 if (timeElapsed >= ESP32_WAIT_DATA_TIMEOUT) {
                     return reject("Timeout waiting for the expected data or an acknowledge");
                 }
 
-                if (data.len() >= ESP32_MAX_DATA_LEN) {
+                if (accumulateData && dataLen >= ESP32_MAX_DATA_LEN) {
                     return reject("Too much data received but still no expected data");
                 }
 
@@ -3026,22 +3141,23 @@ class ESP32Driver {
     /**
      * Parse the data returned by the AT+BLESCAN command
      *
-     * @param {string} data - String with a reply to the AT+BLESCAN command
-     *
-     * @return {array} of scanned BLE advertisements
+     * @param {string} data - String with a data chunk of the reply to the AT+BLESCAN command
+     * @param {array} dstArray - Array for saving parsed results. May contain previously saved results
      *  Each element of the array is a table with the following fields:
      *     "address"  : {string}  - BLE address.
      *     "rssi"     : {integer} - RSSI (signal strength).
      *     "advData"  : {blob} - Advertising data.
      *     "addrType" : {integer} - Address type: 0 - public, 1 - random.
+     *
+     * @return {string} Unparsed tail of the data chunk or an empty string
      * An exception may be thrown in case of an error.
      */
-    function _parseBLEAdverts(data) {
+    function _parseBLEAdverts(data, dstArray) {
         // The data should look like the following:
         // AT+BLESCAN=1,5
         // OK
-        // +BLESCAN:6f:92:8a:04:e1:79,-89,1aff4c000215646be3e46e4e4e25ad0177a28f3df4bd00000000bf,,1
-        // +BLESCAN:76:72:c3:3e:29:e4,-79,1bffffffbeac726addafa7044528b00b12f8f57e7d8200000000bb00,,1
+        // +BLESCAN:"6f:92:8a:04:e1:79",-89,1aff4c000215646be3e46e4e4e25ad0177a28f3df4bd00000000bf,,1
+        // +BLESCAN:"76:72:c3:3e:29:e4",-79,1bffffffbeac726addafa7044528b00b12f8f57e7d8200000000bb00,,1
 
         // Sub-expressions of the regular expression for parsing AT+BLESCAN response
         const ESP32_BLESCAN_PREFIX        = @"\+BLESCAN:";
@@ -3061,20 +3177,23 @@ class ESP32Driver {
         ::debug("Parsing the BLE devices scan response..", "ESP32Driver");
 
         try {
-            // Result array of scanned advertisements
-            local result = [];
-            // Array of strings to be compared to check the uniqueness of an advertisement
-            local uniqueAdverts = [];
             local dataRows = split(data, "\r\n");
-
-            // In order to process fresher advertisements first (to get the latest RSSI for duplicated adverts), reverse this array
-            dataRows.reverse();
+            local unparsedTail = "";
 
             foreach (row in dataRows) {
                 local regexCapture = regex.capture(row);
 
                 if (regexCapture == null) {
-                    continue;
+                    if (row != dataRows.top()) {
+                        continue;
+                    }
+
+                    local lastChar = data[data.len() - 1];
+                    if (lastChar != '\r' && lastChar != '\n') {
+                        unparsedTail = row;
+                    }
+
+                    break;
                 }
 
                 // The first capture is the full row. Let's remove it as we only need the parsed pieces of the row
@@ -3084,31 +3203,32 @@ class ESP32Driver {
                     regexCapture[i] = row.slice(val.begin, val.end);
                 }
 
-                local address = _removeColon(regexCapture[ESP32_BLE_PARAM_ORDER.ADDR]);
-                local advData = regexCapture[ESP32_BLE_PARAM_ORDER.ADV_DATA];
-                local addrType = regexCapture[ESP32_BLE_PARAM_ORDER.ADDR_TYPE].tointeger();
-
-                // Make a string that helps to compare adverts.
-                // Advertisement uniqueness is determined by equality of address, advData and addrType
-                local stringAdvert = address + advData + addrType;
-
-                if (uniqueAdverts.find(stringAdvert) != null) {
-                    continue;
-                }
-
-                uniqueAdverts.push(stringAdvert);
-
+                local advDataStr = regexCapture[ESP32_BLE_PARAM_ORDER.ADV_DATA];
                 local resultAdvert = {
-                    "address" : address,
+                    "address" : _removeColon(regexCapture[ESP32_BLE_PARAM_ORDER.ADDR]),
                     "rssi"    : regexCapture[ESP32_BLE_PARAM_ORDER.RSSI].tointeger(),
-                    "advData" : advData.len() >= 2 ? utilities.hexStringToBlob(advData) : blob(),
-                    "addrType": addrType
+                    "advData" : advDataStr.len() >= 2 ? utilities.hexStringToBlob(advDataStr) : blob(),
+                    "addrType": regexCapture[ESP32_BLE_PARAM_ORDER.ADDR_TYPE].tointeger()
                 };
 
-                result.push(resultAdvert);
+                local alreadyExists = false;
+
+                foreach (existingAdvert in dstArray) {
+                    if (existingAdvert.address == resultAdvert.address &&
+                        existingAdvert.advData.tostring() == resultAdvert.advData.tostring() &&
+                        existingAdvert.addrType == resultAdvert.addrType) {
+                        alreadyExists = true;
+                        existingAdvert.rssi = resultAdvert.rssi;
+                        break;
+                    }
+                }
+
+                if (!alreadyExists) {
+                    dstArray.push(resultAdvert);
+                }
             }
 
-            return result;
+            return unparsedTail;
         } catch (err) {
             throw "BLE advertisements parsing error: " + err;
         }
@@ -3565,17 +3685,18 @@ class AccelerometerDriver {
      * @param {table} shockCnd - Table with the shock condition settings.
      *        Optional, all settings have defaults.
      *        The settings:
-     *          "shockThreshold": {float} - Shock acceleration threshold, in g.
-     *                                      Default: ACCEL_DEFAULT_SHOCK_THR
+     *          "shockThreshold": {float|integer} - Shock acceleration threshold, in g.
+     *                                              Default: ACCEL_DEFAULT_SHOCK_THR
      */
     function enableShockDetection(shockCb, shockCnd = {}) {
         local shockSettIsCorr = true;
         _shockThr = ACCEL_DEFAULT_SHOCK_THR;
+        // NOTE: This can be implemented without a loop
         foreach (key, value in shockCnd) {
             if (typeof key == "string") {
                 if (key == "shockThreshold") {
-                    if (typeof value == "float" && value > 0.0 && value <= 16.0) {
-                        _shockThr = value;
+                    if (value > 0.0 && value <= 16.0) {
+                        _shockThr = value.tofloat();
                     } else {
                         ::error("shockThreshold incorrect value (must be in [0;16] g)", "AccelerometerDriver");
                         shockSettIsCorr = false;
@@ -3617,19 +3738,19 @@ class AccelerometerDriver {
      * @param {table} motionCnd - Table with the motion condition settings.
      *        Optional, all settings have defaults.
      *        The settings:
-     *          "movementAccMax": {float}    - Movement acceleration maximum threshold, in g.
-     *                                        Default: ACCEL_DEFAULT_MOV_MAX
-     *          "movementAccMin": {float}    - Movement acceleration minimum threshold, in g.
-     *                                        Default: ACCEL_DEFAULT_MOV_MIN
-     *          "movementAccDur": {float}    - Duration of exceeding movement acceleration threshold, in seconds.
-     *                                        Default: ACCEL_DEFAULT_MOV_DUR
-     *          "motionTime": {float}  - Maximum time to determine motion detection after the initial movement, in seconds.
-     *                                        Default: ACCEL_DEFAULT_MOTION_TIME
-     *          "motionVelocity": {float} - Minimum instantaneous velocity  to determine motion detection condition, in meters per second.
-     *                                        Default: ACCEL_DEFAULT_MOTION_VEL
-     *          "motionDistance": {float} - Minimal movement distance to determine motion detection condition, in meters.
-     *                                      If 0, distance is not calculated (not used for motion detection).
-     *                                        Default: ACCEL_DEFAULT_MOTION_DIST
+     *          "movementAccMax": {float|integer} - Movement acceleration maximum threshold, in g.
+     *                                              Default: ACCEL_DEFAULT_MOV_MAX
+     *          "movementAccMin": {float|integer} - Movement acceleration minimum threshold, in g.
+     *                                              Default: ACCEL_DEFAULT_MOV_MIN
+     *          "movementAccDur": {float|integer} - Duration of exceeding movement acceleration threshold, in seconds.
+     *                                              Default: ACCEL_DEFAULT_MOV_DUR
+     *          "motionTime":     {float|integer} - Maximum time to determine motion detection after the initial movement, in seconds.
+     *                                              Default: ACCEL_DEFAULT_MOTION_TIME
+     *          "motionVelocity": {float|integer} - Minimum instantaneous velocity  to determine motion detection condition, in meters per second.
+     *                                              Default: ACCEL_DEFAULT_MOTION_VEL
+     *          "motionDistance": {float|integer} - Minimal movement distance to determine motion detection condition, in meters.
+     *                                              If 0, distance is not calculated (not used for motion detection).
+     *                                              Default: ACCEL_DEFAULT_MOTION_DIST
      */
     function detectMotion(motionCb, motionCnd = {}) {
         local motionSettIsCorr = true;
@@ -3643,8 +3764,8 @@ class AccelerometerDriver {
         foreach (key, value in motionCnd) {
             if (typeof key == "string") {
                 if (key == "movementAccMax") {
-                    if (typeof value == "float" && value > 0) {
-                        _movementAccMax = value;
+                    if (value > 0) {
+                        _movementAccMax = value.tofloat();
                     } else {
                         ::error("movementAccMax incorrect value", "AccelerometerDriver");
                         motionSettIsCorr = false;
@@ -3653,9 +3774,9 @@ class AccelerometerDriver {
                 }
 
                 if (key == "movementAccMin") {
-                    if (typeof value == "float"  && value > 0) {
-                        _movementAccMin = value;
-                        _movementCurThr = value;
+                    if (value > 0) {
+                        _movementAccMin = value.tofloat();
+                        _movementCurThr = value.tofloat();
                     } else {
                         ::error("movementAccMin incorrect value", "AccelerometerDriver");
                         motionSettIsCorr = false;
@@ -3664,8 +3785,8 @@ class AccelerometerDriver {
                 }
 
                 if (key == "movementAccDur") {
-                    if (typeof value == "float"  && value > 0) {
-                        _movementAccDur = value;
+                    if (value > 0) {
+                        _movementAccDur = value.tofloat();
                     } else {
                         ::error("movementAccDur incorrect value", "AccelerometerDriver");
                         motionSettIsCorr = false;
@@ -3674,8 +3795,8 @@ class AccelerometerDriver {
                 }
 
                 if (key == "motionTime") {
-                    if (typeof value == "float"  && value > 0) {
-                        _motionTime = value;
+                    if (value > 0) {
+                        _motionTime = value.tofloat();
                     } else {
                         ::error("motionTime incorrect value", "AccelerometerDriver");
                         motionSettIsCorr = false;
@@ -3684,8 +3805,8 @@ class AccelerometerDriver {
                 }
 
                 if (key == "motionVelocity") {
-                    if (typeof value == "float"  && value >= 0) {
-                        _motionVelocity = value;
+                    if (value >= 0) {
+                        _motionVelocity = value.tofloat();
                     } else {
                         ::error("motionVelocity incorrect value", "AccelerometerDriver");
                         motionSettIsCorr = false;
@@ -3694,8 +3815,8 @@ class AccelerometerDriver {
                 }
 
                 if (key == "motionDistance") {
-                    if (typeof value == "float"  && value >= 0) {
-                        _motionDistance = value;
+                    if (value >= 0) {
+                        _motionDistance = value.tofloat();
                     } else {
                         ::error("motionDistance incorrect value", "AccelerometerDriver");
                         motionSettIsCorr = false;
@@ -4018,7 +4139,7 @@ const BM_AVG_SAMPLES = 6;
 const BM_VOLTAGE_GAIN = 2.4242;
 
 // 3 x 1.5v battery
-const BM_FULL_VOLTAGE = 4.0;
+const BM_FULL_VOLTAGE = 4.2;
 
 // Measures the battery level
 class BatteryMonitor {
@@ -4467,16 +4588,16 @@ class LocationMonitor {
                 local distWithoutAccurace = dist - curLocation.accuracy;
                 if (distWithoutAccurace > 0 && distWithoutAccurace > _geofence.radius) {
                     if (_geofence.inZone != false) {
-                        _geofence.eventCb && _geofence.eventCb(false);
                         _geofence.inZone = false;
+                        _geofence.eventCb && _geofence.eventCb(false);
                     }
                 }
             } else {
                 local distWithAccurace = dist + curLocation.accuracy;
                 if (distWithAccurace <= _geofence.radius) {
                     if (_geofence.inZone != true) {
-                        _geofence.eventCb && _geofence.eventCb(true);
                         _geofence.inZone = true;
+                        _geofence.eventCb && _geofence.eventCb(true);
                     }
                 }
             }
@@ -4774,6 +4895,9 @@ class DataProcessor {
 
     // Settings of shock, temperature and battery alerts
     _alertsSettings = null;
+
+    // Cellular info Promise (null if it's not in progress)
+    _cellInfoPromise = null;
 
     // Last obtained cellular info. Cleared once sent
     _lastCellInfo = null;
@@ -5100,17 +5224,16 @@ class DataProcessor {
 
     // TODO: Comment
     function _getCellInfo() {
-        if (!cm.isConnected()) {
-            return Promise.resolve(null);
+        if (_cellInfoPromise || !cm.isConnected()) {
+            return _cellInfoPromise || Promise.resolve(null);
         }
 
-        return Promise(function(resolve, reject) {
+        return _cellInfoPromise = Promise(function(resolve, reject) {
             // TODO: This is a temporary defense from the incorrect work of getcellinfo()
             local cbTimeoutTimer = imp.wakeup(5, function() {
                 reject("imp.net.getcellinfo didn't call its callback!");
             }.bindenv(this));
 
-            // TODO: Can potentially be called in parallel - need to avoid this
             imp.net.getcellinfo(function(cellInfo) {
                 imp.cancelwakeup(cbTimeoutTimer);
                 _lastCellInfo = _extractCellInfoBG95(cellInfo);
@@ -5120,6 +5243,9 @@ class DataProcessor {
         .fail(function(err) {
             // TODO: Print to the ERROR level?
             ::debug("Failed getting cell info: " + err, "DataProcessor");
+        }.bindenv(this))
+        .finally(function(_) {
+            _cellInfoPromise = null;
         }.bindenv(this));
     }
 
@@ -5566,7 +5692,7 @@ class LocationDriver {
                 if (parsed && parsed.uuid  in knownIBeacons
                            && parsed.major in knownIBeacons[parsed.uuid]
                            && parsed.minor in knownIBeacons[parsed.uuid][parsed.major]) {
-                    local iBeaconInfo = format("UUID %s, Major %s, Minor %s", _formatUUID(parsed.uuid), parsed.major, parsed.minor);
+                    local iBeaconInfo = format("UUID %s, Major %s, Minor %s", parsed.uuid, parsed.major, parsed.minor);
                     ::debug(format("An iBeacon device with known location found: %s, %s", advert.address, iBeaconInfo), "LocationDriver");
 
                     recognized[advert] <- knownIBeacons[parsed.uuid][parsed.major][parsed.minor];
@@ -5809,11 +5935,8 @@ class LocationDriver {
      * Disable u-blox module
      */
     function _disableUBlox() {
-        // TODO: Should u-blox NAV_PVT messages be disabled before switching off the module?
-        // ::debug("Disable u-blox navigation messages...", "LocationDriver._disableNavMsgs");
-        // Disable Position Velocity Time Solution messages
-        // _ubxDriver.enableUbxMsg(UBX_MSG_PARSER_CLASS_MSG_ID.NAV_PVT, 0);
-
+        // Disable the UART to save power
+        HW_UBLOX_UART.disable();
         _ubxSwitchPin.disable();
         ::debug("Switched OFF the u-blox module", "LocationDriver");
     }
@@ -6062,29 +6185,6 @@ class LocationDriver {
             ::error("Invalid date object passed: " + err, "LocationDriver");
             return 0;
         }
-    }
-
-    /**
-     * Format a UUID string to make it printable and human-readable
-     *
-     * @param {string} str - UUID string (16 bytes)
-     *
-     * @return {string} Printable and human-readable UUID string
-     *  The format is: 00112233-4455-6677-8899-aabbccddeeff
-     */
-    function _formatUUID(str) {
-        // The indexes where the dash character ("-") must be placed in the UUID representation
-        local uuidDashes = [3, 5, 7, 9];
-        local res = "";
-
-        for (local i = 0; i < str.len(); i++) {
-            res += format("%02x", str[i]);
-            if (uuidDashes.find(i) != null) {
-                res += "-";
-            }
-        }
-
-        return res;
     }
 }
 

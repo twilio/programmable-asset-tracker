@@ -84,7 +84,7 @@ const ESP32_LOADER_DEFAULT_RX_FIFO_SZ = 4096;
 // Maximum amount of data expected to be received, in bytes
 const ESP32_LOADER_MAX_DATA_LEN = 4096;
 // Maximum time allowed for waiting for data, in seconds
-const ESP32_LOADER_WAIT_DATA_TIMEOUT = 5;
+const ESP32_LOADER_WAIT_DATA_TIMEOUT = 25;
 // Checksum start seed
 const ESP32_LOADER_CHECKSUM_SEED = 0xEF;
 // Each SLIP packet begins and ends with 0xC0
@@ -354,7 +354,7 @@ class ESP32Loader {
                                                    "Flash parameter set failure";
         // FLASH_BEGIN - erasing flash (size to erase, number of data packets, data size in one packet, flash offset)
         local numberOfDataPackets = (fwImgLen + ESP32_LOADER_TRANSMIT_PACKET_LEN - 1) / ESP32_LOADER_TRANSMIT_PACKET_LEN;
-        // NOTE: THIS DOES NOT MATCH THE DOCUMENTATION!!!
+        // NOTE: THIS DOES NOT MATCH THE DOCUMENTATION!!!
         // 4 BYTES DIFFERENCE
         // https://docs.espressif.com/projects/esptool/en/latest/esp32c3/advanced-topics/serial-protocol.html
         local flashBeginStr = format("C00002140000000000%08X%08X%08X%08X00000000C0",
