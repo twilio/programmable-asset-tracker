@@ -336,16 +336,16 @@ class LocationMonitor {
                 local distWithoutAccurace = dist - curLocation.accuracy;
                 if (distWithoutAccurace > 0 && distWithoutAccurace > _geofence.radius) {
                     if (_geofence.inZone != false) {
-                        _geofence.eventCb && _geofence.eventCb(false);
                         _geofence.inZone = false;
+                        _geofence.eventCb && _geofence.eventCb(false);
                     }
                 }
             } else {
                 local distWithAccurace = dist + curLocation.accuracy;
                 if (distWithAccurace <= _geofence.radius) {
                     if (_geofence.inZone != true) {
-                        _geofence.eventCb && _geofence.eventCb(true);
                         _geofence.inZone = true;
+                        _geofence.eventCb && _geofence.eventCb(true);
                     }
                 }
             }

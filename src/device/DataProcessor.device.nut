@@ -67,6 +67,9 @@ class DataProcessor {
     // Settings of shock, temperature and battery alerts
     _alertsSettings = null;
 
+    // Cellular info Promise (null if it's not in progress)
+    _cellInfoPromise = null;
+
     // Last obtained cellular info. Cleared once sent
     _lastCellInfo = null;
 
@@ -392,17 +395,16 @@ class DataProcessor {
 
     // TODO: Comment
     function _getCellInfo() {
-        if (!cm.isConnected()) {
-            return Promise.resolve(null);
+        if (_cellInfoPromise || !cm.isConnected()) {
+            return _cellInfoPromise || Promise.resolve(null);
         }
 
-        return Promise(function(resolve, reject) {
+        return _cellInfoPromise = Promise(function(resolve, reject) {
             // TODO: This is a temporary defense from the incorrect work of getcellinfo()
             local cbTimeoutTimer = imp.wakeup(5, function() {
                 reject("imp.net.getcellinfo didn't call its callback!");
             }.bindenv(this));
 
-            // TODO: Can potentially be called in parallel - need to avoid this
             imp.net.getcellinfo(function(cellInfo) {
                 imp.cancelwakeup(cbTimeoutTimer);
                 _lastCellInfo = _extractCellInfoBG95(cellInfo);
@@ -412,6 +414,9 @@ class DataProcessor {
         .fail(function(err) {
             // TODO: Print to the ERROR level?
             ::debug("Failed getting cell info: " + err, "@{CLASS_NAME}");
+        }.bindenv(this))
+        .finally(function(_) {
+            _cellInfoPromise = null;
         }.bindenv(this));
     }
 

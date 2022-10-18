@@ -55,8 +55,12 @@ class ProductionManager {
                 // No new deployment was detected
                 _printLastErrorAndSleep(data.lastError);
             } else {
+                local onConnect = function(_) {
+                    _printLastErrorAndSleep(data.lastError);
+                }.bindenv(this);
+
                 // Connect to check for a new deployment
-                server.connect(_printLastErrorAndSleep.bindenv(this), PMGR_CONNECT_TIMEOUT);
+                server.connect(onConnect, PMGR_CONNECT_TIMEOUT);
             }
 
             return;
@@ -91,13 +95,9 @@ class ProductionManager {
         data.shipped = true;
         _storeData(data);
 
-        // If the error flag is active, we should still go to sleep. Otherwise, let's run the app
-        if (!data.errorFlag) {
-            // Cancel sleep
-            imp.onidle(null);
-            // Start the main application
-            _startApp();
-        }
+        // Restart to run the application
+        server.flush(PMGR_FLUSH_TIMEOUT);
+        imp.reset();
     }
 
     /**
@@ -109,7 +109,7 @@ class ProductionManager {
         _setErrorFlag(error);
         server.flush(PMGR_FLUSH_TIMEOUT);
         // TODO: Sleep immediately? But what if called from the global exception handler?
-        server.restart();
+        imp.reset();
     }
 
     // TODO: Comment
@@ -132,25 +132,31 @@ class ProductionManager {
      * @param {table | null} lastError - Last saved error with timestamp and description
      */
     function _printLastErrorAndSleep(lastError) {
+        // Timeout of checking for updates, in seconds
+        const PM_CHECK_UPDATES_TIMEOUT = 5;
+
         // TODO: Improve logging!
         if (lastError && "ts" in lastError && "desc" in lastError) {
             _info(format("Last error (at %d): \"%s\"", lastError.ts, lastError.desc));
         }
 
-        // Sleep until the next update (code deploy) check
-        _sleep(PMGR_CHECK_UPDATES_PERIOD);
+        // After the timeout, sleep until the next update (code deploy) check
+        _sleep(PMGR_CHECK_UPDATES_PERIOD, PM_CHECK_UPDATES_TIMEOUT);
     }
 
     /**
      * Go to sleep once Squirrel VM is idle
      *
      * @param {float} sleepTime - The deep sleep duration in seconds
+     * @param {float} [delay] - Delay before sleep, in seconds
      */
-    function _sleep(sleepTime) {
-        imp.onidle(function() {
+    function _sleep(sleepTime, delay = 0) {
+        local sleep = function() {
             _info("Going to sleep for " + sleepTime + " seconds");
             server.sleepfor(sleepTime);
-        }.bindenv(this));
+        }.bindenv(this);
+
+        imp.wakeup(delay, @() imp.onidle(sleep));
     }
 
     /**
