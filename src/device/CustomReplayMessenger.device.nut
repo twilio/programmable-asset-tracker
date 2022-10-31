@@ -1,3 +1,25 @@
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 @set CLASS_NAME = "CustomReplayMessenger" // Class name for logging
 
 // Customized ReplayMessenger library
@@ -14,12 +36,17 @@ const CRM_RESEND_RATE_LIMIT_PCT = 80;
 class CustomReplayMessenger extends ReplayMessenger {
     _persistedMessagesPending = false;
     _eraseAllPending = false;
-    _onIdleCb = null;
     _onAckCbs = null;
     _onAckDefaultCb = null;
     _onFailCbs = null;
     _onFailDefaultCb = null;
 
+    /**
+     * Custom Replay Messenger constructor
+     *
+     * @param {SPIFlashLogger} spiFlashLogger - Instance of spiFlashLogger which will be used to store messages
+     * @param {table} [options] - Key-value table with optional settings
+     */
     constructor(spiFlashLogger, options = {}) {
         // Provide any ID to prevent the standart algorithm of searching of the next usable ID
         options.firstMsgId <- 0;
@@ -39,6 +66,11 @@ class CustomReplayMessenger extends ReplayMessenger {
         _onFailCbs = {};
     }
 
+    /**
+     * Initialize. Read several last saved messages to determine the next ID, which can be used for new messages
+     *
+     * @param {function} onDone - Callback to be called when initialization is done
+     */
     function init(onDone) {
         local maxId = -1;
         local msgRead = 0;
@@ -78,6 +110,12 @@ class CustomReplayMessenger extends ReplayMessenger {
         _spiFL.read(onData, onFinish, -1);
     }
 
+    /**
+     * Sets the name-specific ACK callback which will be called when an ACK received for a message with this name
+     *
+     * @param {function | null} onDone - Callback to be called when an ACK received. If null passed, remove the callback (if set)
+     * @param {string} [name] - Message name. If not passed, the callback will be used as a default one
+     */
     function onAck(cb, name = null) {
         if (name == null) {
             _onAckDefaultCb = cb;
@@ -88,6 +126,13 @@ class CustomReplayMessenger extends ReplayMessenger {
         }
     }
 
+    /**
+     * Sets the name-specific fail callback which will be called when a message with this name has been failed to send
+     *
+     * @param {function | null} onDone - Callback to be called when a message has been failed to send.
+     *                            If null passed, remove the callback (if set)
+     * @param {string} [name] - Message name. If not passed, the callback will be used as a default one
+     */
     function onFail(cb, name = null) {
         if (name == null) {
             _onFailDefaultCb = cb;
@@ -96,23 +141,6 @@ class CustomReplayMessenger extends ReplayMessenger {
         } else if (name in _onFailCbs) {
             delete _onFailCbs[name];
         }
-    }
-
-    function readyToSend() {
-        return _cm.isConnected() && _checkSendLimits();
-    }
-
-    function hasPersistedMessages() {
-        return _persistedMessagesPending;
-    }
-
-    function isIdle() {
-        return _isAllProcessed();
-    }
-
-    // Registers a callback which will be called when _isAllProcessed() turns false
-    function onIdle(cb) {
-        _onIdleCb = cb;
     }
 
     // -------------------- PRIVATE METHODS -------------------- //
@@ -230,7 +258,6 @@ class CustomReplayMessenger extends ReplayMessenger {
             // If Replay Messenger has unsent or unacknowledged messages, keep the connection for it
             cm.keepConnection("@{CLASS_NAME}", true);
         } else {
-            _onIdleCb && _onIdleCb();
             // If Replay Messenger is idle (has no unsent or unacknowledged messages), it doesn't need the connection anymore
             cm.keepConnection("@{CLASS_NAME}", false);
         }
@@ -348,7 +375,6 @@ class CustomReplayMessenger extends ReplayMessenger {
             try {
                 _spiFL.write(payload);
             } catch (err) {
-                // TODO: Go to the emergency mode instead (just throw an exception)?
                 ::error("Couldn't persist a message: " + err, "@{CLASS_NAME}");
                 ::error("Erasing the flash logger!", "@{CLASS_NAME}");
 

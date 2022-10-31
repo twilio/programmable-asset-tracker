@@ -1,31 +1,47 @@
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
 // Supported configuration JSON format/scheme version
 const CFG_SCHEME_VERSION = "1.1";
 
 // Configuration safeguard/validation constants:
+// NOTE: These constants may need some adjustments
 
 // "connectingPeriod"
 // How often the tracker connects to network (minimal value), in seconds.
-// TODO: adjust
 const CFG_CONNECTING_SAFEGUARD_MIN = 10.0;
 // How often the tracker connects to network (maximal value), in seconds.
-// TODO: adjust
 const CFG_CONNECTING_SAFEGUARD_MAX = 360000.0;
 
 // "readingPeriod"
 // How often the tracker polls various data (minimal value), in seconds.
-// TODO: adjust
 const CFG_READING_SAFEGUARD_MIN = 10.0;
 // How often the tracker polls various data (maximal value), in seconds.
-// TODO: adjust
 const CFG_READING_SAFEGUARD_MAX = 360000.0;
 
 // "locReadingPeriod"
 // How often the tracker obtains a location (minimal value), in seconds.
-// TODO: adjust
 const CFG_LOC_READING_SAFEGUARD_MIN = 10.0;
 // How often the tracker obtains a location (maximal value), in seconds.
-// TODO: adjust
 const CFG_LOC_READING_SAFEGUARD_MAX = 360000.0;
 
 // "motionMonitoring":
@@ -124,10 +140,10 @@ const CFG_GEOFENCE_RADIUS_SAFEGUARD_MAX = 6371009.0;
 
 // "after"
 // Minimal start time of repossesion, Unix timestamp
-// 31.03.2020 12:53:04 - TODO: adjust
+// 31.03.2020 12:53:04
 const CFG_MIN_TIMESTAMP = 1585666384;
 // Maximal start time of repossesion, Unix timestamp
-// 17.04.2035 18:48:49 - TODO: adjust
+// 17.04.2035 18:48:49
 const CFG_MAX_TIMESTAMP = 2060448529;
 
 // "duration"
@@ -166,8 +182,6 @@ coordValidationRules <- [{"name":"lng",
  * @return {null | string} null - validation success, otherwise error string.
  */
 function validateCfg(msg) {
-    // TODO: Check if there are extra fields in the cfg
-
     // validate agent configuration
     if ("agentConfiguration" in msg) {
         local agentCfg = msg.agentConfiguration;
@@ -220,7 +234,7 @@ function validateCfg(msg) {
  *          "name": {string} - Parameter name.
  *          "required": {bool} - Availability in the configuration parameters.
  *          "validationType": {string} - Allowed parameter type(s) ("float", "string", "integer").
-                                         Several types can be specified using "|" as a separator.
+ *                                       Several types can be specified using "|" as a separator.
  *          "lowLim": {float, integer} - Parameter minimum value (for float and integer).
  *          "highLim": {float, integer} - Parameter maximum value (for float and integer).
  *          "minLen": {integer} - Minimal length of the string parameter.

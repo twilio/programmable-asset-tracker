@@ -1,3 +1,25 @@
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 @set CLASS_NAME = "CfgService" // Class name for logging
 
 // Configuration API endpoint
@@ -17,7 +39,7 @@ enum CFG_REST_API_HTTP_CODES {
 class CfgService {
     // Messenger instance
     _msngr = null;
-    // HTTP Authorization
+    // HTTP Authorization header
     _authHeader = null;
     // Cfg update ("configuration") which waits for successful delivering to the imp-device
     _pendingCfg = null;
@@ -35,7 +57,8 @@ class CfgService {
      * Constructor for Configuration Service Class
      *
      * @param {object} msngr - Messenger instance
-     * TODO: Update
+     * @param {string} [user] - Username for Basic auth
+     * @param {string} [pass] - Password  for Basic auth
      */
     constructor(msngr, user = null, pass = null) {
         _msngr = msngr;
@@ -116,7 +139,7 @@ class CfgService {
             //   "configuration": {...}
             // }
 
-            // TODO: This may be suboptimal. May need to be improved
+            // NOTE: This may be suboptimal. May need to be improved
             // Copy the reported cfg before modification
             reportToCloud = http.jsondecode(http.jsonencode(_reportedCfg));
         } else {
@@ -210,7 +233,6 @@ class CfgService {
         _saveCfgs();
     }
 
-    // TODO: Comment
     function _loadCfgs() {
         local storedData = server.load();
 
@@ -218,7 +240,6 @@ class CfgService {
         _reportedCfg = "reportedCfg" in storedData ? storedData.reportedCfg : null;
     }
 
-    // TODO: Comment
     function _saveCfgs() {
         local storedData = server.load();
         storedData.agentCfg <- _agentCfg;
@@ -231,7 +252,6 @@ class CfgService {
         }
     }
 
-    // TODO: Comment
     function _defaultAgentCfg() {
         local cfg =
         @include "DefaultConfiguration.agent.nut"

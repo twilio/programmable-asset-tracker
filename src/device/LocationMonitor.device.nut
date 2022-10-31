@@ -1,3 +1,25 @@
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 @set CLASS_NAME = "LocationMonitor" // Class name for logging
 
 // Mean earth radius in meters (https://en.wikipedia.org/wiki/Great-circle_distance)
@@ -57,7 +79,8 @@ class LocationMonitor {
     }
 
     /**
-     *  Start motion monitoring.
+     *  Start motion monitoring
+     *
      *  @param {table} cfg - Table with the full configuration.
      *                       For details, please, see the documentation
      *
@@ -74,7 +97,16 @@ class LocationMonitor {
         return Promise.resolve(null);
     }
 
-    // TODO: Comment
+    /**
+     * Update configuration
+     *
+     * @param {table} cfg - Configuration. May be partial.
+     *                      For details, please, see the documentation
+     *
+     * @return {Promise} that:
+     * - resolves if the operation succeeded
+     * - rejects if the operation failed
+     */
     function updateCfg(cfg) {
         _updCfgGeneral(cfg);
         _updCfgBLEDevices(cfg);
@@ -84,7 +116,14 @@ class LocationMonitor {
         return Promise.resolve(null);
     }
 
-    // TODO: Comment
+    /**
+     * Get status info
+     *
+     * @return {table} with the following keys and values:
+     *  - "flags": a table with keys "inGeofence" and "repossession"
+     *  - "location": the last known (if any) or "default" location
+     *  - "gnssInfo": extra GNSS info from LocationDriver
+     */
     function getStatus() {
         local location = _ld.lastKnownLocation() || {
             "timestamp": 0,
@@ -106,7 +145,11 @@ class LocationMonitor {
         return res;
     }
 
-    // TODO: Comment
+    /**
+     * Set or unset a callback to be called when location obtaining is finished (successfully or not)
+     *
+     * @param {function | null} locationCb - Location callback. Or null to unset the callback
+     */
     function setLocationCb(locationCb) {
         _locationCb = locationCb;
         // This will either:
@@ -116,23 +159,29 @@ class LocationMonitor {
         _managePeriodicLocReading(true);
     }
 
-    // TODO Comment
+    /**
+     * Set a callback to be called when repossession mode is activated
+     *
+     * @param {function} repossessionEventCb - Callback function
+     */
     function setRepossessionEventCb(repossessionEventCb) {
         _repossession.eventCb = repossessionEventCb;
     }
 
     /**
-     *  Set geofencing event callback function.
-     *  @param {function | null} geofencingEventCb - The callback will be called every time the new geofencing event is detected (null - disables the callback)
-     *                 geofencingEventCb(ev), where
-     *                 @param {bool} ev - true: geofence entered, false: geofence exited
+     *  Set geofencing event callback function
+     *
+     *  @param {function | null} geofencingEventCb - The callback will be called every time the new
+     *                                               geofencing event is detected (null - disables the callback)
+     *                           geofencingEventCb(ev), where
+     *                               @param {bool} ev - true: geofence entered, false: geofence exited
      */
     function setGeofencingEventCb(geofencingEventCb) {
         _geofence.eventCb = geofencingEventCb;
     }
 
     /**
-     *  Calculate distance between two locations.
+     *  Calculate distance between two locations
      *
      *   @param {table} locationFirstPoint - Table with the first location value.
      *        The table must include parts:
@@ -182,7 +231,6 @@ class LocationMonitor {
 
     // -------------------- PRIVATE METHODS -------------------- //
 
-    // TODO: Comment
     function _updCfgGeneral(cfg) {
         local readingPeriod = getValFromTable(cfg, "locationTracking/locReadingPeriod");
         _alwaysReadLocation = getValFromTable(cfg, "locationTracking/alwaysOn", _alwaysReadLocation);
@@ -197,7 +245,6 @@ class LocationMonitor {
         _managePeriodicLocReading(readingPeriod != null);
     }
 
-    // TODO: Comment
     function _updCfgBLEDevices(cfg) {
         local bleDevicesCfg = getValFromTable(cfg, "locationTracking/bleDevices");
         local enabled = getValFromTable(bleDevicesCfg, "enabled");
@@ -206,7 +253,6 @@ class LocationMonitor {
         _ld.configureBLEDevices(enabled, knownBLEDevices);
     }
 
-    // TODO: Comment
     function _updCfgGeofence(cfg) {
         // There can be the following fields: "enabled", "lng", "lat" and "radius"
         local geofenceCfg = getValFromTable(cfg, "locationTracking/geofence");
@@ -219,7 +265,6 @@ class LocationMonitor {
         _geofence = mixTables(geofenceCfg, _geofence);
     }
 
-    // TODO: Comment
     function _updCfgRepossession(cfg) {
         // There can be the following fields: "enabled" and "after"
         local repossessionCfg = getValFromTable(cfg, "locationTracking/repossessionMode");
@@ -255,7 +300,6 @@ class LocationMonitor {
         }
     }
 
-    // TODO: Comment
     function _managePeriodicLocReading(reset = false) {
         if (_shouldReadPeriodically()) {
             // If the location reading timer is not currently set or if we should "reset" the periodic location reading,
@@ -268,7 +312,6 @@ class LocationMonitor {
         }
     }
 
-    // TODO: Comment
     function _shouldReadPeriodically() {
         return _alwaysReadLocation || _locationCb || _repossession.activated;
     }
@@ -308,7 +351,7 @@ class LocationMonitor {
     }
 
     /**
-     *  Zone border crossing check.
+     *  Zone border crossing check
      *
      *   @param {table} curLocation - Table with the current location.
      *        The table must include parts:
@@ -327,7 +370,6 @@ class LocationMonitor {
         //            in zone                     not in zone
         // (location with accuracy radius      (location with accuracy radius
         //  entirely in geofence zone)          entirely not in geofence zone)
-        // TODO: location after reboot/reconfigure - not in geofence zone
         if (_geofence.enabled) {
             local center = { "latitude": _geofence.lat, "longitude": _geofence.lng };
             local dist = greatCircleDistance(center, curLocation);

@@ -1,3 +1,25 @@
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 @set CLASS_NAME = "ESP32Driver" // Class name for logging
 
 // Enum for BLE scan enable
@@ -115,8 +137,6 @@ const ESP32_MAX_DATA_LEN = 2048;
 // Automatic switch off delay, in seconds
 const ESP32_SWITCH_OFF_DELAY = 10;
 
-// TODO: Tune the following 3 constants. Sometimes it can scan not all devices
-//       But we also should avoid OOM (please, see the TODO above _waitForData())
 // Scan interval. It should be more than or equal to the value of <scan_window>.
 // The range of this parameter is [0x0004,0x4000].
 // The scan interval equals this parameter multiplied by 0.625 ms,
@@ -167,7 +187,6 @@ class ESP32Driver {
      *                                          Default: ESP32_DEFAULT_FLAGS
      *          "rxFifoSize": {integer} - The new size of the receive FIFO, in bytes.
      *                                          Default: ESP32_DEFAULT_RX_FIFO_SZ
-     * An exception will be thrown in case of settings or UART configuration error.
      */
     constructor(switchPin, uart, settings = {}) {
         _switchPin = switchPin;

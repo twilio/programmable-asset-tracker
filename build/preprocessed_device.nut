@@ -1,6 +1,26 @@
-//line 5 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/not_for_uploading/my_main.device.nut"
 
-//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 #require "Serializer.class.nut:1.0.0"
 #require "JSONParser.class.nut:1.0.1"
 #require "JSONEncoder.class.nut:2.0.0"
@@ -17,12 +37,52 @@
 #require "UBloxAssistNow.device.lib.nut:0.1.0"
 #require "BG96_Modem.device.lib.nut:0.0.4"
 
-// TODO: Aggregate all constants that should be customized in production in one place?
+// MIT License
 
-//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/shared/Version.shared.nut"
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 // Application Version
-const APP_VERSION = "3.0.1";
-//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/shared/Constants.shared.nut"
+const APP_VERSION = "3.0.2";
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 // Constants common for the imp-agent and the imp-device
 
 // ReplayMessenger message names
@@ -38,7 +98,28 @@ const INIT_LATITUDE = 90.0;
 
 // Init longitude value (Greenwich)
 const INIT_LONGITUDE = 0.0;
-//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/shared/Logger/Logger.shared.nut"
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 // Logger for "DEBUG", "INFO" and "ERROR" information.
 // Prints out information to the standard impcentral log ("server.log").
 // The supported data types: string, table. Other types may be printed out incorrectly.
@@ -398,9 +479,51 @@ Logger <- {
 
 Logger.setLogLevelStr("INFO");
 
-//line 22 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
 
-//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/shared/Logger/stream/Logger.IOutputStream.shared.nut"
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 /**
  * Logger output stream interface
  */
@@ -411,7 +534,6 @@ Logger.IOutputStream <- class {
     function close() { throw "The Close method must be implemented in an inherited class" }
 };
 
-//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/shared/Logger/stream/UartOutputStream.device.nut"
 
 /**
  * UART Output Stream.
@@ -445,9 +567,29 @@ class UartOutputStream extends Logger.IOutputStream {
         return server.log(data);
     }
 }
-//line 26 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
 
-//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/LedIndication.device.nut"
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 
 // Duration of a signal, in seconds
 const LI_SIGNAL_DURATION = 1.0;
@@ -547,54 +689,105 @@ class LedIndication {
     }
 }
 
-//line 30 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
 
-//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/PowerSafeI2C.device.nut"
+// MIT License
 
-// TODO: Comment
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
+
+// Power Safe I2C class.
+// Proxies a hardware.i2cXX object but keeps it disabled most of the time
 class PowerSafeI2C {
     _i2c = null;
     _clockSpeed = null;
     _enabled = false;
     _disableTimer = null;
 
-    // TODO: Comment
+    /**
+     * Constructor for PowerSafeI2C class
+     *
+     * @param {object} i2c - The I2C object to be proxied by this class
+     */
     constructor(i2c) {
         _i2c = i2c;
     }
 
-    // TODO: Comment
+    /**
+     * Configures the I2C clock speed and enables the port.
+     * Actually, it doesn't enable the port itself but only sets an
+     * internal flag allowing the port to be enabled once needed
+     *
+     * @param {integer} clockSpeed - The preferred I2C clock speed
+     */
     function configure(clockSpeed) {
         _clockSpeed = clockSpeed;
         _enabled = true;
     }
 
-    // TODO: Comment
+    /**
+     * Disables the I2C bus
+     */
     function disable() {
         _i2c.disable();
         _enabled = false;
     }
 
-    // TODO: Comment
+    /**
+     * Initiates an I2C read from a specific register within a specific device
+     *
+     * @param {integer} deviceAddress - The 8-bit I2C base address
+     * @param {integer} registerAddress - The I2C sub-address, or "" for none
+     * @param {integer} numberOfBytes - The number of bytes to read from the bus
+     *
+     * @return {string | null} the characters read from the I2C bus, or null on error
+     */
     function read(deviceAddress, registerAddress, numberOfBytes) {
         _beforeUse();
         // If the bus is not enabled/configured, this will return null and set the read error code to -13
         return _i2c.read(deviceAddress, registerAddress, numberOfBytes);
     }
 
-    // TODO: Comment
+    /**
+     * Returns the error code generated by the last I2C read
+     *
+     * @return {integer} an I2C error code, or 0 (no error)
+     */
     function readerror() {
         return _i2c.readerror();
     }
 
-    // TODO: Comment
+    /**
+     * Initiates an I2C write to the device at the specified address
+     *
+     * @param {integer} deviceAddress - The 8-bit I2C base address
+     * @param {string} registerPlusData - The I2C sub-address and data, or "" for none
+     *
+     * @return {integer} 0 for success, or an I2C Error Code
+     */
     function write(deviceAddress, registerPlusData) {
         _beforeUse();
         // If the bus is not enabled/configured, this will return -13
         return _i2c.write(deviceAddress, registerPlusData);
     }
 
-    // TODO: Comment
     function _beforeUse() {
         const HW_PSI2C_DISABLE_DELAY = 5;
 
@@ -606,20 +799,47 @@ class PowerSafeI2C {
     }
 }
 
-//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/FlipFlop.device.nut"
+// MIT License
 
-// TODO: Comment
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
+
+// Flip Flop class.
+// Used to work with flip flops as with a usual switch pin.
+// Automatically clocks the flip flop on every action with the pin
 class FlipFlop {
     _clkPin = null;
     _switchPin = null;
 
-    // TODO: Comment
+    /**
+     * Constructor for Flip Flop class
+     *
+     * @param {object} clkPin - Hardware pin object that clocks the flip flop
+     * @param {object} switchPin - Hardware pin object - the switch
+     */
     constructor(clkPin, switchPin) {
         _clkPin = clkPin;
         _switchPin = switchPin;
     }
 
-    // TODO: Comment
     function _get(key) {
         if (!(key in _switchPin)) {
             throw null;
@@ -646,9 +866,30 @@ class FlipFlop {
     }
 }
 
-//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Hardware.device.nut"
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 // Accelerometer's I2C bus
-HW_SHARED_I2C <- PowerSafeI2C(hardware.i2cLM);
+HW_ACCEL_I2C <- PowerSafeI2C(hardware.i2cLM);
 
 // Accelerometer's interrupt pin
 HW_ACCEL_INT_PIN <- hardware.pinW;
@@ -707,9 +948,28 @@ const HW_CFGM_SFFS_END_ADDR = 0x340000;
 // The range to be erased if ERASE_FLASH build-flag is active and a new deployment is detected
 const HW_ERASE_FLASH_START_ADDR = 0x000000;
 const HW_ERASE_FLASH_END_ADDR = 0x340000;
-//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Helpers.device.nut"
+// MIT License
 
-// TODO: Comment
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 function getValFromTable(tbl, path, defaultVal = null) {
     local pathSplit = split(path, "/");
     local curValue = tbl;
@@ -725,7 +985,6 @@ function getValFromTable(tbl, path, defaultVal = null) {
     return curValue;
 }
 
-// TODO: Comment
 function getValsFromTable(tbl, keys) {
     if (tbl == null) {
         return {};
@@ -740,7 +999,6 @@ function getValsFromTable(tbl, keys) {
     return res;
 }
 
-// TODO: Comment
 // Returns null if the object passed has zero length
 function nullEmpty(obj) {
     if (obj == null || obj.len() == 0) {
@@ -750,7 +1008,6 @@ function nullEmpty(obj) {
     return obj;
 }
 
-// TODO: Comment
 function mixTables(src, dst) {
     if (src == null) {
         return dst;
@@ -763,7 +1020,6 @@ function mixTables(src, dst) {
     return dst;
 }
 
-// TODO: Comment
 function deepEqual(value1, value2, level = 0) {
     if (level > 32) {
         throw "Possible cyclic reference";
@@ -803,12 +1059,32 @@ function deepEqual(value1, value2, level = 0) {
     }
 }
 
-// TODO: Comment
 function tableFullCopy(tbl) {
-    // TODO: This may be suboptimal. May need to be improved
+    // NOTE: This may be suboptimal. May need to be improved
     return Serializer.deserialize(Serializer.serialize(tbl));
 }
-//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/ProductionManager.device.nut"
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 
 // ProductionManager's user config field
 const PMGR_USER_CONFIG_FIELD = "ProductionManager";
@@ -833,11 +1109,10 @@ class ProductionManager {
     _isNewDeployment = false;
 
     /**
-     * TODO: Update comment
      * Constructor for Production Manager
      *
      * @param {function} startAppFunc - The function to be called to start the main application
-     * @param {boolean} shippingMode - Enable shipping mode
+     * @param {boolean} [shippingMode = false] - Enable shipping mode
      */
     constructor(startAppFunc, shippingMode = false) {
         _startApp = @() imp.wakeup(0, startAppFunc);
@@ -851,8 +1126,6 @@ class ProductionManager {
     function start() {
         // Maximum sleep time (sec) used for shipping mode
         const PMGR_MAX_SLEEP_TIME = 2419198;
-
-        // TODO: Erase the flash memory on first start (when awake from shipping mode)? Or in factory code?
 
         // NOTE: The app may override this handler but it must call enterEmergencyMode in case of a runtime error
         imp.onunhandledexception(_onUnhandledException.bindenv(this));
@@ -875,7 +1148,6 @@ class ProductionManager {
 
             return;
         } else if (data.deploymentID != __EI.DEPLOYMENT_ID) {
-            // TODO: Is it OK? (the note below)
             // NOTE: The first code deploy will not be recognized as a new deploy!
             _info("New deployment detected!");
             _isNewDeployment = true;
@@ -891,7 +1163,9 @@ class ProductionManager {
         }
     }
 
-    // TODO: Comment
+    /**
+     * This method should be called when the device has been shipped (if shipping mode is enabled)
+     */
     function shipped() {
         local data = _getOrInitializeData();
 
@@ -918,11 +1192,14 @@ class ProductionManager {
     function enterEmergencyMode(error = null) {
         _setErrorFlag(error);
         server.flush(PMGR_FLUSH_TIMEOUT);
-        // TODO: Sleep immediately? But what if called from the global exception handler?
         imp.reset();
     }
 
-    // TODO: Comment
+    /**
+     * Check if new code has just been deployed (i.e. were no reboots after the deployment)
+     *
+     * @return {boolean} True if new code has just been deployed
+     */
     function isNewDeployment() {
         return _isNewDeployment;
     }
@@ -945,7 +1222,6 @@ class ProductionManager {
         // Timeout of checking for updates, in seconds
         const PM_CHECK_UPDATES_TIMEOUT = 5;
 
-        // TODO: Improve logging!
         if (lastError && "ts" in lastError && "desc" in lastError) {
             _info(format("Last error (at %d): \"%s\"", lastError.ts, lastError.desc));
         }
@@ -980,8 +1256,9 @@ class ProductionManager {
     }
 
     /**
-     * TODO: Update comment
      * Create and return the initial user configuration data
+     *
+     * @param {boolean} shipped - True if the device is already shipped or shipping mode is disabled
      *
      * @return {table} The initial user configuration data
      */
@@ -994,7 +1271,11 @@ class ProductionManager {
         };
     }
 
-    // TODO: Comment
+    /**
+     * Get (if exists) or initialize (create and save) user configuration data
+     *
+     * @return {table} Parsed and checked user configuration data
+     */
     function _getOrInitializeData() {
         try {
             local userConf = _readUserConf();
@@ -1017,11 +1298,15 @@ class ProductionManager {
             _error("Error during parsing user configuration: " + err);
         }
 
-        _storeData(_initialData(true));
-        return _initialData(true);
+        _storeData(_initialData(_shippingMode));
+        return _initialData(_shippingMode);
     }
 
-    // TODO: Comment
+    /**
+     * Store user configuration data
+     *
+     * @param {table} data - The user configuration data to be stored for this module
+     */
     function _storeData(data) {
         local userConf = {};
 
@@ -1070,8 +1355,7 @@ class ProductionManager {
     }
 
     /**
-     * TODO: Update comment
-     * Read the user configuration
+     * Read the user configuration and parse it (JSON)
      *
      * @return {table | null} The user configuration converted from JSON to a Squirrel table
      *      or null if there was no user configuration saved
@@ -1085,7 +1369,7 @@ class ProductionManager {
         }
 
         config = config.tostring();
-        // TODO: What if a non-readable string was written? It will be printed "binary: ..."
+        // NOTE: This may print a binary string if something non-printable is in the config
         _debug("User configuration: " + config);
 
         config = JSONParser.parse(config);
@@ -1125,15 +1409,41 @@ class ProductionManager {
     }
 }
 
-//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/CfgManager.device.nut"
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 
 // File names used by Cfg Manager
 enum CFGM_FILE_NAMES {
     CFG = "cfg"
 }
 
-
-// TODO: Comment
+// Configuration Manager class:
+// - Passes the configuration (default or custom) to start modules
+// - Receives configuration updates from the agent
+// - Finds a diff between the current and the new configurations
+// - Passes the diff to the modules
+// - Stores the latest configuration version
+// - Reports the latest configuration version to the agent
 class CfgManager {
     // Array of modules to be configured
     _modules = null;
@@ -1141,10 +1451,14 @@ class CfgManager {
     _storage = null;
     // Promise or null
     _processingCfg = null;
-    // TODO: Comment
+    // The actual (already applied) configuration
     _actualCfg = null;
 
-    // TODO: Comment
+    /**
+     * Constructor for Configuration Manager class
+     *
+     * @param {array} modules - Application modules (must have start() and updateCfg() methods)
+     */
     constructor(modules) {
         _modules = modules;
 
@@ -1153,7 +1467,9 @@ class CfgManager {
         _storage.init();
     }
 
-    // TODO: Comment
+    /**
+     * Load saved configuration or the default one and start modules, report the configuration
+     */
     function start() {
         // Let's keep the connection to be able to report the configuration once it is deployed
         cm.keepConnection("CfgManager", true);
@@ -1205,7 +1521,6 @@ class CfgManager {
         }.bindenv(this));
     }
 
-    // TODO: Comment
     function _onCfgUpdate(msg, customAck) {
         // Let's keep the connection to be able to report the configuration once it is deployed
         cm.keepConnection("CfgManager", true);
@@ -1260,7 +1575,6 @@ class CfgManager {
         }.bindenv(this));
     }
 
-    // TODO: Comment
     function _applyDebugSettings(cfg) {
         if (!("debug" in cfg)) {
             return;
@@ -1276,7 +1590,6 @@ class CfgManager {
         }
     }
 
-    // TODO: Comment
     function _reportCfg() {
         ::debug("Reporting cfg..", "CfgManager");
 
@@ -1290,7 +1603,6 @@ class CfgManager {
         rm.send(APP_RM_MSG_NAME.CFG, cfgReport, RM_IMPORTANCE_HIGH);
     }
 
-    // TODO: Comment
     function _reboot() {
         const CFGM_FLUSH_TIMEOUT = 5;
 
@@ -1298,7 +1610,6 @@ class CfgManager {
         server.restart();
     }
 
-    // TODO: Comment
     function _diff(cfgUpdate, actualCfg, path = "") {
         // The list of the paths which should be handled in a special way when making or applying a diff.
         // When making a diff, we just don't touch these paths (and their sub-paths) in the cfg update - leave them as is.
@@ -1334,7 +1645,6 @@ class CfgManager {
         }
     }
 
-    // TODO: Comment
     function _applyDiff(diff, actualCfg, path = "") {
         foreach (k, v in diff) {
             // The full path which includes the key currently considered
@@ -1352,10 +1662,30 @@ class CfgManager {
         }
     }
 
-    // TODO: Comment
     function _defaultCfg() {
         local cfg =
-//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/DefaultConfiguration.device.nut"
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 {
   "updateId": "myDefaultCfg",
 
@@ -1367,10 +1697,10 @@ class CfgManager {
 
     "motionMonitoring": {
       "enabled": true,          // true - motion monitoring is enabled
-      "movementAccMin": 0.15,    // minimum (starting) acceleration threshold for movement detection, in g
-      "movementAccMax": 0.15,    // maximum  acceleration threshold for movement detection, in g
+      "movementAccMin": 0.15,   // minimum (starting) acceleration threshold for movement detection, in g
+      "movementAccMax": 0.15,   // maximum  acceleration threshold for movement detection, in g
       "movementAccDur": 0.01,   // duration of exceeding movement acceleration threshold, in seconds
-      "motionTime": 8.0,       // maximum time to confirm motion detection after the initial movement, in seconds
+      "motionTime": 8.0,        // maximum time to confirm motion detection after the initial movement, in seconds
       "motionVelocity": 0.1,    // minimum instantaneous velocity to confirm motion detection condition, in meters per second
       "motionDistance": 2.0,    // minimum movement distance to determine motion detection condition, in meters
                                 // (if 0, distance is not calculated, ie. not used for motion confirmation)
@@ -1378,7 +1708,7 @@ class CfgManager {
     },
 
     "repossessionMode": {
-      "enabled": false,          // true - repossession mode is enabled
+      "enabled": false,         // true - repossession mode is enabled
       "after": 1667598736       // (05.11.2022 00:52:16) UNIX timestamp after which location obtaining is activated
     },
 
@@ -1446,16 +1776,14 @@ class CfgManager {
   },
 
   "debug": {                    // debug settings
-    "logLevel": "INFO"         // logging level on Imp-Device ("ERROR", "INFO", "DEBUG")
+    "logLevel": "INFO"          // logging level on Imp-Device ("ERROR", "INFO", "DEBUG")
   }
 }
-//line 232 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/CfgManager.device.nut"
         return cfg;
     }
 
     // -------------------- STORAGE METHODS -------------------- //
 
-    // TODO: Comment
     function _saveCfg(cfg = null, fileName = CFGM_FILE_NAMES.CFG) {
         ::debug("Saving cfg (fileName = " + fileName + ")..", "CfgManager");
 
@@ -1472,7 +1800,6 @@ class CfgManager {
         }
     }
 
-    // TODO: Comment
     function _loadCfg(fileName = CFGM_FILE_NAMES.CFG) {
         try {
             if (_storage.fileExists(fileName)) {
@@ -1488,7 +1815,6 @@ class CfgManager {
         return null;
     }
 
-    // TODO: Comment
     function _eraseCfg(fileName = CFGM_FILE_NAMES.CFG) {
         try {
             // Erase the existing file if any
@@ -1499,7 +1825,28 @@ class CfgManager {
     }
 }
 
-//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/CustomConnectionManager.device.nut"
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 
 // Customized ConnectionManager library
 class CustomConnectionManager extends ConnectionManager {
@@ -1540,7 +1887,7 @@ class CustomConnectionManager extends ConnectionManager {
         onTimeout(_onConnectionTimeoutCb.bindenv(this), "CustomConnectionManager");
         onDisconnect(_onDisconnectCb.bindenv(this), "CustomConnectionManager");
 
-        // TODO: Add periodic connection?
+        // NOTE: It may worth adding a periodic connection feature to this module
     }
 
     /**
@@ -1678,7 +2025,28 @@ class CustomConnectionManager extends ConnectionManager {
     }
 }
 
-//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/CustomReplayMessenger.device.nut"
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 
 // Customized ReplayMessenger library
 
@@ -1694,12 +2062,17 @@ const CRM_RESEND_RATE_LIMIT_PCT = 80;
 class CustomReplayMessenger extends ReplayMessenger {
     _persistedMessagesPending = false;
     _eraseAllPending = false;
-    _onIdleCb = null;
     _onAckCbs = null;
     _onAckDefaultCb = null;
     _onFailCbs = null;
     _onFailDefaultCb = null;
 
+    /**
+     * Custom Replay Messenger constructor
+     *
+     * @param {SPIFlashLogger} spiFlashLogger - Instance of spiFlashLogger which will be used to store messages
+     * @param {table} [options] - Key-value table with optional settings
+     */
     constructor(spiFlashLogger, options = {}) {
         // Provide any ID to prevent the standart algorithm of searching of the next usable ID
         options.firstMsgId <- 0;
@@ -1719,6 +2092,11 @@ class CustomReplayMessenger extends ReplayMessenger {
         _onFailCbs = {};
     }
 
+    /**
+     * Initialize. Read several last saved messages to determine the next ID, which can be used for new messages
+     *
+     * @param {function} onDone - Callback to be called when initialization is done
+     */
     function init(onDone) {
         local maxId = -1;
         local msgRead = 0;
@@ -1758,6 +2136,12 @@ class CustomReplayMessenger extends ReplayMessenger {
         _spiFL.read(onData, onFinish, -1);
     }
 
+    /**
+     * Sets the name-specific ACK callback which will be called when an ACK received for a message with this name
+     *
+     * @param {function | null} onDone - Callback to be called when an ACK received. If null passed, remove the callback (if set)
+     * @param {string} [name] - Message name. If not passed, the callback will be used as a default one
+     */
     function onAck(cb, name = null) {
         if (name == null) {
             _onAckDefaultCb = cb;
@@ -1768,6 +2152,13 @@ class CustomReplayMessenger extends ReplayMessenger {
         }
     }
 
+    /**
+     * Sets the name-specific fail callback which will be called when a message with this name has been failed to send
+     *
+     * @param {function | null} onDone - Callback to be called when a message has been failed to send.
+     *                            If null passed, remove the callback (if set)
+     * @param {string} [name] - Message name. If not passed, the callback will be used as a default one
+     */
     function onFail(cb, name = null) {
         if (name == null) {
             _onFailDefaultCb = cb;
@@ -1776,23 +2167,6 @@ class CustomReplayMessenger extends ReplayMessenger {
         } else if (name in _onFailCbs) {
             delete _onFailCbs[name];
         }
-    }
-
-    function readyToSend() {
-        return _cm.isConnected() && _checkSendLimits();
-    }
-
-    function hasPersistedMessages() {
-        return _persistedMessagesPending;
-    }
-
-    function isIdle() {
-        return _isAllProcessed();
-    }
-
-    // Registers a callback which will be called when _isAllProcessed() turns false
-    function onIdle(cb) {
-        _onIdleCb = cb;
     }
 
     // -------------------- PRIVATE METHODS -------------------- //
@@ -1910,7 +2284,6 @@ class CustomReplayMessenger extends ReplayMessenger {
             // If Replay Messenger has unsent or unacknowledged messages, keep the connection for it
             cm.keepConnection("CustomReplayMessenger", true);
         } else {
-            _onIdleCb && _onIdleCb();
             // If Replay Messenger is idle (has no unsent or unacknowledged messages), it doesn't need the connection anymore
             cm.keepConnection("CustomReplayMessenger", false);
         }
@@ -2028,7 +2401,6 @@ class CustomReplayMessenger extends ReplayMessenger {
             try {
                 _spiFL.write(payload);
             } catch (err) {
-                // TODO: Go to the emergency mode instead (just throw an exception)?
                 ::error("Couldn't persist a message: " + err, "CustomReplayMessenger");
                 ::error("Erasing the flash logger!", "CustomReplayMessenger");
 
@@ -2119,7 +2491,28 @@ class CustomReplayMessenger extends ReplayMessenger {
     }
 }
 
-//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/BG9xCellInfo.device.nut"
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 
 // Required BG96/95 AT Commands
 enum AT_COMMAND {
@@ -2236,7 +2629,7 @@ class BG9xCellInfo {
     function _writeAndParseAT(cmd) {
         const BG9XCI_FLUSH_TIMEOUT = 2;
 
-        // TODO: Make sure it helps to avoid "Command in progress" error
+        // This helps to avoid "Command in progress" error in some cases
         server.flush(BG9XCI_FLUSH_TIMEOUT);
         local resp = _writeATCommand(cmd);
         return _parseATResp(resp);
@@ -2458,7 +2851,28 @@ class BG9xCellInfo {
     }
 }
 
-//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/ESP32Driver.device.nut"
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 
 // Enum for BLE scan enable
 enum ESP32_BLE_SCAN {
@@ -2575,8 +2989,6 @@ const ESP32_MAX_DATA_LEN = 2048;
 // Automatic switch off delay, in seconds
 const ESP32_SWITCH_OFF_DELAY = 10;
 
-// TODO: Tune the following 3 constants. Sometimes it can scan not all devices
-//       But we also should avoid OOM (please, see the TODO above _waitForData())
 // Scan interval. It should be more than or equal to the value of <scan_window>.
 // The range of this parameter is [0x0004,0x4000].
 // The scan interval equals this parameter multiplied by 0.625 ms,
@@ -2627,7 +3039,6 @@ class ESP32Driver {
      *                                          Default: ESP32_DEFAULT_FLAGS
      *          "rxFifoSize": {integer} - The new size of the receive FIFO, in bytes.
      *                                          Default: ESP32_DEFAULT_RX_FIFO_SZ
-     * An exception will be thrown in case of settings or UART configuration error.
      */
     constructor(switchPin, uart, settings = {}) {
         _switchPin = switchPin;
@@ -3235,26 +3646,58 @@ class ESP32Driver {
     }
 }
 
-//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Photoresistor.device.nut"
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 
 // Default polling period, in seconds
 const PR_DEFAULT_POLL_PERIOD = 1.0;
 // The value that indicates that the light was detected
 const PR_LIGHT_DETECTED_VALUE = 1;
 
-// TODO: Comment
+// Photoresistor class.
+// Used to poll a photoresistor
 class Photoresistor {
     _valPin = null;
     _switchPin = null;
     _pollTimer = null;
 
-    // TODO: Comment
+    /**
+     * Constructor for Photoresistor class
+     *
+     * @param {object} switchPin - Hardware pin object that switches power of the photoresistor
+     * @param {object} valPin - Hardware pin object used for reading the photoresistor's state/value
+     */
     constructor(switchPin, valPin) {
         _switchPin = switchPin;
         _valPin = valPin;
     }
 
-    // TODO: Comment
+    /**
+     * Start polling of the photoresistor
+     *
+     * @param {function} callback - Callback to be called when the state/value on the photoresistor is changed
+     * @param {float} [pollPeriod = PR_DEFAULT_POLL_PERIOD] - Polling period
+     */
     function startPolling(callback, pollPeriod = PR_DEFAULT_POLL_PERIOD) {
         stopPolling();
 
@@ -3279,7 +3722,9 @@ class Photoresistor {
         poll();
     }
 
-    // TODO: Comment
+    /**
+     * Stop polling of the photoresistor
+     */
     function stopPolling() {
         _pollTimer && imp.cancelwakeup(_pollTimer);
         _switchPin.disable();
@@ -3289,7 +3734,28 @@ class Photoresistor {
     }
 }
 
-//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/AccelerometerDriver.device.nut"
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 
 // Accelerometer Driver class:
 // - utilizes LIS2DH12 accelerometer connected via I2C
@@ -3593,8 +4059,7 @@ class AccelerometerDriver {
      *
      * @param {object} i2c - I2C object connected to accelerometer
      * @param {object} intPin - Hardware pin object connected to accelerometer int1 pin
-     * @param {integer} addr - I2C address of accelerometer. Optional.
-     *                         Default: ACCEL_DEFAULT_I2C_ADDR
+     * @param {integer} [addr = ACCEL_DEFAULT_I2C_ADDR] - I2C address of accelerometer
      * An exception will be thrown in case of accelerometer configuration error.
      */
     constructor(i2c, intPin, addr = ACCEL_DEFAULT_I2C_ADDR) {
@@ -3640,7 +4105,6 @@ class AccelerometerDriver {
             _accel.configureFifo(true, LIS3DH_FIFO_BYPASS_MODE);
             _accel.configureFifo(true, LIS3DH_FIFO_STREAM_TO_FIFO_MODE);
             _accel.getInterruptTable();
-            // TODO: Disable the pin when it's not in use to save power?
             _intPin.configure(DIGITAL_IN_WAKEUP, _checkInt.bindenv(this));
             _accel._getReg(LIS2DH12_REFERENCE);
             ::debug("Accelerometer configured", "AccelerometerDriver");
@@ -3713,11 +4177,11 @@ class AccelerometerDriver {
         if (_isFunction(shockCb) && shockSettIsCorr) {
             _shockCb = shockCb;
             _enShockDetect = true;
-            // TODO: deal with the shock after initialization
-            // accelerometer range determined by the value of shock threashold
+            // NOTE: This may need some adjustments depending on the use case
+            // Accelerometer range determined by the value of shock threashold
             local range = _accel.setRange(_shockThr.tointeger());
             ::info(format("Accelerometer range +-%d g", range), "AccelerometerDriver");
-            // TODO: Is it better to use inertial interrupt here?
+            // NOTE: Inertial interrupt can be used here instead of click interrupt. It may work better
             _accel.configureClickInterrupt(true, LIS3DH_SINGLE_CLICK, _shockThr);
             ::info("Shock detection enabled", "AccelerometerDriver");
         } else {
@@ -4035,7 +4499,6 @@ class AccelerometerDriver {
 
     /**
      * Check if motion condition(s) occured
-     *
      */
     function _confirmMotion() {
         local vel = _velCur.length();
@@ -4129,7 +4592,28 @@ class AccelerometerDriver {
     }
 }
 
-//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/BatteryMonitor.device.nut"
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 
 // Delay (sec) between reads when getting the average value
 const BM_AVG_DELAY = 0.8;
@@ -4141,7 +4625,9 @@ const BM_VOLTAGE_GAIN = 2.4242;
 // 3 x 1.5v battery
 const BM_FULL_VOLTAGE = 4.2;
 
-// Measures the battery level
+// Battery class:
+// - Reads battery voltage (several times with a delay)
+// - Converts it to remaining capacity (%)
 class BatteryMonitor {
     _batLvlEnablePin = null;
     _batLvlPin = null;
@@ -4164,15 +4650,23 @@ class BatteryMonitor {
         [0.0,     0.0]
     ];
 
-    // TODO: Comment
+    /**
+     * Constructor for Battery Monitor class
+     *
+     * @param {object} batLvlEnablePin - Hardware pin object that enables battery level measurement circuit
+     * @param {object} batLvlPin - Hardware pin object that measures battery level (voltage)
+     */
     constructor(batLvlEnablePin, batLvlPin) {
         _batLvlEnablePin = batLvlEnablePin;
         _batLvlPin = batLvlPin;
     }
 
-    // TODO: Comment
-    // Returns a Promise that resolves with the result of the battery measuring
-    // The result is a table { "percent": <pct>, "voltage": <V> }
+    /**
+     * Measure battery level
+     *
+     * @return {Promise} that resolves with the result of the battery measuring.
+     *  The result is a table { "percent": <pct>, "voltage": <V> }
+     */
     function measureBattery() {
         if (_measuringBattery) {
             return _measuringBattery;
@@ -4215,8 +4709,6 @@ class BatteryMonitor {
         }.bindenv(this));
     }
 
-    // TODO: Comment
-    // Returns battery level { "percent": <pct>, "voltage": <V> }
     function _getBatteryLevelByVoltage(voltage) {
         local calTableLen = _calibrationTable.len();
 
@@ -4250,7 +4742,28 @@ class BatteryMonitor {
     }
 }
 
-//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/LocationMonitor.device.nut"
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 
 // Mean earth radius in meters (https://en.wikipedia.org/wiki/Great-circle_distance)
 const MM_EARTH_RAD = 6371009;
@@ -4309,7 +4822,8 @@ class LocationMonitor {
     }
 
     /**
-     *  Start motion monitoring.
+     *  Start motion monitoring
+     *
      *  @param {table} cfg - Table with the full configuration.
      *                       For details, please, see the documentation
      *
@@ -4326,7 +4840,16 @@ class LocationMonitor {
         return Promise.resolve(null);
     }
 
-    // TODO: Comment
+    /**
+     * Update configuration
+     *
+     * @param {table} cfg - Configuration. May be partial.
+     *                      For details, please, see the documentation
+     *
+     * @return {Promise} that:
+     * - resolves if the operation succeeded
+     * - rejects if the operation failed
+     */
     function updateCfg(cfg) {
         _updCfgGeneral(cfg);
         _updCfgBLEDevices(cfg);
@@ -4336,7 +4859,14 @@ class LocationMonitor {
         return Promise.resolve(null);
     }
 
-    // TODO: Comment
+    /**
+     * Get status info
+     *
+     * @return {table} with the following keys and values:
+     *  - "flags": a table with keys "inGeofence" and "repossession"
+     *  - "location": the last known (if any) or "default" location
+     *  - "gnssInfo": extra GNSS info from LocationDriver
+     */
     function getStatus() {
         local location = _ld.lastKnownLocation() || {
             "timestamp": 0,
@@ -4358,7 +4888,11 @@ class LocationMonitor {
         return res;
     }
 
-    // TODO: Comment
+    /**
+     * Set or unset a callback to be called when location obtaining is finished (successfully or not)
+     *
+     * @param {function | null} locationCb - Location callback. Or null to unset the callback
+     */
     function setLocationCb(locationCb) {
         _locationCb = locationCb;
         // This will either:
@@ -4368,23 +4902,29 @@ class LocationMonitor {
         _managePeriodicLocReading(true);
     }
 
-    // TODO Comment
+    /**
+     * Set a callback to be called when repossession mode is activated
+     *
+     * @param {function} repossessionEventCb - Callback function
+     */
     function setRepossessionEventCb(repossessionEventCb) {
         _repossession.eventCb = repossessionEventCb;
     }
 
     /**
-     *  Set geofencing event callback function.
-     *  @param {function | null} geofencingEventCb - The callback will be called every time the new geofencing event is detected (null - disables the callback)
-     *                 geofencingEventCb(ev), where
-     *                 @param {bool} ev - true: geofence entered, false: geofence exited
+     *  Set geofencing event callback function
+     *
+     *  @param {function | null} geofencingEventCb - The callback will be called every time the new
+     *                                               geofencing event is detected (null - disables the callback)
+     *                           geofencingEventCb(ev), where
+     *                               @param {bool} ev - true: geofence entered, false: geofence exited
      */
     function setGeofencingEventCb(geofencingEventCb) {
         _geofence.eventCb = geofencingEventCb;
     }
 
     /**
-     *  Calculate distance between two locations.
+     *  Calculate distance between two locations
      *
      *   @param {table} locationFirstPoint - Table with the first location value.
      *        The table must include parts:
@@ -4434,7 +4974,6 @@ class LocationMonitor {
 
     // -------------------- PRIVATE METHODS -------------------- //
 
-    // TODO: Comment
     function _updCfgGeneral(cfg) {
         local readingPeriod = getValFromTable(cfg, "locationTracking/locReadingPeriod");
         _alwaysReadLocation = getValFromTable(cfg, "locationTracking/alwaysOn", _alwaysReadLocation);
@@ -4449,7 +4988,6 @@ class LocationMonitor {
         _managePeriodicLocReading(readingPeriod != null);
     }
 
-    // TODO: Comment
     function _updCfgBLEDevices(cfg) {
         local bleDevicesCfg = getValFromTable(cfg, "locationTracking/bleDevices");
         local enabled = getValFromTable(bleDevicesCfg, "enabled");
@@ -4458,7 +4996,6 @@ class LocationMonitor {
         _ld.configureBLEDevices(enabled, knownBLEDevices);
     }
 
-    // TODO: Comment
     function _updCfgGeofence(cfg) {
         // There can be the following fields: "enabled", "lng", "lat" and "radius"
         local geofenceCfg = getValFromTable(cfg, "locationTracking/geofence");
@@ -4471,7 +5008,6 @@ class LocationMonitor {
         _geofence = mixTables(geofenceCfg, _geofence);
     }
 
-    // TODO: Comment
     function _updCfgRepossession(cfg) {
         // There can be the following fields: "enabled" and "after"
         local repossessionCfg = getValFromTable(cfg, "locationTracking/repossessionMode");
@@ -4507,7 +5043,6 @@ class LocationMonitor {
         }
     }
 
-    // TODO: Comment
     function _managePeriodicLocReading(reset = false) {
         if (_shouldReadPeriodically()) {
             // If the location reading timer is not currently set or if we should "reset" the periodic location reading,
@@ -4520,7 +5055,6 @@ class LocationMonitor {
         }
     }
 
-    // TODO: Comment
     function _shouldReadPeriodically() {
         return _alwaysReadLocation || _locationCb || _repossession.activated;
     }
@@ -4560,7 +5094,7 @@ class LocationMonitor {
     }
 
     /**
-     *  Zone border crossing check.
+     *  Zone border crossing check
      *
      *   @param {table} curLocation - Table with the current location.
      *        The table must include parts:
@@ -4579,7 +5113,6 @@ class LocationMonitor {
         //            in zone                     not in zone
         // (location with accuracy radius      (location with accuracy radius
         //  entirely in geofence zone)          entirely not in geofence zone)
-        // TODO: location after reboot/reconfigure - not in geofence zone
         if (_geofence.enabled) {
             local center = { "latitude": _geofence.lat, "longitude": _geofence.lng };
             local dist = greatCircleDistance(center, curLocation);
@@ -4605,13 +5138,34 @@ class LocationMonitor {
     }
 }
 
-//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/MotionMonitor.device.nut"
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 
 // Mean earth radius in meters (https://en.wikipedia.org/wiki/Great-circle_distance)
 const MM_EARTH_RAD = 6371009;
 
 // Motion Monitor class.
-// Starts and stops motion monitoring.
+// Implements an algorithm of motion monitoring based on accelerometer and location
 class MotionMonitor {
     // Accelerometer driver object
     _ad = null;
@@ -4642,16 +5196,16 @@ class MotionMonitor {
     // True (relevant) / false (not relevant) / null (haven't yet got a location or a failure)
     _prevLocFresh = null;
 
-    // TODO: Comment
+    // Motion stop confirmation timeout
     _motionStopTimeout = null;
 
-    // TODO: Comment
+    // Motion stop confirmation timer
     _confirmMotionStopTimer = null;
 
-    // TODO: Comment
+    // Motion monitoring state: enabled/disabled
     _motionMonitoringEnabled = false;
 
-    // TODO: Comment
+    // Accelerometer's parameters for motion detection
     _accelDetectMotionParams = null;
 
     /**
@@ -4665,7 +5219,8 @@ class MotionMonitor {
     }
 
     /**
-     *  Start motion monitoring.
+     *  Start motion monitoring
+     *
      *  @param {table} cfg - Table with the full configuration.
      *                       For details, please, see the documentation
      *
@@ -4680,7 +5235,16 @@ class MotionMonitor {
         return updateCfg(cfg);
     }
 
-    // TODO: Comment
+    /**
+     * Update configuration
+     *
+     * @param {table} cfg - Configuration. May be partial.
+     *                      For details, please, see the documentation
+     *
+     * @return {Promise} that:
+     * - resolves if the operation succeeded
+     * - rejects if the operation failed
+     */
     function updateCfg(cfg) {
         local detectMotionParamNames = ["movementAccMin", "movementAccMax", "movementAccDur",
                                         "motionTime", "motionVelocity", "motionDistance"];
@@ -4722,7 +5286,12 @@ class MotionMonitor {
         return Promise.resolve(null);
     }
 
-    // TODO: Comment
+    /**
+     * Get status info
+     *
+     * @return {table} with the following keys and values:
+     *  - "flags": a table with key "inMotion"
+     */
     function getStatus() {
         local res = {
             "flags": {}
@@ -4764,7 +5333,11 @@ class MotionMonitor {
         }
     }
 
-    // TODO: Comment
+    /**
+     * A callback called when location obtaining is finished (successfully or not)
+     *
+     * @param {table | null} location - The location obtained or null
+     */
     function _onLocation(location) {
         _prevLoc = _curLoc;
         _prevLocFresh = _curLocFresh;
@@ -4818,8 +5391,6 @@ class MotionMonitor {
         if (!_inMotion) {
             _inMotion = true;
 
-            // TODO: Maybe it's better to copy the latest known location to _curLoc here?
-
             // Start getting new locations to check if we are actually moving
             _lm.setLocationCb(_onLocation.bindenv(this));
             _motionEventCb && _motionEventCb(true);
@@ -4827,7 +5398,28 @@ class MotionMonitor {
     }
 }
 
-//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/DataProcessor.device.nut"
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 
 // Temperature state enum
 enum DP_TEMPERATURE_LEVEL {
@@ -4921,7 +5513,6 @@ class DataProcessor {
         _pr = photoresistor;
 
         _allAlerts = {
-            // TODO: Do we need alerts like trackerReset, trackerReconfigured?
             "shockDetected"         : false,
             "motionStarted"         : false,
             "motionStopped"         : false,
@@ -4944,7 +5535,8 @@ class DataProcessor {
     }
 
     /**
-     *  Start data processing.
+     *  Start data processing
+     *
      *  @param {table} cfg - Table with the full configuration.
      *                       For details, please, see the documentation
      *
@@ -4964,7 +5556,16 @@ class DataProcessor {
         return Promise.resolve(null);
     }
 
-    // TODO: Comment
+    /**
+     * Update configuration
+     *
+     * @param {table} cfg - Configuration. May be partial
+     *                      For details, please, see the documentation
+     *
+     * @return {Promise} that:
+     * - resolves if the operation succeeded
+     * - rejects if the operation failed
+     */
     function updateCfg(cfg) {
         _updCfgAlerts(cfg);
         // This call will trigger data reading/sending. So it should be the last one
@@ -4975,7 +5576,6 @@ class DataProcessor {
 
     // -------------------- PRIVATE METHODS -------------------- //
 
-    // TODO: Comment
     function _updCfgGeneral(cfg) {
         if ("readingPeriod" in cfg || "connectingPeriod" in cfg) {
             _dataReadingPeriod = getValFromTable(cfg, "readingPeriod", _dataReadingPeriod);
@@ -4987,7 +5587,6 @@ class DataProcessor {
         }
     }
 
-    // TODO: Comment
     function _updCfgAlerts(cfg) {
         local alertsCfg            = getValFromTable(cfg, "alerts");
         local shockDetectedCfg     = getValFromTable(alertsCfg, "shockDetected");
@@ -5020,7 +5619,6 @@ class DataProcessor {
         }
     }
 
-    // TODO: Comment
     function _configureShockDetection() {
         if (_alertsSettings.shockDetected.enabled) {
             ::debug("Activating shock detection..", "DataProcessor");
@@ -5031,7 +5629,6 @@ class DataProcessor {
         }
     }
 
-    // TODO: Comment
     function _configureTamperingDetection() {
         if (_alertsSettings.tamperingDetected.enabled) {
             ::debug("Activating tampering detection..", "DataProcessor");
@@ -5193,6 +5790,10 @@ class DataProcessor {
 
     /**
      *  Read battery level, check alert conditions
+     *
+     * @return {Promise} that:
+     * - resolves if the operation succeeded
+     * - rejects if the operation failed
      */
     function _checkBatteryLevel() {
         return _bd.measureBattery()
@@ -5222,15 +5823,16 @@ class DataProcessor {
         }.bindenv(this));
     }
 
-    // TODO: Comment
     function _getCellInfo() {
         if (_cellInfoPromise || !cm.isConnected()) {
             return _cellInfoPromise || Promise.resolve(null);
         }
 
         return _cellInfoPromise = Promise(function(resolve, reject) {
-            // TODO: This is a temporary defense from the incorrect work of getcellinfo()
-            local cbTimeoutTimer = imp.wakeup(5, function() {
+            const DP_GET_CELL_INFO_TIMEOUT = 5;
+
+            // NOTE: This is a defense from the incorrect work of getcellinfo()
+            local cbTimeoutTimer = imp.wakeup(DP_GET_CELL_INFO_TIMEOUT, function() {
                 reject("imp.net.getcellinfo didn't call its callback!");
             }.bindenv(this));
 
@@ -5241,15 +5843,13 @@ class DataProcessor {
             }.bindenv(this));
         }.bindenv(this))
         .fail(function(err) {
-            // TODO: Print to the ERROR level?
-            ::debug("Failed getting cell info: " + err, "DataProcessor");
+            ::error("Failed getting cell info: " + err, "DataProcessor");
         }.bindenv(this))
         .finally(function(_) {
             _cellInfoPromise = null;
         }.bindenv(this));
     }
 
-    // TODO: Comment
     function _extractCellInfoBG95(cellInfo) {
         local res = {
             "timestamp": time(),
@@ -5358,10 +5958,30 @@ class DataProcessor {
     }
 }
 
-//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/LocationDriver.device.nut"
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 
 // GNSS options:
-// TODO: Make a global const? Or use a builer-variable? Think of many other variables
 // Accuracy threshold of positioning, in meters
 const LD_GNSS_ACCURACY = 50;
 // The maximum positioning time, in seconds
@@ -5437,15 +6057,29 @@ class LocationDriver {
         _updateAssistData();
     }
 
-    // TODO: Comment
+    /**
+     * Get the last known location (stored in the persistent storage)
+     *
+     * @return {table} with the following keys and values:
+     *  "timestamp": UNIX time of the location,
+     *  "type": location type ("gnss" / "wifi" / "cell" / "wifi+cell" / "ble"),
+     *  "accuracy": location accuracy,
+     *  "longitude": location longitude,
+     *  "latitude": location latitude
+     */
     function lastKnownLocation() {
         return _load(LD_FILE_NAMES.LAST_KNOWN_LOCATION, Serializer.deserialize.bindenv(Serializer));
     }
 
-    // TODO: Comment
-    // NOTE: This class only stores a reference to the object with BLE devices.
-    // If this object is changed outside this class, this class will have the updated version of the object
-    function configureBLEDevices(enabled = null, knownBLEDevices = null) {
+    /**
+     * Configure BLE devices
+     *
+     * @param {boolean | null} enabled - If true, enable BLE location. If null, ignored
+     * @param {table} [knownBLEDevices] - Known BLE devices (generic and iBeacon). If null, ignored
+     *                                    NOTE: This class only stores a reference to the object with BLE devices. If this object
+     *                                    is changed outside this class, this class will have the updated version of the object
+     */
+    function configureBLEDevices(enabled, knownBLEDevices = null) {
         knownBLEDevices && (_knownBLEDevices = knownBLEDevices);
 
         if (enabled && !_knownBLEDevices) {
@@ -5496,7 +6130,12 @@ class LocationDriver {
         }.bindenv(this));
     }
 
-    // TODO: Comment
+    /**
+     * Get extra info (e.g., number of GNSS satellites)
+     *
+     * @return {table} with the following keys and values:
+     *  - "gnss": a table with keys "satellitesUsed" and "timestamp"
+     */
     function getExtraInfo() {
         return tableFullCopy(_extraInfo);
     }
@@ -5515,7 +6154,6 @@ class LocationDriver {
             return Promise.reject("Cooldown period is active");
         }
 
-        // TODO: This may leave the UART enabled when it's not needed anymore
         local ubxDriver = _initUblox();
         ::debug("Switched ON the u-blox module", "LocationDriver");
 
@@ -5596,7 +6234,6 @@ class LocationDriver {
 
         return cm.connect()
         .then(function(_) {
-            // TODO: This can fail due to the cellInfo command called from an onConnect handler
             scannedTowers = BG9xCellInfo.scanCellTowers();
             // Wait until the WiFi scanning is finished (if not yet)
             return scanWifiPromise;
@@ -5863,14 +6500,17 @@ class LocationDriver {
 
     // -------------------- UBLOX-SPECIFIC METHODS -------------------- //
 
-    // TODO: Comment
+    /**
+     * Initialize u-blox module and UBloxM8N library
+     *
+     * @return {object} UBloxM8N library instance
+     */
     function _initUblox() {
         _ubxSwitchPin.configure(DIGITAL_OUT, 1);
 
         local ubxDriver = UBloxM8N(HW_UBLOX_UART);
         local ubxSettings = {
             "outputMode"   : UBLOX_M8N_MSG_MODE.UBX_ONLY,
-            // TODO: Why BOTH?
             "inputMode"    : UBLOX_M8N_MSG_MODE.BOTH
         };
 
@@ -5898,7 +6538,7 @@ class LocationDriver {
 
 
             if (parsed.error != null) {
-                // TODO: Check if this can be printed and read ok
+                // NOTE: This may be printed as binary data
                 ::error(parsed.error, "LocationDriver");
                 ::debug("The full payload containing the error: " + payload, "LocationDriver");
                 return;
@@ -5942,8 +6582,9 @@ class LocationDriver {
     }
 
     /**
-     * TODO: Update the comment
      * Write the applicable u-blox assist data (if any) saved in the storage to the u-blox module
+     *
+     * @param {object} ubxAssist - U-blox Assist Now library instance
      *
      * @return {Promise} that:
      * - resolves if the operation succeeded
@@ -5976,7 +6617,7 @@ class LocationDriver {
             ::debug("Writing assist data to u-blox..", "LocationDriver");
             ubxAssist.writeAssistNow(assistData, onDone);
 
-            // TODO: Temporarily resolve this Promise after a timeout because for some reason,
+            // NOTE: Resolve this Promise after a timeout because for some reason,
             // the callback is not always called by the writeAssistNow() method
             imp.wakeup(LD_ASSIST_DATA_WRITE_TIMEOUT, reject);
         }.bindenv(this));
@@ -6103,7 +6744,6 @@ class LocationDriver {
 
     // -------------------- STORAGE METHODS -------------------- //
 
-    // TODO: Comment
     function _save(data, fileName, encoder = null) {
         _erase(fileName);
 
@@ -6116,7 +6756,6 @@ class LocationDriver {
         }
     }
 
-    // TODO: Comment
     function _load(fileName, decoder = null) {
         try {
             if (_storage.fileExists(fileName)) {
@@ -6132,7 +6771,6 @@ class LocationDriver {
         return null;
     }
 
-    // TODO: Comment
     function _erase(fileName) {
         try {
             // Erase the existing file if any
@@ -6188,16 +6826,39 @@ class LocationDriver {
     }
 }
 
-//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/SimUpdater.device.nut"
+// MIT License
 
-// TODO: Comment
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
+
+// SIM Updater class
+// Initiates SIM OTA update and holds the connection for specified time to let the SIM update
 class SimUpdater {
     _enabled = false;
     _duration = null;
     _keepConnectionTimer = null;
 
     /**
-     *  Start SIM updater.
+     *  Start SIM updater
+     *
      *  @param {table} cfg - Table with the full configuration.
      *                       For details, please, see the documentation
      *
@@ -6211,7 +6872,16 @@ class SimUpdater {
         return Promise.resolve(null);
     }
 
-    // TODO: Comment
+    /**
+     * Update configuration
+     *
+     * @param {table} cfg - Configuration. May be partial.
+     *                      For details, please, see the documentation
+     *
+     * @return {Promise} that:
+     * - resolves if the operation succeeded
+     * - rejects if the operation failed
+     */
     function updateCfg(cfg) {
         local simUpdateCfg = getValFromTable(cfg, "simUpdate");
         _enabled = getValFromTable(simUpdateCfg, "enabled", _enabled);
@@ -6224,7 +6894,6 @@ class SimUpdater {
         return Promise.resolve(null);
     }
 
-    // TODO: Comment
     function _enable() {
         // Maximum server flush duration (sec) before forcing SIM-OTA
         const SU_SERVER_FLUSH_TIMEOUT = 5;
@@ -6263,7 +6932,6 @@ class SimUpdater {
         cm.isConnected() && onConnected();
     }
 
-    // TODO: Comment
     function _disable() {
         if (_keepConnectionTimer) {
             imp.cancelwakeup(_keepConnectionTimer);
@@ -6277,7 +6945,6 @@ class SimUpdater {
     }
 }
 
-//line 49 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/device/Main.device.nut"
 
 // Main application on Imp-Device: does the main logic of the application
 
@@ -6299,7 +6966,6 @@ const APP_RM_MSG_RESEND_LIMIT = 5;
 // Send buffer size, in bytes
 const APP_SEND_BUFFER_SIZE = 8192;
 
-// TODO: Check the RAM consumption!
 class Application {
     /**
      * Application Constructor
@@ -6327,13 +6993,13 @@ class Application {
             flipFlop.disable();
         }
 
-        // TODO: Is it the proper usage of the ublox's backup pin?
+        // Keep the u-blox backup pin always on
         HW_UBLOX_BACKUP_PIN.configure(DIGITAL_OUT, 1);
 
         // Create and intialize Replay Messenger
         _initReplayMessenger()
         .then(function(_) {
-            HW_SHARED_I2C.configure(CLOCK_SPEED_400_KHZ);
+            HW_ACCEL_I2C.configure(CLOCK_SPEED_400_KHZ);
 
             // Create and initialize Battery Monitor
             local batteryMon = BatteryMonitor(HW_BAT_LEVEL_POWER_EN_PIN, HW_BAT_LEVEL_PIN);
@@ -6342,7 +7008,7 @@ class Application {
             // Create and initialize Location Driver
             local locationDriver = LocationDriver();
             // Create and initialize Accelerometer Driver
-            local accelDriver = AccelerometerDriver(HW_SHARED_I2C, HW_ACCEL_INT_PIN);
+            local accelDriver = AccelerometerDriver(HW_ACCEL_I2C, HW_ACCEL_INT_PIN);
             // Create and initialize Location Monitor
             local locationMon = LocationMonitor(locationDriver);
             // Create and initialize Motion Monitor
@@ -6358,8 +7024,6 @@ class Application {
         }.bindenv(this))
         .fail(function(err) {
             ::error("Error during initialization: " + err);
-
-            // TODO: Reboot after a delay? Or enter the emergency mode? Let's temporarily put entering the emergency mode
             pm.enterEmergencyMode("Error during initialization: " + err);
         }.bindenv(this));
     }
@@ -6423,7 +7087,9 @@ class Application {
         return name == APP_RM_MSG_NAME.DATA;
     }
 
-    // TODO: Comment
+    /**
+     * Erase SPI flash
+     */
     function _eraseFlash() {
         ::info(format("Erasing SPI flash from 0x%x to 0x%x...", HW_ERASE_FLASH_START_ADDR, HW_ERASE_FLASH_END_ADDR));
 
@@ -6458,7 +7124,7 @@ local photoresistor = Photoresistor(HW_LDR_POWER_EN_PIN, HW_LDR_PIN);
 local startApp = function() {
     // Stop polling as we are going to start the main app => the device has already been shipped.
     // This is guaranteed to be called after (!) the startPolling() call as the startApp callback
-    // is called asyncronously (using imp.wakeup)
+    // is called asynchronously (using imp.wakeup)
     photoresistor.stopPolling();
     // Run the application
     ::app <- Application();
@@ -6482,5 +7148,4 @@ if (hardware.wakereason() == WAKEREASON_PIN) {
     // pin so the light detection is enabled during the deep sleep
     photoresistor.startPolling(onLightDetected);
 }
-//line 7 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/not_for_uploading/my_main.device.nut"
 
