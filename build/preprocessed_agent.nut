@@ -1,10 +1,30 @@
-//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/agent/Main.agent.nut"
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 #require "rocky.agent.lib.nut:3.0.1"
 #require "Promise.lib.nut:4.0.0"
 #require "Messenger.lib.nut:0.2.0"
 #require "UBloxAssistNow.agent.lib.nut:1.0.0"
 
-//line 1 "github:electricimp/GoogleMaps/./GoogleMaps.agent.lib.nut"
 // MIT License
 //
 // Copyright 2017-2021 Electric Imp
@@ -232,10 +252,52 @@ class GoogleMaps {
         return result.toupper();
     }
 }
-//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/shared/Version.shared.nut"
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 // Application Version
-const APP_VERSION = "3.0.1";
-//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/shared/Constants.shared.nut"
+const APP_VERSION = "3.0.2";
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 // Constants common for the imp-agent and the imp-device
 
 // ReplayMessenger message names
@@ -251,7 +313,28 @@ const INIT_LATITUDE = 90.0;
 
 // Init longitude value (Greenwich)
 const INIT_LONGITUDE = 0.0;
-//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/shared/Logger/Logger.shared.nut"
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 // Logger for "DEBUG", "INFO" and "ERROR" information.
 // Prints out information to the standard impcentral log ("server.log").
 // The supported data types: string, table. Other types may be printed out incorrectly.
@@ -611,16 +694,28 @@ Logger <- {
 
 Logger.setLogLevelStr("INFO");
 
-//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/agent/CloudClient.agent.nut"
+// MIT License
 
-// Communicates with the cloud.
-//   - Sends data to the cloud using REST API
-//   - Basic HTTP authentication is used
-//   - No buffering, data is sent immediately
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
 
-// Timeout for waiting for a response from the cloud, in seconds
-// TODO - decide do we need it, how it correlates with RM ack timeout
-const CLOUD_REST_API_TIMEOUT = 60;
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 
 // "Data is accepted" status code returned from the cloud
 const CLOUD_REST_API_SUCCESS_CODE = 200;
@@ -628,15 +723,25 @@ const CLOUD_REST_API_SUCCESS_CODE = 200;
 // API endpoints
 const CLOUD_REST_API_DATA_ENDPOINT = "/data";
 
+// Communicates with the cloud.
+//   - Sends data to the cloud using REST API
+//   - Basic HTTP authentication is used
+//   - No buffering, data is sent immediately and only once
 class CloudClient {
-    // TODO: Comment
+    // Cloud's URL
     _url = null;
-    // TODO: Comment
+    // Username for Basic auth
     _user = null;
-    // TODO: Comment
+    // Password for Basic auth
     _pass = null;
 
-    // TODO: Comment
+    /**
+     * Constructor for Configuration Service Class
+     *
+     * @param {string} url - Cloud's URL
+     * @param {string} user - Username for Basic auth
+     * @param {string} pass - Password  for Basic auth
+     */
     constructor(url, user, pass) {
         _url = url;
         _user = user;
@@ -667,14 +772,33 @@ class CloudClient {
                 } else {
                     reject(resp.statuscode);
                 }
-            }.bindenv(this),
-            null,
-            CLOUD_REST_API_TIMEOUT);
+            }.bindenv(this));
         }.bindenv(this));
     }
 }
 
-//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/agent/LocationAssistant.agent.nut"
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 
 // Google Maps Geolocation API URL
 const LA_GOOGLE_MAPS_LOCATION_URL = "https://www.googleapis.com/geolocation/v1/geolocate?key=";
@@ -688,14 +812,19 @@ class LocationAssistant {
     // Google Maps instance
     _gmaps = null;
 
-    // TODO: Comment
+    /**
+     * Set tokens for u-blox Assist Now and Google Geolocation API
+     *
+     * @param {string} [ubloxAssistToken] - U-blox Assist Now token
+     * @param {string} [gmapsKey] - U-blox Assist Now token
+     */
     function setTokens(ubloxAssistToken = null, gmapsKey = null) {
         ubloxAssistToken && (_ubloxAssistNow = UBloxAssistNow(ubloxAssistToken));
         gmapsKey         && (_gmaps = GoogleMaps(gmapsKey));
     }
 
     /**
-     * Obtains GNSS Assist data for u-blox
+     * Obtain GNSS Assist data for u-blox
      *
      * @return {Promise} that:
      * - resolves with u-blox assist data if the operation succeeded
@@ -734,7 +863,7 @@ class LocationAssistant {
     }
 
     /**
-     * Obtains the location by cell towers and WiFi networks using Google Maps Geolocation API
+     * Obtain the location by cell towers and WiFi networks using Google Maps Geolocation API
      *
      * @param {table} locationData - Scanned cell towers and WiFi networks
      *
@@ -754,35 +883,50 @@ class LocationAssistant {
     }
 }
 
-//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/agent/CfgValidation.agent.nut"
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
 // Supported configuration JSON format/scheme version
 const CFG_SCHEME_VERSION = "1.1";
 
 // Configuration safeguard/validation constants:
+// NOTE: These constants may need some adjustments
 
 // "connectingPeriod"
 // How often the tracker connects to network (minimal value), in seconds.
-// TODO: adjust
 const CFG_CONNECTING_SAFEGUARD_MIN = 10.0;
 // How often the tracker connects to network (maximal value), in seconds.
-// TODO: adjust
 const CFG_CONNECTING_SAFEGUARD_MAX = 360000.0;
 
 // "readingPeriod"
 // How often the tracker polls various data (minimal value), in seconds.
-// TODO: adjust
 const CFG_READING_SAFEGUARD_MIN = 10.0;
 // How often the tracker polls various data (maximal value), in seconds.
-// TODO: adjust
 const CFG_READING_SAFEGUARD_MAX = 360000.0;
 
 // "locReadingPeriod"
 // How often the tracker obtains a location (minimal value), in seconds.
-// TODO: adjust
 const CFG_LOC_READING_SAFEGUARD_MIN = 10.0;
 // How often the tracker obtains a location (maximal value), in seconds.
-// TODO: adjust
 const CFG_LOC_READING_SAFEGUARD_MAX = 360000.0;
 
 // "motionMonitoring":
@@ -881,10 +1025,10 @@ const CFG_GEOFENCE_RADIUS_SAFEGUARD_MAX = 6371009.0;
 
 // "after"
 // Minimal start time of repossesion, Unix timestamp
-// 31.03.2020 12:53:04 - TODO: adjust
+// 31.03.2020 12:53:04
 const CFG_MIN_TIMESTAMP = 1585666384;
 // Maximal start time of repossesion, Unix timestamp
-// 17.04.2035 18:48:49 - TODO: adjust
+// 17.04.2035 18:48:49
 const CFG_MAX_TIMESTAMP = 2060448529;
 
 // "duration"
@@ -923,8 +1067,6 @@ coordValidationRules <- [{"name":"lng",
  * @return {null | string} null - validation success, otherwise error string.
  */
 function validateCfg(msg) {
-    // TODO: Check if there are extra fields in the cfg
-
     // validate agent configuration
     if ("agentConfiguration" in msg) {
         local agentCfg = msg.agentConfiguration;
@@ -977,7 +1119,7 @@ function validateCfg(msg) {
  *          "name": {string} - Parameter name.
  *          "required": {bool} - Availability in the configuration parameters.
  *          "validationType": {string} - Allowed parameter type(s) ("float", "string", "integer").
-                                         Several types can be specified using "|" as a separator.
+ *                                       Several types can be specified using "|" as a separator.
  *          "lowLim": {float, integer} - Parameter minimum value (for float and integer).
  *          "highLim": {float, integer} - Parameter maximum value (for float and integer).
  *          "minLen": {integer} - Minimal length of the string parameter.
@@ -1432,7 +1574,28 @@ function _validateBeacon(iBeacons) {
     }
     return null;
 }
-//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/agent/CfgService.agent.nut"
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 
 // Configuration API endpoint
 const CFG_REST_API_DATA_ENDPOINT = "/cfg";
@@ -1451,7 +1614,7 @@ enum CFG_REST_API_HTTP_CODES {
 class CfgService {
     // Messenger instance
     _msngr = null;
-    // HTTP Authorization
+    // HTTP Authorization header
     _authHeader = null;
     // Cfg update ("configuration") which waits for successful delivering to the imp-device
     _pendingCfg = null;
@@ -1469,7 +1632,8 @@ class CfgService {
      * Constructor for Configuration Service Class
      *
      * @param {object} msngr - Messenger instance
-     * TODO: Update
+     * @param {string} [user] - Username for Basic auth
+     * @param {string} [pass] - Password  for Basic auth
      */
     constructor(msngr, user = null, pass = null) {
         _msngr = msngr;
@@ -1550,7 +1714,7 @@ class CfgService {
             //   "configuration": {...}
             // }
 
-            // TODO: This may be suboptimal. May need to be improved
+            // NOTE: This may be suboptimal. May need to be improved
             // Copy the reported cfg before modification
             reportToCloud = http.jsondecode(http.jsonencode(_reportedCfg));
         } else {
@@ -1644,7 +1808,6 @@ class CfgService {
         _saveCfgs();
     }
 
-    // TODO: Comment
     function _loadCfgs() {
         local storedData = server.load();
 
@@ -1652,7 +1815,6 @@ class CfgService {
         _reportedCfg = "reportedCfg" in storedData ? storedData.reportedCfg : null;
     }
 
-    // TODO: Comment
     function _saveCfgs() {
         local storedData = server.load();
         storedData.agentCfg <- _agentCfg;
@@ -1665,16 +1827,35 @@ class CfgService {
         }
     }
 
-    // TODO: Comment
     function _defaultAgentCfg() {
         local cfg =
-//line 1 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/agent/DefaultConfiguration.agent.nut"
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 {
   "debug": {                // debug settings
     "logLevel": "INFO"       // logging level on Imp-Agent ("ERROR", "INFO", "DEBUG")
   }
 }
-//line 238 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/agent/CfgService.agent.nut"
         return cfg;
     }
 
@@ -1740,35 +1921,59 @@ class CfgService {
     }
 }
 
-//line 2 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/agent/WebUI.agent.nut"
+// MIT License
 
-// Configuration API endpoint
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
+
+// Index page endpoint
 const WEBUI_INDEX_PAGE_ENDPOINT = "/";
-// TODO: Comment
+// Data (latest message from the device, alerts history) API endpoint
 const WEBUI_DATA_ENDPOINT = "/web-ui/data";
-// TODO: Comment
+// Tokens (u-blox, google) setting API endpoint
 const WEBUI_TOKENS_ENDPOINT = "/web-ui/tokens";
-// TODO: Comment
+// Cloud settings (URL, user, pass) API endpoint
 const WEBUI_CLOUD_SETTINGS_ENDPOINT = "/web-ui/cloud-settings";
 
-// TODO: Comment
+// Maximum alerts to be kept in the history
 const WEBUI_ALERTS_HISTORY_LEN = 10;
 
-// Web UI class
+// Web UI class:
+// - Provides HTTP endpoints for Web interface
+// - Stores data required for Web interface
 class WebUI {
-    // TODO: Comment
+    // Latest data message received from the device
     _latestData = null;
-    // TODO: Comment
+    // Alerts history
     _alertsHistory = null;
-    // TODO: Comment
+    // Tokens setter function
     _tokensSetter = null;
-    // TODO: Comment
+    // Cloud configurator function
     _cloudConfigurator = null;
 
     /**
      * Constructor for Web UI class
      *
-     * TODO
+     * @param {function} tokensSetter - Tokens setter function
+     * @param {function} cloudConfigurator - Cloud configurator function
      */
     constructor(tokensSetter, cloudConfigurator) {
         _tokensSetter = tokensSetter;
@@ -1782,7 +1987,11 @@ class WebUI {
         _alertsHistory = [];
     }
 
-    // TODO: Comment
+    /**
+     * Pass new data received from the device
+     *
+     * @param {table} data - Tokens setter function
+     */
     function newData(data) {
         _latestData = data;
 
@@ -1800,7 +2009,6 @@ class WebUI {
 
     // -------------------- PRIVATE METHODS -------------------- //
 
-    // TODO: Comment
     function _getIndexPageRockyHandler(context) {
         ::debug("GET " + WEBUI_INDEX_PAGE_ENDPOINT + " request received", "WebUI");
 
@@ -1808,7 +2016,6 @@ class WebUI {
         context.send(200, _indexHtml());
     }
 
-    // TODO: Comment
     function _getDataRockyHandler(context) {
         ::debug("GET " + WEBUI_DATA_ENDPOINT + " request received", "WebUI");
 
@@ -1821,7 +2028,6 @@ class WebUI {
         context.send(200, data);
     }
 
-    // TODO: Comment
     function _patchTokensRockyHandler(context) {
         ::debug("PATCH " + WEBUI_TOKENS_ENDPOINT + " request received", "WebUI");
 
@@ -1833,7 +2039,6 @@ class WebUI {
         context.send(200);
     }
 
-    // TODO: Comment
     function _patchCloudSettingsRockyHandler(context) {
         ::debug("PATCH " + WEBUI_CLOUD_SETTINGS_ENDPOINT + " request received", "WebUI");
 
@@ -1843,13 +2048,11 @@ class WebUI {
         context.send(200);
     }
 
-    // TODO: Comment
     function _indexHtml() {
-        return "<!doctype html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"utf-8\"/>\n    <link rel=\"icon\" href=\"https://progx.s3.amazonaws.com/agent-assets/favicon.ico\"/>\n    <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"/>\n    <meta name=\"theme-color\" content=\"#000000\"/>\n    <link rel=\"preconnect\" href=\"https://assets.twilio.com\" crossorigin/>\n    <link rel=\"stylesheet\" href=\"https://assets.twilio.com/public_assets/paste-fonts/main-1.2.0/fonts.css\"/>\n    <title>Programmable Asset Tracker</title>\n    <script defer=\"defer\" src=\"https://progx.s3.amazonaws.com/agent-assets/static/js/main.js\"></script>\n    <link href=\"https://progx.s3.amazonaws.com/agent-assets/static/css/main.css\" rel=\"stylesheet\">\n</head>\n<body>\n<noscript>You need to enable JavaScript to run this app.</noscript>\n<div id=\"root\"></div>\n</body>\n</html>";
+        return "<!--\nMIT License\n\nCopyright (C) 2022, Twilio, Inc. <help@twilio.com>\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of\nthis software and associated documentation files (the \"Software\"), to deal in\nthe Software without restriction, including without limitation the rights to\nuse, copy, modify, merge, publish, distribute, sublicense, and/or sell copies\nof the Software, and to permit persons to whom the Software is furnished to do\nso, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n-->\n\n<!doctype html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"utf-8\"/>\n    <link rel=\"icon\" href=\"https://progx.s3.amazonaws.com/agent-assets/favicon.ico\"/>\n    <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"/>\n    <meta name=\"theme-color\" content=\"#000000\"/>\n    <link rel=\"preconnect\" href=\"https://assets.twilio.com\" crossorigin/>\n    <link rel=\"stylesheet\" href=\"https://assets.twilio.com/public_assets/paste-fonts/main-1.2.0/fonts.css\"/>\n    <title>Programmable Asset Tracker</title>\n    <script defer=\"defer\" src=\"https://progx.s3.amazonaws.com/agent-assets/static/js/main.js\"></script>\n    <link href=\"https://progx.s3.amazonaws.com/agent-assets/static/css/main.css\" rel=\"stylesheet\">\n</head>\n<body>\n<noscript>You need to enable JavaScript to run this app.</noscript>\n<div id=\"root\"></div>\n</body>\n</html>";
     }
 }
 
-//line 15 "/Users/ragruslan/Dropbox/NoBitLost/Prog-X/nbl_gl_repo/src/agent/Main.agent.nut"
 
 // Main application on Imp-Agent:
 // - Forwards Data messages from Imp-Device to Cloud REST API
@@ -1859,7 +2062,6 @@ class WebUI {
 // - Implements REST API for the tracker configuration
 //   -- Sends cfg update request to Imp-Device
 //   -- Stores actual cfg received from from Imp-Device
-
 class Application {
     // Messenger instance
     _msngr = null;
@@ -1886,8 +2088,6 @@ class Application {
         _initCfgService();
         // Initialize Web UI
         _initWebUI();
-
-        // TODO: Make a build-flag to allow erasing the agent's memory?
     }
 
     // -------------------- PRIVATE METHODS -------------------- //
@@ -1904,7 +2104,9 @@ class Application {
 
     /**
      * Create and initialize configuration service instance
-     * TODO: Update
+     *
+     * @param {string} [user] - Username for configuration service authorization
+     * @param {string} [pass] - Password for configuration service authorization
      */
     function _initCfgService(user = null, pass = null) {
         Rocky.init();
@@ -1920,7 +2122,10 @@ class Application {
 
     /**
      * Create and initialize Cloud Client instance
-     * TODO: Update
+     *
+     * @param {string} url - Cloud's URL
+     * @param {string} user - Username for Cloud's authorization
+     * @param {string} pass - Password for Cloud's authorization
      */
     function _initCloudClient(url, user, pass) {
         _cloudClient = CloudClient(url, user, pass);
@@ -1939,7 +2144,7 @@ class Application {
      * Handler for Data received from Imp-Device
      *
      * @param {table} msg - Received message payload.
-     * @param customAck - Custom acknowledgment function.
+     * @param {function} customAck - Custom acknowledgment function.
      */
     function _onData(msg, customAck) {
         ::debug("Data received from imp-device, msgId = " + msg.id);
@@ -1965,7 +2170,7 @@ class Application {
      * Handler for GNSS Assist request received from Imp-Device
      *
      * @param {table} msg - Received message payload.
-     * @param customAck - Custom acknowledgment function.
+     * @param {function} customAck - Custom acknowledgment function.
      */
     function _onGnssAssist(msg, customAck) {
         local ack = customAck();
@@ -1985,7 +2190,7 @@ class Application {
      * Handler for Location By Cell Info and WiFi request received from Imp-Device
      *
      * @param {table} msg - Received message payload.
-     * @param customAck - Custom acknowledgment function.
+     * @param {function} customAck - Custom acknowledgment function.
      */
     function _onLocationCellAndWiFi(msg, customAck) {
         local ack = customAck();

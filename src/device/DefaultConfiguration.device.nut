@@ -1,3 +1,25 @@
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 {
   "updateId": "myDefaultCfg",
 
@@ -9,10 +31,10 @@
 
     "motionMonitoring": {
       "enabled": true,          // true - motion monitoring is enabled
-      "movementAccMin": 0.15,    // minimum (starting) acceleration threshold for movement detection, in g
-      "movementAccMax": 0.15,    // maximum  acceleration threshold for movement detection, in g
+      "movementAccMin": 0.15,   // minimum (starting) acceleration threshold for movement detection, in g
+      "movementAccMax": 0.15,   // maximum  acceleration threshold for movement detection, in g
       "movementAccDur": 0.01,   // duration of exceeding movement acceleration threshold, in seconds
-      "motionTime": 8.0,       // maximum time to confirm motion detection after the initial movement, in seconds
+      "motionTime": 8.0,        // maximum time to confirm motion detection after the initial movement, in seconds
       "motionVelocity": 0.1,    // minimum instantaneous velocity to confirm motion detection condition, in meters per second
       "motionDistance": 2.0,    // minimum movement distance to determine motion detection condition, in meters
                                 // (if 0, distance is not calculated, ie. not used for motion confirmation)
@@ -20,7 +42,7 @@
     },
 
     "repossessionMode": {
-      "enabled": false,          // true - repossession mode is enabled
+      "enabled": false,         // true - repossession mode is enabled
       "after": 1667598736       // (05.11.2022 00:52:16) UNIX timestamp after which location obtaining is activated
     },
 
@@ -88,6 +110,6 @@
   },
 
   "debug": {                    // debug settings
-    "logLevel": "INFO"         // logging level on Imp-Device ("ERROR", "INFO", "DEBUG")
+    "logLevel": "INFO"          // logging level on Imp-Device ("ERROR", "INFO", "DEBUG")
   }
 }

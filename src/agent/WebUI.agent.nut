@@ -1,32 +1,57 @@
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 @set CLASS_NAME = "WebUI" // Class name for logging
 
-// Configuration API endpoint
+// Index page endpoint
 const WEBUI_INDEX_PAGE_ENDPOINT = "/";
-// TODO: Comment
+// Data (latest message from the device, alerts history) API endpoint
 const WEBUI_DATA_ENDPOINT = "/web-ui/data";
-// TODO: Comment
+// Tokens (u-blox, google) setting API endpoint
 const WEBUI_TOKENS_ENDPOINT = "/web-ui/tokens";
-// TODO: Comment
+// Cloud settings (URL, user, pass) API endpoint
 const WEBUI_CLOUD_SETTINGS_ENDPOINT = "/web-ui/cloud-settings";
 
-// TODO: Comment
+// Maximum alerts to be kept in the history
 const WEBUI_ALERTS_HISTORY_LEN = 10;
 
-// Web UI class
+// Web UI class:
+// - Provides HTTP endpoints for Web interface
+// - Stores data required for Web interface
 class WebUI {
-    // TODO: Comment
+    // Latest data message received from the device
     _latestData = null;
-    // TODO: Comment
+    // Alerts history
     _alertsHistory = null;
-    // TODO: Comment
+    // Tokens setter function
     _tokensSetter = null;
-    // TODO: Comment
+    // Cloud configurator function
     _cloudConfigurator = null;
 
     /**
      * Constructor for Web UI class
      *
-     * TODO
+     * @param {function} tokensSetter - Tokens setter function
+     * @param {function} cloudConfigurator - Cloud configurator function
      */
     constructor(tokensSetter, cloudConfigurator) {
         _tokensSetter = tokensSetter;
@@ -40,7 +65,11 @@ class WebUI {
         _alertsHistory = [];
     }
 
-    // TODO: Comment
+    /**
+     * Pass new data received from the device
+     *
+     * @param {table} data - Tokens setter function
+     */
     function newData(data) {
         _latestData = data;
 
@@ -58,7 +87,6 @@ class WebUI {
 
     // -------------------- PRIVATE METHODS -------------------- //
 
-    // TODO: Comment
     function _getIndexPageRockyHandler(context) {
         ::debug("GET " + WEBUI_INDEX_PAGE_ENDPOINT + " request received", "@{CLASS_NAME}");
 
@@ -66,7 +94,6 @@ class WebUI {
         context.send(200, _indexHtml());
     }
 
-    // TODO: Comment
     function _getDataRockyHandler(context) {
         ::debug("GET " + WEBUI_DATA_ENDPOINT + " request received", "@{CLASS_NAME}");
 
@@ -79,7 +106,6 @@ class WebUI {
         context.send(200, data);
     }
 
-    // TODO: Comment
     function _patchTokensRockyHandler(context) {
         ::debug("PATCH " + WEBUI_TOKENS_ENDPOINT + " request received", "@{CLASS_NAME}");
 
@@ -91,7 +117,6 @@ class WebUI {
         context.send(200);
     }
 
-    // TODO: Comment
     function _patchCloudSettingsRockyHandler(context) {
         ::debug("PATCH " + WEBUI_CLOUD_SETTINGS_ENDPOINT + " request received", "@{CLASS_NAME}");
 
@@ -101,7 +126,6 @@ class WebUI {
         context.send(200);
     }
 
-    // TODO: Comment
     function _indexHtml() {
         return "@{include("WebUI/index.html") | escape}";
     }

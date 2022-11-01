@@ -1,3 +1,25 @@
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 #require "rocky.agent.lib.nut:3.0.1"
 #require "Promise.lib.nut:4.0.0"
 #require "Messenger.lib.nut:0.2.0"
@@ -21,7 +43,6 @@
 // - Implements REST API for the tracker configuration
 //   -- Sends cfg update request to Imp-Device
 //   -- Stores actual cfg received from from Imp-Device
-
 class Application {
     // Messenger instance
     _msngr = null;
@@ -57,8 +78,6 @@ class Application {
         // Since Web UI is disabled, let's take tokens from env vars
         _locAssistant.setTokens(__VARS.UBLOX_ASSIST_NOW_TOKEN, __VARS.GOOGLE_MAPS_API_KEY);
 @endif
-
-        // TODO: Make a build-flag to allow erasing the agent's memory?
     }
 
     // -------------------- PRIVATE METHODS -------------------- //
@@ -75,7 +94,9 @@ class Application {
 
     /**
      * Create and initialize configuration service instance
-     * TODO: Update
+     *
+     * @param {string} [user] - Username for configuration service authorization
+     * @param {string} [pass] - Password for configuration service authorization
      */
     function _initCfgService(user = null, pass = null) {
         Rocky.init();
@@ -91,7 +112,10 @@ class Application {
 
     /**
      * Create and initialize Cloud Client instance
-     * TODO: Update
+     *
+     * @param {string} url - Cloud's URL
+     * @param {string} user - Username for Cloud's authorization
+     * @param {string} pass - Password for Cloud's authorization
      */
     function _initCloudClient(url, user, pass) {
         _cloudClient = CloudClient(url, user, pass);
@@ -110,7 +134,7 @@ class Application {
      * Handler for Data received from Imp-Device
      *
      * @param {table} msg - Received message payload.
-     * @param customAck - Custom acknowledgment function.
+     * @param {function} customAck - Custom acknowledgment function.
      */
     function _onData(msg, customAck) {
         ::debug("Data received from imp-device, msgId = " + msg.id);
@@ -136,7 +160,7 @@ class Application {
      * Handler for GNSS Assist request received from Imp-Device
      *
      * @param {table} msg - Received message payload.
-     * @param customAck - Custom acknowledgment function.
+     * @param {function} customAck - Custom acknowledgment function.
      */
     function _onGnssAssist(msg, customAck) {
         local ack = customAck();
@@ -156,7 +180,7 @@ class Application {
      * Handler for Location By Cell Info and WiFi request received from Imp-Device
      *
      * @param {table} msg - Received message payload.
-     * @param customAck - Custom acknowledgment function.
+     * @param {function} customAck - Custom acknowledgment function.
      */
     function _onLocationCellAndWiFi(msg, customAck) {
         local ack = customAck();

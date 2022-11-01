@@ -1,13 +1,26 @@
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 @set CLASS_NAME = "CloudClient" // Class name for logging
-
-// Communicates with the cloud.
-//   - Sends data to the cloud using REST API
-//   - Basic HTTP authentication is used
-//   - No buffering, data is sent immediately
-
-// Timeout for waiting for a response from the cloud, in seconds
-// TODO - decide do we need it, how it correlates with RM ack timeout
-const CLOUD_REST_API_TIMEOUT = 60;
 
 // "Data is accepted" status code returned from the cloud
 const CLOUD_REST_API_SUCCESS_CODE = 200;
@@ -15,15 +28,25 @@ const CLOUD_REST_API_SUCCESS_CODE = 200;
 // API endpoints
 const CLOUD_REST_API_DATA_ENDPOINT = "/data";
 
+// Communicates with the cloud.
+//   - Sends data to the cloud using REST API
+//   - Basic HTTP authentication is used
+//   - No buffering, data is sent immediately and only once
 class CloudClient {
-    // TODO: Comment
+    // Cloud's URL
     _url = null;
-    // TODO: Comment
+    // Username for Basic auth
     _user = null;
-    // TODO: Comment
+    // Password for Basic auth
     _pass = null;
 
-    // TODO: Comment
+    /**
+     * Constructor for Configuration Service Class
+     *
+     * @param {string} url - Cloud's URL
+     * @param {string} user - Username for Basic auth
+     * @param {string} pass - Password  for Basic auth
+     */
     constructor(url, user, pass) {
         _url = url;
         _user = user;
@@ -54,9 +77,7 @@ class CloudClient {
                 } else {
                     reject(resp.statuscode);
                 }
-            }.bindenv(this),
-            null,
-            CLOUD_REST_API_TIMEOUT);
+            }.bindenv(this));
         }.bindenv(this));
     }
 }

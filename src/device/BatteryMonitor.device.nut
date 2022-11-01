@@ -1,3 +1,25 @@
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 @set CLASS_NAME = "BatteryMonitor" // Class name for logging
 
 // Delay (sec) between reads when getting the average value
@@ -10,7 +32,9 @@ const BM_VOLTAGE_GAIN = 2.4242;
 // 3 x 1.5v battery
 const BM_FULL_VOLTAGE = 4.2;
 
-// Measures the battery level
+// Battery class:
+// - Reads battery voltage (several times with a delay)
+// - Converts it to remaining capacity (%)
 class BatteryMonitor {
     _batLvlEnablePin = null;
     _batLvlPin = null;
@@ -33,15 +57,23 @@ class BatteryMonitor {
         [0.0,     0.0]
     ];
 
-    // TODO: Comment
+    /**
+     * Constructor for Battery Monitor class
+     *
+     * @param {object} batLvlEnablePin - Hardware pin object that enables battery level measurement circuit
+     * @param {object} batLvlPin - Hardware pin object that measures battery level (voltage)
+     */
     constructor(batLvlEnablePin, batLvlPin) {
         _batLvlEnablePin = batLvlEnablePin;
         _batLvlPin = batLvlPin;
     }
 
-    // TODO: Comment
-    // Returns a Promise that resolves with the result of the battery measuring
-    // The result is a table { "percent": <pct>, "voltage": <V> }
+    /**
+     * Measure battery level
+     *
+     * @return {Promise} that resolves with the result of the battery measuring.
+     *  The result is a table { "percent": <pct>, "voltage": <V> }
+     */
     function measureBattery() {
         if (_measuringBattery) {
             return _measuringBattery;
@@ -84,8 +116,6 @@ class BatteryMonitor {
         }.bindenv(this));
     }
 
-    // TODO: Comment
-    // Returns battery level { "percent": <pct>, "voltage": <V> }
     function _getBatteryLevelByVoltage(voltage) {
         local calTableLen = _calibrationTable.len();
 

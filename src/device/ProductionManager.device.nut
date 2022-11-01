@@ -1,3 +1,25 @@
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 @set CLASS_NAME = "ProductionManager" // Class name for logging
 
 // ProductionManager's user config field
@@ -23,11 +45,10 @@ class ProductionManager {
     _isNewDeployment = false;
 
     /**
-     * TODO: Update comment
      * Constructor for Production Manager
      *
      * @param {function} startAppFunc - The function to be called to start the main application
-     * @param {boolean} shippingMode - Enable shipping mode
+     * @param {boolean} [shippingMode = false] - Enable shipping mode
      */
     constructor(startAppFunc, shippingMode = false) {
         _startApp = @() imp.wakeup(0, startAppFunc);
@@ -41,8 +62,6 @@ class ProductionManager {
     function start() {
         // Maximum sleep time (sec) used for shipping mode
         const PMGR_MAX_SLEEP_TIME = 2419198;
-
-        // TODO: Erase the flash memory on first start (when awake from shipping mode)? Or in factory code?
 
         // NOTE: The app may override this handler but it must call enterEmergencyMode in case of a runtime error
         imp.onunhandledexception(_onUnhandledException.bindenv(this));
@@ -65,7 +84,6 @@ class ProductionManager {
 
             return;
         } else if (data.deploymentID != __EI.DEPLOYMENT_ID) {
-            // TODO: Is it OK? (the note below)
             // NOTE: The first code deploy will not be recognized as a new deploy!
             _info("New deployment detected!");
             _isNewDeployment = true;
@@ -81,7 +99,9 @@ class ProductionManager {
         }
     }
 
-    // TODO: Comment
+    /**
+     * This method should be called when the device has been shipped (if shipping mode is enabled)
+     */
     function shipped() {
         local data = _getOrInitializeData();
 
@@ -108,11 +128,14 @@ class ProductionManager {
     function enterEmergencyMode(error = null) {
         _setErrorFlag(error);
         server.flush(PMGR_FLUSH_TIMEOUT);
-        // TODO: Sleep immediately? But what if called from the global exception handler?
         imp.reset();
     }
 
-    // TODO: Comment
+    /**
+     * Check if new code has just been deployed (i.e. were no reboots after the deployment)
+     *
+     * @return {boolean} True if new code has just been deployed
+     */
     function isNewDeployment() {
         return _isNewDeployment;
     }
@@ -135,7 +158,6 @@ class ProductionManager {
         // Timeout of checking for updates, in seconds
         const PM_CHECK_UPDATES_TIMEOUT = 5;
 
-        // TODO: Improve logging!
         if (lastError && "ts" in lastError && "desc" in lastError) {
             _info(format("Last error (at %d): \"%s\"", lastError.ts, lastError.desc));
         }
@@ -170,8 +192,9 @@ class ProductionManager {
     }
 
     /**
-     * TODO: Update comment
      * Create and return the initial user configuration data
+     *
+     * @param {boolean} shipped - True if the device is already shipped or shipping mode is disabled
      *
      * @return {table} The initial user configuration data
      */
@@ -184,7 +207,11 @@ class ProductionManager {
         };
     }
 
-    // TODO: Comment
+    /**
+     * Get (if exists) or initialize (create and save) user configuration data
+     *
+     * @return {table} Parsed and checked user configuration data
+     */
     function _getOrInitializeData() {
         try {
             local userConf = _readUserConf();
@@ -207,11 +234,15 @@ class ProductionManager {
             _error("Error during parsing user configuration: " + err);
         }
 
-        _storeData(_initialData(true));
-        return _initialData(true);
+        _storeData(_initialData(_shippingMode));
+        return _initialData(_shippingMode);
     }
 
-    // TODO: Comment
+    /**
+     * Store user configuration data
+     *
+     * @param {table} data - The user configuration data to be stored for this module
+     */
     function _storeData(data) {
         local userConf = {};
 
@@ -260,8 +291,7 @@ class ProductionManager {
     }
 
     /**
-     * TODO: Update comment
-     * Read the user configuration
+     * Read the user configuration and parse it (JSON)
      *
      * @return {table | null} The user configuration converted from JSON to a Squirrel table
      *      or null if there was no user configuration saved
@@ -275,7 +305,7 @@ class ProductionManager {
         }
 
         config = config.tostring();
-        // TODO: What if a non-readable string was written? It will be printed "binary: ..."
+        // NOTE: This may print a binary string if something non-printable is in the config
         _debug("User configuration: " + config);
 
         config = JSONParser.parse(config);

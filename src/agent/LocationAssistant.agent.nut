@@ -1,3 +1,25 @@
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 @set CLASS_NAME = "LocationAssistant" // Class name for logging
 
 // Google Maps Geolocation API URL
@@ -12,14 +34,19 @@ class LocationAssistant {
     // Google Maps instance
     _gmaps = null;
 
-    // TODO: Comment
+    /**
+     * Set tokens for u-blox Assist Now and Google Geolocation API
+     *
+     * @param {string} [ubloxAssistToken] - U-blox Assist Now token
+     * @param {string} [gmapsKey] - U-blox Assist Now token
+     */
     function setTokens(ubloxAssistToken = null, gmapsKey = null) {
         ubloxAssistToken && (_ubloxAssistNow = UBloxAssistNow(ubloxAssistToken));
         gmapsKey         && (_gmaps = GoogleMaps(gmapsKey));
     }
 
     /**
-     * Obtains GNSS Assist data for u-blox
+     * Obtain GNSS Assist data for u-blox
      *
      * @return {Promise} that:
      * - resolves with u-blox assist data if the operation succeeded
@@ -58,7 +85,7 @@ class LocationAssistant {
     }
 
     /**
-     * Obtains the location by cell towers and WiFi networks using Google Maps Geolocation API
+     * Obtain the location by cell towers and WiFi networks using Google Maps Geolocation API
      *
      * @param {table} locationData - Scanned cell towers and WiFi networks
      *

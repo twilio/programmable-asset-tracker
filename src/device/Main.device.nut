@@ -1,3 +1,25 @@
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 #require "Serializer.class.nut:1.0.0"
 #require "JSONParser.class.nut:1.0.1"
 #require "JSONEncoder.class.nut:2.0.0"
@@ -13,8 +35,6 @@
 #require "UbxMsgParser.lib.nut:2.0.1"
 #require "UBloxAssistNow.device.lib.nut:0.1.0"
 #require "BG96_Modem.device.lib.nut:0.0.4"
-
-// TODO: Aggregate all constants that should be customized in production in one place?
 
 @include once "../shared/Version.shared.nut"
 @include once "../shared/Constants.shared.nut"
@@ -67,7 +87,6 @@ const APP_RM_MSG_RESEND_LIMIT = 5;
 // Send buffer size, in bytes
 const APP_SEND_BUFFER_SIZE = 8192;
 
-// TODO: Check the RAM consumption!
 class Application {
     /**
      * Application Constructor
@@ -102,13 +121,13 @@ class Application {
             flipFlop.disable();
         }
 
-        // TODO: Is it the proper usage of the ublox's backup pin?
+        // Keep the u-blox backup pin always on
         HW_UBLOX_BACKUP_PIN.configure(DIGITAL_OUT, 1);
 
         // Create and intialize Replay Messenger
         _initReplayMessenger()
         .then(function(_) {
-            HW_SHARED_I2C.configure(CLOCK_SPEED_400_KHZ);
+            HW_ACCEL_I2C.configure(CLOCK_SPEED_400_KHZ);
 
             // Create and initialize Battery Monitor
             local batteryMon = BatteryMonitor(HW_BAT_LEVEL_POWER_EN_PIN, HW_BAT_LEVEL_PIN);
@@ -117,7 +136,7 @@ class Application {
             // Create and initialize Location Driver
             local locationDriver = LocationDriver();
             // Create and initialize Accelerometer Driver
-            local accelDriver = AccelerometerDriver(HW_SHARED_I2C, HW_ACCEL_INT_PIN);
+            local accelDriver = AccelerometerDriver(HW_ACCEL_I2C, HW_ACCEL_INT_PIN);
             // Create and initialize Location Monitor
             local locationMon = LocationMonitor(locationDriver);
             // Create and initialize Motion Monitor
@@ -133,8 +152,6 @@ class Application {
         }.bindenv(this))
         .fail(function(err) {
             ::error("Error during initialization: " + err);
-
-            // TODO: Reboot after a delay? Or enter the emergency mode? Let's temporarily put entering the emergency mode
             pm.enterEmergencyMode("Error during initialization: " + err);
         }.bindenv(this));
     }
@@ -202,7 +219,9 @@ class Application {
         return name == APP_RM_MSG_NAME.DATA;
     }
 
-    // TODO: Comment
+    /**
+     * Erase SPI flash
+     */
     function _eraseFlash() {
         ::info(format("Erasing SPI flash from 0x%x to 0x%x...", HW_ERASE_FLASH_START_ADDR, HW_ERASE_FLASH_END_ADDR));
 
@@ -237,7 +256,7 @@ local photoresistor = Photoresistor(HW_LDR_POWER_EN_PIN, HW_LDR_PIN);
 local startApp = function() {
     // Stop polling as we are going to start the main app => the device has already been shipped.
     // This is guaranteed to be called after (!) the startPolling() call as the startApp callback
-    // is called asyncronously (using imp.wakeup)
+    // is called asynchronously (using imp.wakeup)
     photoresistor.stopPolling();
     // Run the application
     ::app <- Application();

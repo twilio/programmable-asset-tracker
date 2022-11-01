@@ -1,3 +1,25 @@
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 @set CLASS_NAME = "CfgManager" // Class name for logging
 
 // File names used by Cfg Manager
@@ -5,8 +27,13 @@ enum CFGM_FILE_NAMES {
     CFG = "cfg"
 }
 
-
-// TODO: Comment
+// Configuration Manager class:
+// - Passes the configuration (default or custom) to start modules
+// - Receives configuration updates from the agent
+// - Finds a diff between the current and the new configurations
+// - Passes the diff to the modules
+// - Stores the latest configuration version
+// - Reports the latest configuration version to the agent
 class CfgManager {
     // Array of modules to be configured
     _modules = null;
@@ -14,10 +41,14 @@ class CfgManager {
     _storage = null;
     // Promise or null
     _processingCfg = null;
-    // TODO: Comment
+    // The actual (already applied) configuration
     _actualCfg = null;
 
-    // TODO: Comment
+    /**
+     * Constructor for Configuration Manager class
+     *
+     * @param {array} modules - Application modules (must have start() and updateCfg() methods)
+     */
     constructor(modules) {
         _modules = modules;
 
@@ -26,7 +57,9 @@ class CfgManager {
         _storage.init();
     }
 
-    // TODO: Comment
+    /**
+     * Load saved configuration or the default one and start modules, report the configuration
+     */
     function start() {
         // Let's keep the connection to be able to report the configuration once it is deployed
         cm.keepConnection("@{CLASS_NAME}", true);
@@ -78,7 +111,6 @@ class CfgManager {
         }.bindenv(this));
     }
 
-    // TODO: Comment
     function _onCfgUpdate(msg, customAck) {
         // Let's keep the connection to be able to report the configuration once it is deployed
         cm.keepConnection("@{CLASS_NAME}", true);
@@ -133,7 +165,6 @@ class CfgManager {
         }.bindenv(this));
     }
 
-    // TODO: Comment
     function _applyDebugSettings(cfg) {
         if (!("debug" in cfg)) {
             return;
@@ -149,7 +180,6 @@ class CfgManager {
         }
     }
 
-    // TODO: Comment
     function _reportCfg() {
         ::debug("Reporting cfg..", "@{CLASS_NAME}");
 
@@ -163,7 +193,6 @@ class CfgManager {
         rm.send(APP_RM_MSG_NAME.CFG, cfgReport, RM_IMPORTANCE_HIGH);
     }
 
-    // TODO: Comment
     function _reboot() {
         const CFGM_FLUSH_TIMEOUT = 5;
 
@@ -171,7 +200,6 @@ class CfgManager {
         server.restart();
     }
 
-    // TODO: Comment
     function _diff(cfgUpdate, actualCfg, path = "") {
         // The list of the paths which should be handled in a special way when making or applying a diff.
         // When making a diff, we just don't touch these paths (and their sub-paths) in the cfg update - leave them as is.
@@ -207,7 +235,6 @@ class CfgManager {
         }
     }
 
-    // TODO: Comment
     function _applyDiff(diff, actualCfg, path = "") {
         foreach (k, v in diff) {
             // The full path which includes the key currently considered
@@ -225,7 +252,6 @@ class CfgManager {
         }
     }
 
-    // TODO: Comment
     function _defaultCfg() {
         local cfg =
         @include "DefaultConfiguration.device.nut"
@@ -234,7 +260,6 @@ class CfgManager {
 
     // -------------------- STORAGE METHODS -------------------- //
 
-    // TODO: Comment
     function _saveCfg(cfg = null, fileName = CFGM_FILE_NAMES.CFG) {
         ::debug("Saving cfg (fileName = " + fileName + ")..", "@{CLASS_NAME}");
 
@@ -251,7 +276,6 @@ class CfgManager {
         }
     }
 
-    // TODO: Comment
     function _loadCfg(fileName = CFGM_FILE_NAMES.CFG) {
         try {
             if (_storage.fileExists(fileName)) {
@@ -267,7 +291,6 @@ class CfgManager {
         return null;
     }
 
-    // TODO: Comment
     function _eraseCfg(fileName = CFGM_FILE_NAMES.CFG) {
         try {
             // Erase the existing file if any
