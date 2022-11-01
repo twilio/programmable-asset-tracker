@@ -1,10 +1,32 @@
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 @set CLASS_NAME = "MotionMonitor" // Class name for logging
 
 // Mean earth radius in meters (https://en.wikipedia.org/wiki/Great-circle_distance)
 const MM_EARTH_RAD = 6371009;
 
 // Motion Monitor class.
-// Starts and stops motion monitoring.
+// Implements an algorithm of motion monitoring based on accelerometer and location
 class MotionMonitor {
     // Accelerometer driver object
     _ad = null;
@@ -35,16 +57,16 @@ class MotionMonitor {
     // True (relevant) / false (not relevant) / null (haven't yet got a location or a failure)
     _prevLocFresh = null;
 
-    // TODO: Comment
+    // Motion stop confirmation timeout
     _motionStopTimeout = null;
 
-    // TODO: Comment
+    // Motion stop confirmation timer
     _confirmMotionStopTimer = null;
 
-    // TODO: Comment
+    // Motion monitoring state: enabled/disabled
     _motionMonitoringEnabled = false;
 
-    // TODO: Comment
+    // Accelerometer's parameters for motion detection
     _accelDetectMotionParams = null;
 
     /**
@@ -58,7 +80,8 @@ class MotionMonitor {
     }
 
     /**
-     *  Start motion monitoring.
+     *  Start motion monitoring
+     *
      *  @param {table} cfg - Table with the full configuration.
      *                       For details, please, see the documentation
      *
@@ -73,7 +96,16 @@ class MotionMonitor {
         return updateCfg(cfg);
     }
 
-    // TODO: Comment
+    /**
+     * Update configuration
+     *
+     * @param {table} cfg - Configuration. May be partial.
+     *                      For details, please, see the documentation
+     *
+     * @return {Promise} that:
+     * - resolves if the operation succeeded
+     * - rejects if the operation failed
+     */
     function updateCfg(cfg) {
         local detectMotionParamNames = ["movementAccMin", "movementAccMax", "movementAccDur",
                                         "motionTime", "motionVelocity", "motionDistance"];
@@ -115,7 +147,12 @@ class MotionMonitor {
         return Promise.resolve(null);
     }
 
-    // TODO: Comment
+    /**
+     * Get status info
+     *
+     * @return {table} with the following keys and values:
+     *  - "flags": a table with key "inMotion"
+     */
     function getStatus() {
         local res = {
             "flags": {}
@@ -157,7 +194,11 @@ class MotionMonitor {
         }
     }
 
-    // TODO: Comment
+    /**
+     * A callback called when location obtaining is finished (successfully or not)
+     *
+     * @param {table | null} location - The location obtained or null
+     */
     function _onLocation(location) {
         _prevLoc = _curLoc;
         _prevLocFresh = _curLocFresh;
@@ -210,8 +251,6 @@ class MotionMonitor {
         _motionStopAssumption = false;
         if (!_inMotion) {
             _inMotion = true;
-
-            // TODO: Maybe it's better to copy the latest known location to _curLoc here?
 
             // Start getting new locations to check if we are actually moving
             _lm.setLocationCb(_onLocation.bindenv(this));

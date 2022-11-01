@@ -1,6 +1,6 @@
 # Prog-X Asset Tracker #
 
-**Version of the Application: 3.0.1 (Field Trial on Prog-X Asset Tracker target board)**
+**Version of the Application: 3.0.2 (Field Trial on Prog-X Asset Tracker target board)**
 
 An application in Squirrel language for [Electric Imp platform](https://www.electricimp.com/platform) that implements asset tracking functionality.
 
@@ -216,7 +216,11 @@ If an unhandled error has occurred, the tracker application:
 - saves the error,
 - stops all activities,
 - goes to the "sleep" mode,
-- periodically wakes up:
+- wakes up periodically or if the photoresistor detects light:
   - connects to the imp-central server,
   - logs the saved error,
   - waits for an application update.
+
+## License ##
+
+The application is licensed under the [MIT License](./LICENSE).

@@ -1,3 +1,25 @@
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 @set CLASS_NAME = "DataProcessor" // Class name for logging
 
 // Temperature state enum
@@ -92,7 +114,6 @@ class DataProcessor {
         _pr = photoresistor;
 
         _allAlerts = {
-            // TODO: Do we need alerts like trackerReset, trackerReconfigured?
             "shockDetected"         : false,
             "motionStarted"         : false,
             "motionStopped"         : false,
@@ -115,7 +136,8 @@ class DataProcessor {
     }
 
     /**
-     *  Start data processing.
+     *  Start data processing
+     *
      *  @param {table} cfg - Table with the full configuration.
      *                       For details, please, see the documentation
      *
@@ -135,7 +157,16 @@ class DataProcessor {
         return Promise.resolve(null);
     }
 
-    // TODO: Comment
+    /**
+     * Update configuration
+     *
+     * @param {table} cfg - Configuration. May be partial
+     *                      For details, please, see the documentation
+     *
+     * @return {Promise} that:
+     * - resolves if the operation succeeded
+     * - rejects if the operation failed
+     */
     function updateCfg(cfg) {
         _updCfgAlerts(cfg);
         // This call will trigger data reading/sending. So it should be the last one
@@ -146,7 +177,6 @@ class DataProcessor {
 
     // -------------------- PRIVATE METHODS -------------------- //
 
-    // TODO: Comment
     function _updCfgGeneral(cfg) {
         if ("readingPeriod" in cfg || "connectingPeriod" in cfg) {
             _dataReadingPeriod = getValFromTable(cfg, "readingPeriod", _dataReadingPeriod);
@@ -158,7 +188,6 @@ class DataProcessor {
         }
     }
 
-    // TODO: Comment
     function _updCfgAlerts(cfg) {
         local alertsCfg            = getValFromTable(cfg, "alerts");
         local shockDetectedCfg     = getValFromTable(alertsCfg, "shockDetected");
@@ -191,7 +220,6 @@ class DataProcessor {
         }
     }
 
-    // TODO: Comment
     function _configureShockDetection() {
         if (_alertsSettings.shockDetected.enabled) {
             ::debug("Activating shock detection..", "@{CLASS_NAME}");
@@ -202,7 +230,6 @@ class DataProcessor {
         }
     }
 
-    // TODO: Comment
     function _configureTamperingDetection() {
         if (_alertsSettings.tamperingDetected.enabled) {
             ::debug("Activating tampering detection..", "@{CLASS_NAME}");
@@ -364,6 +391,10 @@ class DataProcessor {
 
     /**
      *  Read battery level, check alert conditions
+     *
+     * @return {Promise} that:
+     * - resolves if the operation succeeded
+     * - rejects if the operation failed
      */
     function _checkBatteryLevel() {
         return _bd.measureBattery()
@@ -393,15 +424,16 @@ class DataProcessor {
         }.bindenv(this));
     }
 
-    // TODO: Comment
     function _getCellInfo() {
         if (_cellInfoPromise || !cm.isConnected()) {
             return _cellInfoPromise || Promise.resolve(null);
         }
 
         return _cellInfoPromise = Promise(function(resolve, reject) {
-            // TODO: This is a temporary defense from the incorrect work of getcellinfo()
-            local cbTimeoutTimer = imp.wakeup(5, function() {
+            const DP_GET_CELL_INFO_TIMEOUT = 5;
+
+            // NOTE: This is a defense from the incorrect work of getcellinfo()
+            local cbTimeoutTimer = imp.wakeup(DP_GET_CELL_INFO_TIMEOUT, function() {
                 reject("imp.net.getcellinfo didn't call its callback!");
             }.bindenv(this));
 
@@ -412,15 +444,13 @@ class DataProcessor {
             }.bindenv(this));
         }.bindenv(this))
         .fail(function(err) {
-            // TODO: Print to the ERROR level?
-            ::debug("Failed getting cell info: " + err, "@{CLASS_NAME}");
+            ::error("Failed getting cell info: " + err, "@{CLASS_NAME}");
         }.bindenv(this))
         .finally(function(_) {
             _cellInfoPromise = null;
         }.bindenv(this));
     }
 
-    // TODO: Comment
     function _extractCellInfoBG95(cellInfo) {
         local res = {
             "timestamp": time(),

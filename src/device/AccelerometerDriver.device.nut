@@ -1,3 +1,25 @@
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 @set CLASS_NAME = "AccelerometerDriver" // Class name for logging
 
 // Accelerometer Driver class:
@@ -302,8 +324,7 @@ class AccelerometerDriver {
      *
      * @param {object} i2c - I2C object connected to accelerometer
      * @param {object} intPin - Hardware pin object connected to accelerometer int1 pin
-     * @param {integer} addr - I2C address of accelerometer. Optional.
-     *                         Default: ACCEL_DEFAULT_I2C_ADDR
+     * @param {integer} [addr = ACCEL_DEFAULT_I2C_ADDR] - I2C address of accelerometer
      * An exception will be thrown in case of accelerometer configuration error.
      */
     constructor(i2c, intPin, addr = ACCEL_DEFAULT_I2C_ADDR) {
@@ -349,7 +370,6 @@ class AccelerometerDriver {
             _accel.configureFifo(true, LIS3DH_FIFO_BYPASS_MODE);
             _accel.configureFifo(true, LIS3DH_FIFO_STREAM_TO_FIFO_MODE);
             _accel.getInterruptTable();
-            // TODO: Disable the pin when it's not in use to save power?
             _intPin.configure(DIGITAL_IN_WAKEUP, _checkInt.bindenv(this));
             _accel._getReg(LIS2DH12_REFERENCE);
             ::debug("Accelerometer configured", "@{CLASS_NAME}");
@@ -422,11 +442,11 @@ class AccelerometerDriver {
         if (_isFunction(shockCb) && shockSettIsCorr) {
             _shockCb = shockCb;
             _enShockDetect = true;
-            // TODO: deal with the shock after initialization
-            // accelerometer range determined by the value of shock threashold
+            // NOTE: This may need some adjustments depending on the use case
+            // Accelerometer range determined by the value of shock threashold
             local range = _accel.setRange(_shockThr.tointeger());
             ::info(format("Accelerometer range +-%d g", range), "@{CLASS_NAME}");
-            // TODO: Is it better to use inertial interrupt here?
+            // NOTE: Inertial interrupt can be used here instead of click interrupt. It may work better
             _accel.configureClickInterrupt(true, LIS3DH_SINGLE_CLICK, _shockThr);
             ::info("Shock detection enabled", "@{CLASS_NAME}");
         } else {
@@ -744,7 +764,6 @@ class AccelerometerDriver {
 
     /**
      * Check if motion condition(s) occured
-     *
      */
     function _confirmMotion() {
         local vel = _velCur.length();

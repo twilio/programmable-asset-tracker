@@ -1,7 +1,28 @@
+// MIT License
+
+// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 @set CLASS_NAME = "LocationDriver" // Class name for logging
 
 // GNSS options:
-// TODO: Make a global const? Or use a builer-variable? Think of many other variables
 // Accuracy threshold of positioning, in meters
 const LD_GNSS_ACCURACY = 50;
 // The maximum positioning time, in seconds
@@ -77,15 +98,29 @@ class LocationDriver {
         _updateAssistData();
     }
 
-    // TODO: Comment
+    /**
+     * Get the last known location (stored in the persistent storage)
+     *
+     * @return {table} with the following keys and values:
+     *  "timestamp": UNIX time of the location,
+     *  "type": location type ("gnss" / "wifi" / "cell" / "wifi+cell" / "ble"),
+     *  "accuracy": location accuracy,
+     *  "longitude": location longitude,
+     *  "latitude": location latitude
+     */
     function lastKnownLocation() {
         return _load(LD_FILE_NAMES.LAST_KNOWN_LOCATION, Serializer.deserialize.bindenv(Serializer));
     }
 
-    // TODO: Comment
-    // NOTE: This class only stores a reference to the object with BLE devices.
-    // If this object is changed outside this class, this class will have the updated version of the object
-    function configureBLEDevices(enabled = null, knownBLEDevices = null) {
+    /**
+     * Configure BLE devices
+     *
+     * @param {boolean | null} enabled - If true, enable BLE location. If null, ignored
+     * @param {table} [knownBLEDevices] - Known BLE devices (generic and iBeacon). If null, ignored
+     *                                    NOTE: This class only stores a reference to the object with BLE devices. If this object
+     *                                    is changed outside this class, this class will have the updated version of the object
+     */
+    function configureBLEDevices(enabled, knownBLEDevices = null) {
         knownBLEDevices && (_knownBLEDevices = knownBLEDevices);
 
         if (enabled && !_knownBLEDevices) {
@@ -136,7 +171,12 @@ class LocationDriver {
         }.bindenv(this));
     }
 
-    // TODO: Comment
+    /**
+     * Get extra info (e.g., number of GNSS satellites)
+     *
+     * @return {table} with the following keys and values:
+     *  - "gnss": a table with keys "satellitesUsed" and "timestamp"
+     */
     function getExtraInfo() {
         return tableFullCopy(_extraInfo);
     }
@@ -155,7 +195,6 @@ class LocationDriver {
             return Promise.reject("Cooldown period is active");
         }
 
-        // TODO: This may leave the UART enabled when it's not needed anymore
         local ubxDriver = _initUblox();
         ::debug("Switched ON the u-blox module", "@{CLASS_NAME}");
 
@@ -236,7 +275,6 @@ class LocationDriver {
 
         return cm.connect()
         .then(function(_) {
-            // TODO: This can fail due to the cellInfo command called from an onConnect handler
             scannedTowers = BG9xCellInfo.scanCellTowers();
             // Wait until the WiFi scanning is finished (if not yet)
             return scanWifiPromise;
@@ -503,14 +541,17 @@ class LocationDriver {
 
     // -------------------- UBLOX-SPECIFIC METHODS -------------------- //
 
-    // TODO: Comment
+    /**
+     * Initialize u-blox module and UBloxM8N library
+     *
+     * @return {object} UBloxM8N library instance
+     */
     function _initUblox() {
         _ubxSwitchPin.configure(DIGITAL_OUT, 1);
 
         local ubxDriver = UBloxM8N(HW_UBLOX_UART);
         local ubxSettings = {
             "outputMode"   : UBLOX_M8N_MSG_MODE.UBX_ONLY,
-            // TODO: Why BOTH?
             "inputMode"    : UBLOX_M8N_MSG_MODE.BOTH
         };
 
@@ -549,7 +590,7 @@ class LocationDriver {
 @endif
 
             if (parsed.error != null) {
-                // TODO: Check if this can be printed and read ok
+                // NOTE: This may be printed as binary data
                 ::error(parsed.error, "@{CLASS_NAME}");
                 ::debug("The full payload containing the error: " + payload, "@{CLASS_NAME}");
                 return;
@@ -598,8 +639,9 @@ class LocationDriver {
     }
 
     /**
-     * TODO: Update the comment
      * Write the applicable u-blox assist data (if any) saved in the storage to the u-blox module
+     *
+     * @param {object} ubxAssist - U-blox Assist Now library instance
      *
      * @return {Promise} that:
      * - resolves if the operation succeeded
@@ -632,7 +674,7 @@ class LocationDriver {
             ::debug("Writing assist data to u-blox..", "@{CLASS_NAME}");
             ubxAssist.writeAssistNow(assistData, onDone);
 
-            // TODO: Temporarily resolve this Promise after a timeout because for some reason,
+            // NOTE: Resolve this Promise after a timeout because for some reason,
             // the callback is not always called by the writeAssistNow() method
             imp.wakeup(LD_ASSIST_DATA_WRITE_TIMEOUT, reject);
         }.bindenv(this));
@@ -807,7 +849,6 @@ class LocationDriver {
 
     // -------------------- STORAGE METHODS -------------------- //
 
-    // TODO: Comment
     function _save(data, fileName, encoder = null) {
         _erase(fileName);
 
@@ -820,7 +861,6 @@ class LocationDriver {
         }
     }
 
-    // TODO: Comment
     function _load(fileName, decoder = null) {
         try {
             if (_storage.fileExists(fileName)) {
@@ -836,7 +876,6 @@ class LocationDriver {
         return null;
     }
 
-    // TODO: Comment
     function _erase(fileName) {
         try {
             // Erase the existing file if any
