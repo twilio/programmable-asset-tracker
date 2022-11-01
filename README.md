@@ -220,3 +220,7 @@ If an unhandled error has occurred, the tracker application:
   - connects to the imp-central server,
   - logs the saved error,
   - waits for an application update.
+
+## License ##
+
+The application is licensed under the [MIT License](./LICENSE).
