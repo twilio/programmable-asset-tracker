@@ -32,6 +32,8 @@ const APP_FLASH_START_ADDR = 0x000000;
 const APP_FLASH_END_ADDR = 0x200000;
 // Flash sector size
 const APP_SECTOR_SIZE = 0x1000;
+// New baud rate value
+const APP_NEW_BAUD_RATE = 460800;
 
 // Messenger message names
 enum APP_M_MSG_NAME {
@@ -254,7 +256,7 @@ class Application {
         ::info("Writing to the imp's flash finished. Loading to the ESP32 started.");
         _isActive = true;
 
-        _espLoader.start()
+        _espLoader.start(APP_NEW_BAUD_RATE)
         .then(function(_) {
             ::info("ROM loader successfully started");
 

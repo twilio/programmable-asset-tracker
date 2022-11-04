@@ -199,11 +199,13 @@ class ESP32Loader {
      * Initiate the loading procedure.
      * Starts ROM loader (set strapping pins, configure UART, send SYNC and identify chip).
      *
+     * @param {integer} baudRate - New UART baud rate. Default value is 115200. Optional parameter.
+     *
      * @return {Promise} that:
      * - resolves if the operation succeeded
      * - rejects if the operation failed
      */
-    function start() {
+    function start(baudRate = ESP32_LOADER_DEFAULT_BAUDRATE) {
         if (_inLoader) {
             return Promise.resolve(null);
         }
@@ -261,6 +263,14 @@ class ESP32Loader {
                                                              ESP32_LOADER_ESP32C3_CHIP_DETECT_MAGIC_VALUE) ?
                                               null :
                                               "Chip name identify failure";
+        // change baud rate command. Request example: c0000f0800000000000008070000000000c0
+        // Responce example: c0010f0400f784000000000000c0
+        local changeBaudRateStr = format("C0000F080000000000%08X00000000C0",
+                                         swap4(baudRate));
+        local changeBaudRateValidator = @(data, _) _basicRespCheck(data,
+                                                                   ESP32_LOADER_CMD.CHANGE_BAUDRATE) ?
+                                                                   null :
+                                                                   "Change baud rate failure";;
 
         // Functions that return promises which will be executed serially
         local promiseFuncs = [
@@ -274,7 +284,24 @@ class ESP32Loader {
             _communicate(identChipStr, chipNameValidator)
         ];
 
+        if (baudRate != ESP32_LOADER_DEFAULT_BAUDRATE) {
+            promiseFuncs.append(_communicate(changeBaudRateStr, changeBaudRateValidator));
+        }
+
         return Promise.serial(promiseFuncs)
+        .then(function(_) {
+            // setting a new baud rate if it is not equal to the default baud rate 115200
+            if (baudRate != ESP32_LOADER_DEFAULT_BAUDRATE) {
+                ::info("UART baud rate is changed: " + baudRate, "@{CLASS_NAME}");
+                _serial.disable();
+                _serial.setrxfifosize(ESP32_LOADER_DEFAULT_RX_FIFO_SZ);
+                _serial.configure(baudRate,
+                                  ESP32_LOADER_DEFAULT_WORD_SIZE,
+                                  ESP32_LOADER_DEFAULT_PARITY,
+                                  ESP32_LOADER_DEFAULT_STOP_BITS,
+                                  ESP32_LOADER_DEFAULT_FLAGS);
+            }
+        }.bindenv(this))
         .fail(function(err) {
             // Disable everything
             finish();
