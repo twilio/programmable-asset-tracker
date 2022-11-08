@@ -45,4 +45,4 @@ done < $1
 printf '"DEFAULT_CFG": "%s"\n' "$minimized_json"
 
 # Example:
-# ./json2string.sh default-cfg.json
+# ./json2var.sh default-cfg.json
