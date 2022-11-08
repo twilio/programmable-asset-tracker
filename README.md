@@ -85,16 +85,18 @@ Default Configuration is specified as a value of the `DEFAULT_CFG` [Environment 
 
 This value must be a string which includes a valid JSON where all `"` symbols are escaped (prefixed by the `\` symbol).
 
-To prepare such a string the [./tools/json2var.sh](./tools/json2var.sh) script can be used:
-- Run it as `json2var.sh <json_file>`
+To prepare such a string the [./tools/json2var.sh](./tools/json2var.sh) bash script can be used:
+- Run it as `./json2var.sh <json_file>`
 - Where `<json_file>` - is a valid JSON file which includes the default configuration. Note: comments are not allowed in this file.
 - The script adds the `\` symbol where needed, removes unnecessary spaces and generates the result as `"DEFAULT_CFG":"<json as string>"`
 - The result is printed out in the console.
 - Copy&paste it as the environment variable.
 
-Example:
-- [./tools/default-cfg.json](./tools/default-cfg.json) - example of an original default configuration in JSON format
-- [./tools/default-cfg.txt](./tools/default-cfg.txt) - example of the `DEFAULT_CFG` environment variable with the string value which corresponds to the original JSON
+Note: to run the script on Windows, install [git (with bash component)](http://git-scm.com/download/win) and execute the script with git bash terminal.
+
+Example of a default configuration:
+- [./tools/default-cfg.json](./tools/default-cfg.json) - an original default configuration in JSON format
+- [./tools/default-cfg.txt](./tools/default-cfg.txt) - `DEFAULT_CFG` environment variable with the string value which corresponds to the original JSON
 
 ### User-Defined Environment Variables ###
 
