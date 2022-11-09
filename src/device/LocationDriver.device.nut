@@ -268,7 +268,7 @@ class LocationDriver {
         // Run WiFi scanning in the background
         local scanWifiPromise = _esp.scanWiFiNetworks()
         .then(function(wifis) {
-            scannedWifis = wifis;
+            scannedWifis = wifis.len() > 0 ? wifis : null;
         }.bindenv(this), function(err) {
             ::error("Couldn't scan WiFi networks: " + err, "@{CLASS_NAME}");
         }.bindenv(this));
@@ -276,6 +276,7 @@ class LocationDriver {
         return cm.connect()
         .then(function(_) {
             scannedTowers = BG9xCellInfo.scanCellTowers();
+            scannedTowers = (scannedTowers && scannedTowers.cellTowers.len() > 0) ? scannedTowers : null;
             // Wait until the WiFi scanning is finished (if not yet)
             return scanWifiPromise;
         }.bindenv(this), function(_) {
