@@ -253,9 +253,11 @@ class CfgManager {
     }
 
     function _defaultCfg() {
-        local cfg =
-        @include "DefaultConfiguration.device.nut"
-        return cfg;
+        try {
+            return JSONParser.parse(__VARS.DEFAULT_CFG).configuration;
+        } catch (err) {
+            throw "Can't parse the default configuration: " + err;
+        }
     }
 
     // -------------------- STORAGE METHODS -------------------- //

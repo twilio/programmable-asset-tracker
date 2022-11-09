@@ -66,6 +66,15 @@ class CfgService {
         _msngr.onAck(_ackCb.bindenv(this));
         _msngr.onFail(_failCb.bindenv(this));
 
+        try {
+            _validateDefaultCfg();
+            _loadCfgs();
+            _applyAgentCfg(_agentCfg);
+        } catch (err) {
+            ::error("Initialization failure: " + err, "@{CLASS_NAME}");
+            return;
+        }
+
         local getRoute = Rocky.on("GET", CFG_REST_API_DATA_ENDPOINT, _getCfgRockyHandler.bindenv(this));
         local patchRoute = Rocky.on("PATCH", CFG_REST_API_DATA_ENDPOINT, _patchCfgRockyHandler.bindenv(this));
 
@@ -76,9 +85,6 @@ class CfgService {
                 route.authorize(_authCb.bindenv(this)).onUnauthorized(_unauthCb.bindenv(this));
             }
         }
-
-        _loadCfgs();
-        _applyAgentCfg(_agentCfg);
 
         ::info("JSON Cfg Scheme Version: " + CFG_SCHEME_VERSION, "@{CLASS_NAME}");
     }
@@ -253,9 +259,22 @@ class CfgService {
     }
 
     function _defaultAgentCfg() {
-        local cfg =
-        @include "DefaultConfiguration.agent.nut"
-        return cfg;
+        return http.jsondecode(__VARS.DEFAULT_CFG).agentConfiguration;
+    }
+
+    function _validateDefaultCfg() {
+        local cfg = null;
+
+        try {
+            cfg = http.jsondecode(__VARS.DEFAULT_CFG);
+        } catch (err) {
+            throw "Can't parse the default configuration: " + err;
+        }
+
+        local validateCfgRes = validateCfg(cfg);
+        if (validateCfgRes != null) {
+            throw "Default configuration validation failure: " + validateCfgRes;
+        }
     }
 
     /**

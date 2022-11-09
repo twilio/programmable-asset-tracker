@@ -275,7 +275,7 @@ class GoogleMaps {
 // SOFTWARE.
 
 // Application Version
-const APP_VERSION = "3.0.2";
+const APP_VERSION = "3.1.0";
 // MIT License
 
 // Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
@@ -1641,6 +1641,15 @@ class CfgService {
         _msngr.onAck(_ackCb.bindenv(this));
         _msngr.onFail(_failCb.bindenv(this));
 
+        try {
+            _validateDefaultCfg();
+            _loadCfgs();
+            _applyAgentCfg(_agentCfg);
+        } catch (err) {
+            ::error("Initialization failure: " + err, "CfgService");
+            return;
+        }
+
         local getRoute = Rocky.on("GET", CFG_REST_API_DATA_ENDPOINT, _getCfgRockyHandler.bindenv(this));
         local patchRoute = Rocky.on("PATCH", CFG_REST_API_DATA_ENDPOINT, _patchCfgRockyHandler.bindenv(this));
 
@@ -1651,9 +1660,6 @@ class CfgService {
                 route.authorize(_authCb.bindenv(this)).onUnauthorized(_unauthCb.bindenv(this));
             }
         }
-
-        _loadCfgs();
-        _applyAgentCfg(_agentCfg);
 
         ::info("JSON Cfg Scheme Version: " + CFG_SCHEME_VERSION, "CfgService");
     }
@@ -1828,35 +1834,22 @@ class CfgService {
     }
 
     function _defaultAgentCfg() {
-        local cfg =
-// MIT License
+        return http.jsondecode(__VARS.DEFAULT_CFG).agentConfiguration;
+    }
 
-// Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
+    function _validateDefaultCfg() {
+        local cfg = null;
 
-// Permission is hereby granted, free of charge, to any person obtaining a copy of
-// this software and associated documentation files (the "Software"), to deal in
-// the Software without restriction, including without limitation the rights to
-// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
-// of the Software, and to permit persons to whom the Software is furnished to do
-// so, subject to the following conditions:
+        try {
+            cfg = http.jsondecode(__VARS.DEFAULT_CFG);
+        } catch (err) {
+            throw "Can't parse the default configuration: " + err;
+        }
 
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
-
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.
-
-{
-  "debug": {                // debug settings
-    "logLevel": "INFO"       // logging level on Imp-Agent ("ERROR", "INFO", "DEBUG")
-  }
-}
-        return cfg;
+        local validateCfgRes = validateCfg(cfg);
+        if (validateCfgRes != null) {
+            throw "Default configuration validation failure: " + validateCfgRes;
+        }
     }
 
     /**
@@ -2088,6 +2081,9 @@ class Application {
         _initCfgService();
         // Initialize Web UI
         _initWebUI();
+
+        // Always take U-blox Assist Now token from env vars
+        _locAssistant.setTokens(__VARS.UBLOX_ASSIST_NOW_TOKEN);
     }
 
     // -------------------- PRIVATE METHODS -------------------- //
