@@ -75,9 +75,12 @@ class Application {
         _initCfgService(__VARS.CFG_REST_API_USERNAME, __VARS.CFG_REST_API_PASSWORD);
         // Initialize Cloud Client instance
         _initCloudClient(__VARS.CLOUD_REST_API_URL, __VARS.CLOUD_REST_API_USERNAME, __VARS.CLOUD_REST_API_PASSWORD);
-        // Since Web UI is disabled, let's take tokens from env vars
-        _locAssistant.setTokens(__VARS.UBLOX_ASSIST_NOW_TOKEN, __VARS.GOOGLE_MAPS_API_KEY);
+        // Since Web UI is disabled, let's take Google Maps API token from env vars
+        _locAssistant.setTokens(null, __VARS.GOOGLE_MAPS_API_KEY);
 @endif
+
+        // Always take U-blox Assist Now token from env vars
+        _locAssistant.setTokens(__VARS.UBLOX_ASSIST_NOW_TOKEN);
     }
 
     // -------------------- PRIVATE METHODS -------------------- //

@@ -234,7 +234,10 @@ Example for the Prog-X Asset Tracker module:
 
 Method `start()` initiates the loading procedure.
 
-No parameters.
+**Method parameters**:
+```
+    - UART baud rate. Optional. Default: 115200
+```
 
 #### Load ####
 
@@ -264,4 +267,3 @@ No parameters.
 
 1) Load and use an alternative bootloader - ["stub loader"](https://docs.espressif.com/projects/esptool/en/latest/esp32/esptool/flasher-stub.html) - it can increase the download speed.
 2) Support compressed firmware files transfer.
-3) Test at higher UART baud rate (460800).

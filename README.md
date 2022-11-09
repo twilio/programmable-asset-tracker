@@ -1,6 +1,6 @@
 # Prog-X Asset Tracker #
 
-**Version of the Application: 3.0.2**
+**Version of the Application: 3.1.0**
 
 An application in Squirrel language for [Electric Imp platform](https://www.electricimp.com/platform) that implements asset tracking functionality.
 
@@ -9,7 +9,7 @@ The requirements: [./docs/Requirements - Prog-X Asset Tracker - external-GPx.pdf
 This version supports:
 - Target hardware: [Prog-X Asset Tracker target board schematics](./docs/vdf-nt16e_mb_s11_220228.pdf)
 - Communication with the Internet (between Imp-Device and Imp-Agent) via cellular network.
-- Default configuration of the asset tracker application is hardcoded in the source file.
+- Default configuration of the asset tracker application is provided as a Device Group environment variable.
 - The configuration can be updated in runtime using the [Southbound REST API](./docs/southbound-api.md)
 - Motion start detection using Accelerometer.
 - Motion stop detection using Location tracking (+ Accelerometer for confirmation).
@@ -64,14 +64,6 @@ Preprocessed files: [./build](./build)
 
 ## Setup ##
 
-### Default Configuration ###
-
-Default Configuration:
-- for Imp-Device part - [./src/device/DefaultConfiguration.device.nut](./src/device/DefaultConfiguration.device.nut)
-- for Imp-Agent part - [./src/agent/DefaultConfiguration.agent.nut](./src/agent/DefaultConfiguration.agent.nut)
-
-For the configuration description see the [Southbound REST API](./docs/southbound-api.md)
-
 ### Builder Variables ###
 
 Should be passed to [Builder](https://github.com/electricimp/Builder/):
@@ -85,20 +77,42 @@ Variables:
 - `LED_INDICATION` - Enable (`1`) / disable (`0`) [LED indication](#led-indication) of events. Optional. Default: **enabled**
 - `WEB_UI` - Enable (`1`) / disable (`0`) [Device Evaluation UI](#device-evaluation-ui) on Imp-Agent. Optional. Default: **enabled**
 
+### Default Configuration ###
+
+For the configuration description see the [Southbound REST API](./docs/southbound-api.md)
+
+Default Configuration is specified as a value of the `DEFAULT_CFG` [Environment Variable](#user-defined-environment-variables).
+
+This value must be a string which includes a valid JSON where all `"` symbols are escaped (prefixed by the `\` symbol).
+
+To prepare such a string the [./tools/json2var.sh](./tools/json2var.sh) bash script can be used:
+- Run it as `./json2var.sh <json_file>`
+- Where `<json_file>` - is a valid JSON file which includes the default configuration. Note: comments are not allowed in this file.
+- The script adds the `\` symbol where needed, removes unnecessary spaces and generates the result as `"DEFAULT_CFG":"<json as string>"`
+- The result is printed out in the console.
+- Copy&paste it as the environment variable.
+
+Note: to run the script on Windows, install [git (with bash component)](http://git-scm.com/download/win) and execute the script with git bash terminal.
+
+Example of a default configuration:
+- [./tools/default-cfg.json](./tools/default-cfg.json) - an original default configuration in JSON format
+- [./tools/default-cfg.txt](./tools/default-cfg.txt) - `DEFAULT_CFG` environment variable with the string value which corresponds to the original JSON
+
 ### User-Defined Environment Variables ###
 
-Are used for sensitive settings, eg. credentials, in production deployments. Note, if [Device Evaluation UI](#device-evaluation-ui) is enabled, the environment variables are ignored.
+Are used for sensitive settings, eg. credentials, in production deployments, and to specify [Default Configuration](#default-configuration).
 
 Should be passed to [impcentral Device Group Environment Variables](https://developer.electricimp.com/tools/impcentral/environmentvariables#user-defined-environment-variables) in JSON format
 
 Variables:
-- `CLOUD_REST_API_URL` - Cloud (Northbound) REST API URL. Mandatory. Has no default.
-- `CLOUD_REST_API_USERNAME` - Username to access the cloud (Northbound) REST API. Mandatory. Has no default.
-- `CLOUD_REST_API_PASSWORD` - Password to access the cloud (Northbound) REST API. Mandatory. Has no default.
-- `CFG_REST_API_USERNAME` - Username to access the tracker (Southbound) REST API. Mandatory. Has no default.
-- `CFG_REST_API_PASSWORD` - Password to access the tracker (Southbound) REST API. Mandatory. Has no default.
-- `GOOGLE_MAPS_API_KEY` - API Key for Google Maps Platform. Required by [Google Maps Geolocation API](https://developers.google.com/maps/documentation/geolocation/overview) to determine the location by cell towers info or by WiFi networks. See [here](https://developers.google.com/maps/documentation/geolocation/get-api-key) how to obtain the Key.
-- `UBLOX_ASSIST_NOW_TOKEN` - [U-blox AssistNow token](https://www.u-blox.com/en/product/assistnow). Required for downloading of assist data for u-blox GNSS receiver. See [here](https://www.u-blox.com/en/assistnow-service-evaluation-token-request-form) how to obtain the Token.
+- `DEFAULT_CFG` - [Default Configuration](#default-configuration). Always mandatory. 
+- `CLOUD_REST_API_URL` - Cloud (Northbound) REST API URL. Mandatory if [Device Evaluation UI](#device-evaluation-ui) is not enabled.
+- `CLOUD_REST_API_USERNAME` - Username to access the cloud (Northbound) REST API. Ignored if [Device Evaluation UI](#device-evaluation-ui) is enabled.
+- `CLOUD_REST_API_PASSWORD` - Password to access the cloud (Northbound) REST API. Ignored if [Device Evaluation UI](#device-evaluation-ui) is enabled.
+- `CFG_REST_API_USERNAME` - Username to access the tracker (Southbound) REST API. Ignored if [Device Evaluation UI](#device-evaluation-ui) is enabled.
+- `CFG_REST_API_PASSWORD` - Password to access the tracker (Southbound) REST API. Ignored if [Device Evaluation UI](#device-evaluation-ui) is enabled.
+- `GOOGLE_MAPS_API_KEY` - API Key for Google Maps Platform. Required by [Google Maps Geolocation API](https://developers.google.com/maps/documentation/geolocation/overview) to determine the location by cell towers info or by WiFi networks. See [here](https://developers.google.com/maps/documentation/geolocation/get-api-key) how to obtain the Key. Ignored if [Device Evaluation UI](#device-evaluation-ui) is enabled.
+- `UBLOX_ASSIST_NOW_TOKEN` - [U-blox AssistNow token](https://www.u-blox.com/en/product/assistnow). Required for downloading of assist data for u-blox GNSS receiver. See [here](https://www.u-blox.com/en/assistnow-service-evaluation-token-request-form) how to obtain the Token. Always mandatory.
 
 Example of JSON with environment variables (when Cloud REST API is [emulated on another Imp](#simple-cloud-emulation)):
 ```
@@ -109,7 +123,8 @@ Example of JSON with environment variables (when Cloud REST API is [emulated on 
   "CFG_REST_API_USERNAME": "test",
   "CFG_REST_API_PASSWORD": "test",
   "GOOGLE_MAPS_API_KEY": "AIzaSyDJQV2m_qNMjdw5snP6qPjdtoMRau-ger8", // not a real key
-  "UBLOX_ASSIST_NOW_TOKEN": "CW2lcwNtSE2pHmXYP_LbKP" // not a real token
+  "UBLOX_ASSIST_NOW_TOKEN": "CW2lcwNtSE2pHmXYP_LbKP", // not a real token
+  "DEFAULT_CFG": "..." // see ./tools/default-cfg.txt
 }
 ```
 
@@ -118,7 +133,8 @@ Example of JSON with environment variables (when Cloud REST API is [emulated on 
 Before running the application for the first time make sure that:
 - ESP32 chip on the Prog-X Asset Tracker target board has a firmware flashed. For more details see [./docs/esp32_readme.md](./docs/esp32_readme.md)
 - Imp-Device SPI flash is clean (has no "garbage").
-- [User Configuration Storage](https://developer.electricimp.com/resources/permanentstore) is clean (has no data).
+- Imp-Device [User Configuration Storage](https://developer.electricimp.com/resources/permanentstore) is clean (has no data).
+- Imp-Agent [Persistent Data](https://developer.electricimp.com/examples/agentdatapersistence) is clean (has no data).
 
 Note, the application goes first to the Shipping mode when [User Configuration Storage](https://developer.electricimp.com/resources/permanentstore) is clean or contains a special application-specific setting. Otherwise, the application considers that the tracker is already "shipped" and starts the normal operation.
 
@@ -127,17 +143,17 @@ For production devices it is assumed that the first run preparation is done by a
 For development devices, if needed, the first run preparation steps can be done manually:
 - To reflash ESP32 firmware - see [./docs/esp32_readme.md](./docs/esp32_readme.md)
 - To clean Imp-Device SPI flash - build and run the application with the `ERASE_MEMORY` [Builder Variable](#builder-variables)
-- To clean [User Configuration Storage](https://developer.electricimp.com/resources/permanentstore) (re-initiate the Shipping mode) - run a simple application with the ["imp.setuserconfiguration(null);"](https://developer.electricimp.com/api/imp/setuserconfiguration) call before running the Prog-X Asset Tracker application.
+- To clean Imp-Device [User Configuration Storage](https://developer.electricimp.com/resources/permanentstore) (re-initiate the Shipping mode) - run a simple application on Imp-Device with the ["imp.setuserconfiguration(null);"](https://developer.electricimp.com/api/imp/setuserconfiguration) call before running the Prog-X Asset Tracker application.
+- To clean Imp-Agent [Persistent Data](https://developer.electricimp.com/examples/agentdatapersistence) - run a simple application on Imp-Agent with the ["server.save({});"](https://developer.electricimp.com/api/server/save) call before running the Prog-X Asset Tracker application.
 
 ## Build And Run ##
 
-- If no need to change [Default Configuration](#default-configuration) and [Builder Variables](#builder-variables), take already preprocessed files from the [./build](./build) folder.
+- If no need to change the default values of [Builder Variables](#builder-variables), take already preprocessed files from the [./build](./build) folder.
 - Otherwise:
-  - Change [Default Configuration](#default-configuration), if needed.
   - Specify [Builder Variables](#builder-variables), if needed.
   - Run [Builder](https://github.com/electricimp/Builder/) for [./src/agent/Main.agent.nut](./src/agent/Main.agent.nut) file to get Imp-Agent preprocessed file.
   - Run [Builder](https://github.com/electricimp/Builder/) for [./src/device/Main.device.nut](./src/device/Main.device.nut) file to get Imp-Device preprocessed file.
-- For deployments without [Device Evaluation UI](#device-evaluation-ui) specify mandatory [Environment Variables](#user-defined-environment-variables) in the impcentral Device Group where you plan to run the application.
+- Specify settings required by your build as the [Environment Variable](#user-defined-environment-variables) in the impcentral Device Group where you plan to run the application.
 - Create and build a new deployment in the Device Group and restart Imp.
 - Control the application behavior using different ways:
   - logs in the impcentral,
@@ -196,19 +212,15 @@ To access the Web UI open `https://<tracker_api_url>` URL (no additional endpoin
 
 The Web UI does not require any user credentials to access.
 
-Note, it is recommended to open the UI from a PC/laptop. The UI may not be optimized for smartphone screens.
-
 The UI includes the following capabilities:
-- Displaying the latest data reported by the Asset Tracker application (the latest data message received from Imp-Device, this is not neccessary a message with the latest timestamp). Note, in parallel with displaying in this UI the data messages still can be forwarded to a cloud, if the cloud URL and credentials are specified (see below).
-- Displaying a history of alerts reported by the Asset Tracker application (several latest alerts received from Imp-Device, they are not neccessary sorted by alert timestamps).
+- Displaying the latest data reported by the Asset Tracker application (the latest data message received from Imp-Device, this is not necessary a message with the latest timestamp). Note, in parallel with displaying in this UI the data messages still can be forwarded to a cloud, if the cloud URL and credentials are specified (see below).
+- Displaying a history of alerts reported by the Asset Tracker application (several latest alerts received from Imp-Device, they are not necessary sorted by alert timestamps).
 - Requesting, displaying, updating and applying the Asset Tracker application configuration. For the configuration description see the [Southbound REST API](./docs/southbound-api.md).
 - Specifying the Asset Tracker application settings - the same which are specified by the [Environment Variables](#user-defined-environment-variables) for production deployments:
   - Tokens / Access keys. Note, there are no defaults for these tokens, for the full functionality of the Asset Tracker application the tokens should be manually specified.
   - URL and credentials of a cloud that implements the [Northbound REST API](./docs/northbound-api.md). Optional. If specified, then the data messages are forwarded to the cloud, in parallel with the Web UI.
   - Note, credentials to access the [Southbound REST API](./docs/southbound-api.md) are not needed. It is still possible to access this API from a cloud, in parallel with working via the Web UI. No authentication is needed in this case.
   - Note, all specified settings are lost after the application redeployment or Imp-Agent restart.
-
-The blocks with the latest data and alerts are auto-refreshed every 30 seconds.
 
 ### Emergency Mode ###
 
