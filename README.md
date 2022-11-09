@@ -133,7 +133,8 @@ Example of JSON with environment variables (when Cloud REST API is [emulated on 
 Before running the application for the first time make sure that:
 - ESP32 chip on the Prog-X Asset Tracker target board has a firmware flashed. For more details see [./docs/esp32_readme.md](./docs/esp32_readme.md)
 - Imp-Device SPI flash is clean (has no "garbage").
-- [User Configuration Storage](https://developer.electricimp.com/resources/permanentstore) is clean (has no data).
+- Imp-Device [User Configuration Storage](https://developer.electricimp.com/resources/permanentstore) is clean (has no data).
+- Imp-Agent [Persistent Data](https://developer.electricimp.com/examples/agentdatapersistence) is clean (has no data).
 
 Note, the application goes first to the Shipping mode when [User Configuration Storage](https://developer.electricimp.com/resources/permanentstore) is clean or contains a special application-specific setting. Otherwise, the application considers that the tracker is already "shipped" and starts the normal operation.
 
@@ -142,7 +143,8 @@ For production devices it is assumed that the first run preparation is done by a
 For development devices, if needed, the first run preparation steps can be done manually:
 - To reflash ESP32 firmware - see [./docs/esp32_readme.md](./docs/esp32_readme.md)
 - To clean Imp-Device SPI flash - build and run the application with the `ERASE_MEMORY` [Builder Variable](#builder-variables)
-- To clean [User Configuration Storage](https://developer.electricimp.com/resources/permanentstore) (re-initiate the Shipping mode) - run a simple application with the ["imp.setuserconfiguration(null);"](https://developer.electricimp.com/api/imp/setuserconfiguration) call before running the Prog-X Asset Tracker application.
+- To clean Imp-Device [User Configuration Storage](https://developer.electricimp.com/resources/permanentstore) (re-initiate the Shipping mode) - run a simple application on Imp-Device with the ["imp.setuserconfiguration(null);"](https://developer.electricimp.com/api/imp/setuserconfiguration) call before running the Prog-X Asset Tracker application.
+- To clean Imp-Agent [Persistent Data](https://developer.electricimp.com/examples/agentdatapersistence) - run a simple application on Imp-Agent with the ["server.save({});"](https://developer.electricimp.com/api/server/save) call before running the Prog-X Asset Tracker application.
 
 ## Build And Run ##
 
