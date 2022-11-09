@@ -2081,6 +2081,9 @@ class Application {
         _initCfgService();
         // Initialize Web UI
         _initWebUI();
+
+        // Always take U-blox Assist Now token from env vars
+        _locAssistant.setTokens(__VARS.UBLOX_ASSIST_NOW_TOKEN);
     }
 
     // -------------------- PRIVATE METHODS -------------------- //
