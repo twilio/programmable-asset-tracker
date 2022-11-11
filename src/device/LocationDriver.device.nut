@@ -649,7 +649,9 @@ class LocationDriver {
      * - rejects if the operation failed
      */
     function _writeAssistDataToUBlox(ubxAssist) {
-        const LD_ASSIST_DATA_WRITE_TIMEOUT = 15;
+        // This timeout should be long enough to let the ubxAssist.writeAssistNow() process be finished.
+        // If it's not finished before this timeout, an unexpected write to the UART (which may be disabled) can occur
+        const LD_ASSIST_DATA_WRITE_TIMEOUT = 120;
 
         return Promise(function(resolve, reject) {
             local assistData = _readUBloxAssistData();
@@ -675,7 +677,7 @@ class LocationDriver {
             ::debug("Writing assist data to u-blox..", "@{CLASS_NAME}");
             ubxAssist.writeAssistNow(assistData, onDone);
 
-            // NOTE: Resolve this Promise after a timeout because for some reason,
+            // NOTE: Resolve this Promise after a timeout because it's been noticed that
             // the callback is not always called by the writeAssistNow() method
             imp.wakeup(LD_ASSIST_DATA_WRITE_TIMEOUT, reject);
         }.bindenv(this));

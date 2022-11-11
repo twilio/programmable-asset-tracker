@@ -1,6 +1,6 @@
 # Prog-X Asset Tracker #
 
-**Version of the Application: 3.1.0**
+**Version of the Application: 3.1.1**
 
 An application in Squirrel language for [Electric Imp platform](https://www.electricimp.com/platform) that implements asset tracking functionality.
 
