@@ -2881,12 +2881,12 @@ const ESP32_SWITCH_OFF_DELAY = 10;
 // The range of this parameter is [0x0004,0x4000].
 // The scan interval equals this parameter multiplied by 0.625 ms,
 // so the range for the actual scan interval is [2.5,10240] ms.
-const ESP32_BLE_SCAN_INTERVAL = 8;
+const ESP32_BLE_SCAN_INTERVAL = 83;
 // Scan window. It should be less than or equal to the value of <scan_interval>.
 // The range of this parameter is [0x0004,0x4000].
 // The scan window equals this parameter multiplied by 0.625 ms,
 // so the range for the actual scan window is [2.5,10240] ms.
-const ESP32_BLE_SCAN_WINDOW = 8;
+const ESP32_BLE_SCAN_WINDOW = 83;
 // BLE advertisements scan period, in seconds
 const ESP32_BLE_SCAN_PERIOD = 6;
 
@@ -4739,8 +4739,9 @@ class LocationMonitor {
      * - rejects if the operation failed
      */
     function updateCfg(cfg) {
-        _updCfgGeneral(cfg);
+        // First configure BLE devices because next lines will likely start location obtaining
         _updCfgBLEDevices(cfg);
+        _updCfgGeneral(cfg);
         _updCfgGeofence(cfg);
         _updCfgRepossession(cfg);
 
@@ -4751,9 +4752,9 @@ class LocationMonitor {
      * Get status info
      *
      * @return {table} with the following keys and values:
-     *  - "flags": a table with keys "inGeofence" and "repossession"
-     *  - "location": the last known (if any) or "default" location
-     *  - "gnssInfo": extra GNSS info from LocationDriver
+     *  - "flags": a table with keys "inGeofence" and "repossession"
+     *  - "location": the last known (if any) or "default" location
+     *  - "gnssInfo": extra GNSS info from LocationDriver
      */
     function getStatus() {
         local location = _ld.lastKnownLocation() || {
@@ -5178,7 +5179,7 @@ class MotionMonitor {
      * Get status info
      *
      * @return {table} with the following keys and values:
-     *  - "flags": a table with key "inMotion"
+     *  - "flags": a table with key "inMotion"
      */
     function getStatus() {
         local res = {

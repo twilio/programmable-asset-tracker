@@ -141,12 +141,12 @@ const ESP32_SWITCH_OFF_DELAY = 10;
 // The range of this parameter is [0x0004,0x4000].
 // The scan interval equals this parameter multiplied by 0.625 ms,
 // so the range for the actual scan interval is [2.5,10240] ms.
-const ESP32_BLE_SCAN_INTERVAL = 8;
+const ESP32_BLE_SCAN_INTERVAL = 83;
 // Scan window. It should be less than or equal to the value of <scan_interval>.
 // The range of this parameter is [0x0004,0x4000].
 // The scan window equals this parameter multiplied by 0.625 ms,
 // so the range for the actual scan window is [2.5,10240] ms.
-const ESP32_BLE_SCAN_WINDOW = 8;
+const ESP32_BLE_SCAN_WINDOW = 83;
 // BLE advertisements scan period, in seconds
 const ESP32_BLE_SCAN_PERIOD = 6;
 
