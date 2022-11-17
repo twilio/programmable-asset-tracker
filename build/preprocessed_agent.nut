@@ -275,7 +275,7 @@ class GoogleMaps {
 // SOFTWARE.
 
 // Application Version
-const APP_VERSION = "3.1.0";
+const APP_VERSION = "3.1.1";
 // MIT License
 
 // Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
