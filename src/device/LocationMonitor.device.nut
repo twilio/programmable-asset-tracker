@@ -108,8 +108,9 @@ class LocationMonitor {
      * - rejects if the operation failed
      */
     function updateCfg(cfg) {
-        _updCfgGeneral(cfg);
+        // First configure BLE devices because next lines will likely start location obtaining
         _updCfgBLEDevices(cfg);
+        _updCfgGeneral(cfg);
         _updCfgGeofence(cfg);
         _updCfgRepossession(cfg);
 
@@ -120,9 +121,9 @@ class LocationMonitor {
      * Get status info
      *
      * @return {table} with the following keys and values:
-     *  - "flags": a table with keys "inGeofence" and "repossession"
-     *  - "location": the last known (if any) or "default" location
-     *  - "gnssInfo": extra GNSS info from LocationDriver
+     *  - "flags": a table with keys "inGeofence" and "repossession"
+     *  - "location": the last known (if any) or "default" location
+     *  - "gnssInfo": extra GNSS info from LocationDriver
      */
     function getStatus() {
         local location = _ld.lastKnownLocation() || {

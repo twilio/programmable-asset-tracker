@@ -151,7 +151,7 @@ class MotionMonitor {
      * Get status info
      *
      * @return {table} with the following keys and values:
-     *  - "flags": a table with key "inMotion"
+     *  - "flags": a table with key "inMotion"
      */
     function getStatus() {
         local res = {

@@ -60,7 +60,7 @@
 // SOFTWARE.
 
 // Application Version
-const APP_VERSION = "3.1.0";
+const APP_VERSION = "3.1.1";
 // MIT License
 
 // Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
@@ -2881,12 +2881,12 @@ const ESP32_SWITCH_OFF_DELAY = 10;
 // The range of this parameter is [0x0004,0x4000].
 // The scan interval equals this parameter multiplied by 0.625 ms,
 // so the range for the actual scan interval is [2.5,10240] ms.
-const ESP32_BLE_SCAN_INTERVAL = 8;
+const ESP32_BLE_SCAN_INTERVAL = 83;
 // Scan window. It should be less than or equal to the value of <scan_interval>.
 // The range of this parameter is [0x0004,0x4000].
 // The scan window equals this parameter multiplied by 0.625 ms,
 // so the range for the actual scan window is [2.5,10240] ms.
-const ESP32_BLE_SCAN_WINDOW = 8;
+const ESP32_BLE_SCAN_WINDOW = 83;
 // BLE advertisements scan period, in seconds
 const ESP32_BLE_SCAN_PERIOD = 6;
 
@@ -4739,8 +4739,9 @@ class LocationMonitor {
      * - rejects if the operation failed
      */
     function updateCfg(cfg) {
-        _updCfgGeneral(cfg);
+        // First configure BLE devices because next lines will likely start location obtaining
         _updCfgBLEDevices(cfg);
+        _updCfgGeneral(cfg);
         _updCfgGeofence(cfg);
         _updCfgRepossession(cfg);
 
@@ -4751,9 +4752,9 @@ class LocationMonitor {
      * Get status info
      *
      * @return {table} with the following keys and values:
-     *  - "flags": a table with keys "inGeofence" and "repossession"
-     *  - "location": the last known (if any) or "default" location
-     *  - "gnssInfo": extra GNSS info from LocationDriver
+     *  - "flags": a table with keys "inGeofence" and "repossession"
+     *  - "location": the last known (if any) or "default" location
+     *  - "gnssInfo": extra GNSS info from LocationDriver
      */
     function getStatus() {
         local location = _ld.lastKnownLocation() || {
@@ -5178,7 +5179,7 @@ class MotionMonitor {
      * Get status info
      *
      * @return {table} with the following keys and values:
-     *  - "flags": a table with key "inMotion"
+     *  - "flags": a table with key "inMotion"
      */
     function getStatus() {
         local res = {
@@ -6115,7 +6116,7 @@ class LocationDriver {
         // Run WiFi scanning in the background
         local scanWifiPromise = _esp.scanWiFiNetworks()
         .then(function(wifis) {
-            scannedWifis = wifis;
+            scannedWifis = wifis.len() > 0 ? wifis : null;
         }.bindenv(this), function(err) {
             ::error("Couldn't scan WiFi networks: " + err, "LocationDriver");
         }.bindenv(this));
@@ -6123,6 +6124,7 @@ class LocationDriver {
         return cm.connect()
         .then(function(_) {
             scannedTowers = BG9xCellInfo.scanCellTowers();
+            scannedTowers = (scannedTowers && scannedTowers.cellTowers.len() > 0) ? scannedTowers : null;
             // Wait until the WiFi scanning is finished (if not yet)
             return scanWifiPromise;
         }.bindenv(this), function(_) {
@@ -6479,7 +6481,9 @@ class LocationDriver {
      * - rejects if the operation failed
      */
     function _writeAssistDataToUBlox(ubxAssist) {
-        const LD_ASSIST_DATA_WRITE_TIMEOUT = 15;
+        // This timeout should be long enough to let the ubxAssist.writeAssistNow() process be finished.
+        // If it's not finished before this timeout, an unexpected write to the UART (which may be disabled) can occur
+        const LD_ASSIST_DATA_WRITE_TIMEOUT = 120;
 
         return Promise(function(resolve, reject) {
             local assistData = _readUBloxAssistData();
@@ -6505,7 +6509,7 @@ class LocationDriver {
             ::debug("Writing assist data to u-blox..", "LocationDriver");
             ubxAssist.writeAssistNow(assistData, onDone);
 
-            // NOTE: Resolve this Promise after a timeout because for some reason,
+            // NOTE: Resolve this Promise after a timeout because it's been noticed that
             // the callback is not always called by the writeAssistNow() method
             imp.wakeup(LD_ASSIST_DATA_WRITE_TIMEOUT, reject);
         }.bindenv(this));
