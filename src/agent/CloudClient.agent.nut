@@ -41,7 +41,7 @@ class CloudClient {
     _pass = null;
 
     /**
-     * Constructor for Configuration Service Class
+     * Constructor for Cloud Client Class
      *
      * @param {string} url - Cloud's URL
      * @param {string} user - Username for Basic auth

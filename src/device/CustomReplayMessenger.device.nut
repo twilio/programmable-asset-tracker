@@ -27,7 +27,7 @@
 // Maximum number of recent messages to look into when searching the maximum message ID
 const CRM_MAX_ID_SEARCH_DEPTH = 20;
 // Minimum free memory (bytes) to allow SPI flash logger reading and resending persisted messages
-const CRM_FREE_MEM_THRESHOLD = 81920;
+const CRM_FREE_MEM_THRESHOLD = 65536;
 // Custom value for MSGR_QUEUE_CHECK_INTERVAL_SEC
 const CRM_QUEUE_CHECK_INTERVAL_SEC = 1.0;
 // Custom value for RM_RESEND_RATE_LIMIT_PCT

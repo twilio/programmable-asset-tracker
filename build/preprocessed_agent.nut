@@ -275,7 +275,7 @@ class GoogleMaps {
 // SOFTWARE.
 
 // Application Version
-const APP_VERSION = "3.1.1";
+const APP_VERSION = "3.1.2";
 // MIT License
 
 // Copyright (C) 2022, Twilio, Inc. <help@twilio.com>
@@ -736,7 +736,7 @@ class CloudClient {
     _pass = null;
 
     /**
-     * Constructor for Configuration Service Class
+     * Constructor for Cloud Client Class
      *
      * @param {string} url - Cloud's URL
      * @param {string} user - Username for Basic auth
