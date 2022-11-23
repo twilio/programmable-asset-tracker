@@ -1,20 +1,18 @@
-# Prog-X Asset Tracker #
+# Programmable Asset Tracker Application #
 
-**Version of the Application: 3.1.1**
+**Version of the Application: 3.1.2**
 
-An application in Squirrel language for [Electric Imp platform](https://www.electricimp.com/platform) that implements asset tracking functionality.
-
-The requirements: [./docs/Requirements - Prog-X Asset Tracker - external-GPx.pdf](./docs/Requirements%20-%20Prog-X%20Asset%20Tracker%20-%20external-GPx.pdf)
+An application in Squirrel language for [Electric Imp platform](https://www.electricimp.com/platform) that implements Programmable Asset Tracker (PAT) functionality.
 
 This version supports:
-- Target hardware: [Prog-X Asset Tracker target board schematics](./docs/vdf-nt16e_mb_s11_220228.pdf)
+- Target hardware: [PAT target board schematics](./docs/vdf-nt16e_mb_s11_220228.pdf)
 - Communication with the Internet (between Imp-Device and Imp-Agent) via cellular network.
 - Default configuration of the asset tracker application is provided as a Device Group environment variable.
 - The configuration can be updated in runtime using the [Southbound REST API](./docs/southbound-api.md)
 - Motion start detection using Accelerometer.
 - Motion stop detection using Location tracking (+ Accelerometer for confirmation).
 - Periodic Location tracking by:
-  - Nearby BLE devices (+ BLE devices location specified in the configuration). BLE devices with [iBeacon Technology](https://developer.apple.com/ibeacon/) are supported.
+  - Nearby BLE devices (+ BLE devices location specified in the configuration). BLE devices with [iBeacon Technology](https://developer.apple.com/ibeacon/) are supported. Found BLE device with the strongest signal (based on RSSI) is used.
   - GNSS fix (u-blox NEO-M8N GNSS) (+ U-blox AssistNow data)
   - Nearby WiFi networks information (+ Google Maps Geolocation API)
   - Nearby cellular towers information (+ Google Maps Geolocation API)
@@ -83,12 +81,12 @@ For the configuration description see the [Southbound REST API](./docs/southboun
 
 Default Configuration is specified as a value of the `DEFAULT_CFG` [Environment Variable](#user-defined-environment-variables).
 
-This value must be a string which includes a valid JSON where all `"` symbols are escaped (prefixed by the `\` symbol).
+This value must be a string (one line) which includes a valid JSON where all `"` symbols are escaped (prefixed by the `\` symbol).
 
 To prepare such a string the [./tools/json2var.sh](./tools/json2var.sh) bash script can be used:
 - Run it as `./json2var.sh <json_file>`
 - Where `<json_file>` - is a valid JSON file which includes the default configuration. Note: comments are not allowed in this file.
-- The script adds the `\` symbol where needed, removes unnecessary spaces and generates the result as `"DEFAULT_CFG":"<json as string>"`
+- The script adds the `\` symbol where needed, removes unnecessary spaces and new line symbols, and generates the result in the `"DEFAULT_CFG":"<json as string>"` form.
 - The result is printed out in the console.
 - Copy&paste it as the environment variable.
 
@@ -131,7 +129,7 @@ Example of JSON with environment variables (when Cloud REST API is [emulated on 
 ## First Run Preparation #
 
 Before running the application for the first time make sure that:
-- ESP32 chip on the Prog-X Asset Tracker target board has a firmware flashed. For more details see [./docs/esp32_readme.md](./docs/esp32_readme.md)
+- ESP32 chip on the PAT target board has a firmware flashed. For more details see [./docs/esp32_readme.md](./docs/esp32_readme.md)
 - Imp-Device SPI flash is clean (has no "garbage").
 - Imp-Device [User Configuration Storage](https://developer.electricimp.com/resources/permanentstore) is clean (has no data).
 - Imp-Agent [Persistent Data](https://developer.electricimp.com/examples/agentdatapersistence) is clean (has no data).
@@ -143,8 +141,8 @@ For production devices it is assumed that the first run preparation is done by a
 For development devices, if needed, the first run preparation steps can be done manually:
 - To reflash ESP32 firmware - see [./docs/esp32_readme.md](./docs/esp32_readme.md)
 - To clean Imp-Device SPI flash - build and run the application with the `ERASE_MEMORY` [Builder Variable](#builder-variables)
-- To clean Imp-Device [User Configuration Storage](https://developer.electricimp.com/resources/permanentstore) (re-initiate the Shipping mode) - run a simple application on Imp-Device with the ["imp.setuserconfiguration(null);"](https://developer.electricimp.com/api/imp/setuserconfiguration) call before running the Prog-X Asset Tracker application.
-- To clean Imp-Agent [Persistent Data](https://developer.electricimp.com/examples/agentdatapersistence) - run a simple application on Imp-Agent with the ["server.save({});"](https://developer.electricimp.com/api/server/save) call before running the Prog-X Asset Tracker application.
+- To clean Imp-Device [User Configuration Storage](https://developer.electricimp.com/resources/permanentstore) (re-initiate the Shipping mode) - run a simple application on Imp-Device with the ["imp.setuserconfiguration(null);"](https://developer.electricimp.com/api/imp/setuserconfiguration) call before running the Asset Tracker application.
+- To clean Imp-Agent [Persistent Data](https://developer.electricimp.com/examples/agentdatapersistence) - run a simple application on Imp-Agent with the ["server.save({});"](https://developer.electricimp.com/api/server/save) call before running the Asset Tracker application.
 
 ## Build And Run ##
 

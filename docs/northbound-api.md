@@ -1,4 +1,4 @@
-# Prog-X Asset Tracker Northbound REST API #
+# Programmable Asset Tracker Northbound REST API #
 
 Sending data from the tracker to a cloud.
 
