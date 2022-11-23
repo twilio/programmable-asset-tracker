@@ -75,14 +75,14 @@ const APP_CM_CONNECT_TIMEOUT = 180.0;
 // Delay before automatic disconnection if there are no connection consumers, in seconds
 const APP_CM_AUTO_DISC_DELAY = 10.0;
 // Maximum time allowed for the imp to be connected to the server, in seconds
-const APP_CM_MAX_CONNECTED_TIME = 300.0;
+const APP_CM_MAX_CONNECTED_TIME = 180.0;
 
 // Replay Messenger configuration constants:
 // The maximum message send rate,
 // ie. the maximum number of messages the library allows to be sent in a second
-const APP_RM_MSG_SENDING_MAX_RATE = 5;
+const APP_RM_MSG_SENDING_MAX_RATE = 3;
 // The maximum number of messages to queue at any given time when replaying
-const APP_RM_MSG_RESEND_LIMIT = 5;
+const APP_RM_MSG_RESEND_LIMIT = 3;
 
 // Send buffer size, in bytes
 const APP_SEND_BUFFER_SIZE = 8192;
@@ -108,7 +108,6 @@ class Application {
 @endif
 
         ::info("Application Version: " + APP_VERSION);
-        ::debug("Wake reason: " + hardware.wakereason());
 
 @if LED_INDICATION || !defined(LED_INDICATION)
         ledIndication = LedIndication(HW_LED_RED_PIN, HW_LED_GREEN_PIN, HW_LED_BLUE_PIN);
@@ -123,6 +122,8 @@ class Application {
 
         // Keep the u-blox backup pin always on
         HW_UBLOX_BACKUP_PIN.configure(DIGITAL_OUT, 1);
+
+        _startSystemMonitoring();
 
         // Create and intialize Replay Messenger
         _initReplayMessenger()
@@ -204,6 +205,46 @@ class Application {
         return Promise(function(resolve, reject) {
             rm.init(resolve);
         }.bindenv(this));
+    }
+
+    /**
+     * Start system monitoring (boot time, wake reason, free RAM)
+     */
+    function _startSystemMonitoring() {
+        // Free RAM Checking period (only when the device is connected), in seconds
+        const APP_CHECK_FREE_MEM_PERIOD = 2.0;
+
+        local wkup = imp.wakeup.bindenv(imp);
+        local getFreeMem = imp.getmemoryfree.bindenv(imp);
+        local checkMemTimer = null;
+
+        local bootTime = time();
+        local wakeReason = hardware.wakereason();
+        local curFreeMem = getFreeMem();
+        local minFreeMem = 0x7FFFFFFF;
+
+        local checkFreeMem = function() {
+            checkMemTimer && imp.cancelwakeup(checkMemTimer);
+
+            curFreeMem = getFreeMem();
+            if (minFreeMem > curFreeMem) {
+                minFreeMem = curFreeMem;
+            }
+
+            cm.isConnected() && (checkMemTimer = wkup(APP_CHECK_FREE_MEM_PERIOD, callee()));
+        }.bindenv(this);
+
+        local onConnected = function() {
+            checkFreeMem();
+            ::info(format("Boot timestamp %i, wake reason %i, free memory: cur %i bytes, min %i bytes",
+                          bootTime,
+                          wakeReason,
+                          curFreeMem,
+                          minFreeMem));
+        }.bindenv(this);
+
+        cm.isConnected() && onConnected();
+        cm.onConnect(onConnected, "SystemMonitoring");
     }
 
     /**
