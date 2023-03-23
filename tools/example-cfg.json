@@ -1,10 +1,10 @@
 {
   "configuration": {
-    "updateId": "myDefaultCfg",
+    "updateId": "myExampleCfg",
 
     "locationTracking": {
-      "locReadingPeriod": 180.0,
-      "alwaysOn": false,
+      "locReadingPeriod": 600.0,
+      "alwaysOn": true,
 
       "motionMonitoring": {
         "enabled": true,
@@ -40,8 +40,8 @@
       }
     },
 
-    "connectingPeriod": 180.0,
-    "readingPeriod": 60.0,
+    "connectingPeriod": 600.0,
+    "readingPeriod": 120.0,
 
     "alerts": {
       "shockDetected" : {
